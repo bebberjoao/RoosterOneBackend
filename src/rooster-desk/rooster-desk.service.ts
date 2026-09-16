@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
+import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
 import { CreateMensagemChamadoDto } from './dto/rooster-desk.dto';
 
 type DeskModel =
@@ -16,7 +17,10 @@ type DeskModel =
 
 @Injectable()
 export class RoosterDeskService implements OnModuleInit {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly usuariosService: UsuariosService,
+  ) {}
 
   async onModuleInit() {
     const seed = [
@@ -89,7 +93,7 @@ export class RoosterDeskService implements OnModuleInit {
     const isAdmin = await this.isAdmin(usuarioId);
     return this.prisma.usuario.findMany({
       where: { ativo: true, ...(isAdmin ? {} : { setores: { some: { setorId: { in: sectorIds } } } }) },
-      include: { setores: { include: { setor: true } }, perfis: { include: { perfil: true } } },
+      include: { setores: { include: { setor: true } } },
       orderBy: { nome: 'asc' },
     });
   }
@@ -152,8 +156,7 @@ export class RoosterDeskService implements OnModuleInit {
   }
 
   private async isAdmin(usuarioId: string) {
-    const user = await this.prisma.usuario.findUnique({ where: { id: usuarioId }, include: { perfis: { include: { perfil: true } } } });
-    return Boolean(user?.perfis.some((profile) => profile.perfil.nome === 'Administrador'));
+    return this.usuariosService.isAdmin(usuarioId);
   }
 
   async findTicketsForUser(usuarioId: string, isAdmin: boolean) {

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, ForbiddenException, Get, Headers, Param, Patch, Post, Query, Req, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query, Req, UseGuards, NotFoundException } from '@nestjs/common';
 import type { Request } from 'express';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
@@ -13,9 +13,17 @@ import {
 import { RoosterDeskService } from './rooster-desk.service';
 import { MensagensGateway } from './mensagens.gateway';
 import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
+import { PermissionGuard } from '../auth/permission.guard';
+import { RequirePermission } from '../auth/require-permission.decorator';
+
+const MODULO = 'Rooster Desk';
+const TELA_TICKETS = '/desk/tickets';
+const TELA_CATEGORIES = '/desk/categories';
+const TELA_TEAM = '/desk/team';
 
 @ApiTags('Rooster Desk')
 @Controller()
+@UseGuards(PermissionGuard)
 export class RoosterDeskController {
   constructor(
     private readonly service: RoosterDeskService,
@@ -26,39 +34,42 @@ export class RoosterDeskController {
   @Post('chamados-categorias')
   async createCategoria(@Req() request: Request, @Body() dto: CreateCategoriaTicketDto) {
     const usuarioId = (request.user as { id: string } | undefined)?.id;
-    await this.requireManagement(usuarioId, 'setor', dto.setorId);
+    await this.requireManagement(usuarioId, 'criar', 'setor', dto.setorId);
     return this.service.create('categoriaTicket', dto);
   }
   @Post('categorias-tickets')
   createCategoriaAlias(@Req() request: Request, @Body() dto: CreateCategoriaTicketDto) { return this.createCategoria(request, dto); }
   @Get('chamados-categorias')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
   async findCategorias(@Req() request: Request) { return this.service.findCategoriesForUser((request.user as { id: string }).id); }
   @Get('categorias-tickets')
   findCategoriasAlias(@Req() request: Request) { return this.findCategorias(request); }
   @Get('chamados-atendentes')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
   findAgents(@Req() request: Request) { return this.service.findAgentsForUser((request.user as { id: string }).id); }
   @Get('chamados-setores')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
   async findSectors(@Req() request: Request) {
     const agents = await this.service.findAgentsForUser((request.user as { id: string }).id);
     return [...new Set(agents.flatMap((agent) => agent.setores.map((sector) => sector.setor.nome)))];
   }
   @Get('chamados-categorias/:id')
   async findCategoria(@Req() request: Request, @Param('id') id: string) {
-    await this.requireManagement((request.user as { id: string }).id, 'categoria', id);
+    await this.requireManagement((request.user as { id: string }).id, 'editar', 'categoria', id);
     return this.service.findOne('categoriaTicket', id);
   }
   @Get('categorias-tickets/:id')
   findCategoriaAlias(@Req() request: Request, @Param('id') id: string) { return this.findCategoria(request, id); }
   @Patch('chamados-categorias/:id') async updateCategoria(@Req() request: Request, @Param('id') id: string, @Body() dto: UpdateCategoriaTicketDto) {
     const usuarioId = (request.user as { id: string }).id;
-    await this.requireManagement(usuarioId, 'categoria', id);
-    if (dto.setorId) await this.requireManagement(usuarioId, 'setor', dto.setorId);
+    await this.requireManagement(usuarioId, 'editar', 'categoria', id);
+    if (dto.setorId) await this.requireManagement(usuarioId, 'editar', 'setor', dto.setorId);
     return this.service.update('categoriaTicket', id, dto);
   }
   @Patch('categorias-tickets/:id')
   updateCategoriaAlias(@Req() request: Request, @Param('id') id: string, @Body() dto: UpdateCategoriaTicketDto) { return this.updateCategoria(request, id, dto); }
   @Delete('chamados-categorias/:id') async removeCategoria(@Req() request: Request, @Param('id') id: string) {
-    await this.requireManagement((request.user as { id: string }).id, 'categoria', id);
+    await this.requireManagement((request.user as { id: string }).id, 'excluir', 'categoria', id);
     return this.service.remove('categoriaTicket', id);
   }
   @Delete('categorias-tickets/:id')
@@ -67,18 +78,19 @@ export class RoosterDeskController {
   @Post('chamados-subcategorias')
   async createSubcategoria(@Req() request: Request, @Body() dto: CreateSubcategoriaTicketDto) {
     const usuarioId = (request.user as { id: string } | undefined)?.id;
-    await this.requireManagement(usuarioId, 'subcategoria', dto.categoriaId);
+    await this.requireManagement(usuarioId, 'subcategorias', 'subcategoria', dto.categoriaId);
     return this.service.create('subcategoriaTicket', dto);
   }
   @Post('subcategorias-tickets')
   createSubcategoriaAlias(@Req() request: Request, @Body() dto: CreateSubcategoriaTicketDto) { return this.createSubcategoria(request, dto); }
   @Get('chamados-subcategorias')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
   findSubcategorias(@Req() request: Request) { return this.service.findSubcategoriesForUser((request.user as { id: string }).id); }
   @Get('subcategorias-tickets')
   findSubcategoriasAlias(@Req() request: Request) { return this.findSubcategorias(request); }
   @Get('chamados-subcategorias/:id')
   async findSubcategoria(@Req() request: Request, @Param('id') id: string) {
-    await this.requireManagement((request.user as { id: string }).id, 'subcategoria', id);
+    await this.requireManagement((request.user as { id: string }).id, 'subcategorias', 'subcategoria', id);
     return this.service.findOne('subcategoriaTicket', id);
   }
   @Get('subcategorias-tickets/:id')
@@ -86,121 +98,137 @@ export class RoosterDeskController {
   @Patch('chamados-subcategorias/:id')
   async updateSubcategoria(@Req() request: Request, @Param('id') id: string, @Body() dto: UpdateSubcategoriaTicketDto) {
     const usuarioId = (request.user as { id: string }).id;
-    await this.requireManagement(usuarioId, 'subcategoria', id);
-    if (dto.categoriaId) await this.requireManagement(usuarioId, 'categoria', dto.categoriaId);
+    await this.requireManagement(usuarioId, 'subcategorias', 'subcategoria', id);
+    if (dto.categoriaId) await this.requireManagement(usuarioId, 'subcategorias', 'categoria', dto.categoriaId);
     return this.service.update('subcategoriaTicket', id, dto);
   }
   @Patch('subcategorias-tickets/:id')
   updateSubcategoriaAlias(@Req() request: Request, @Param('id') id: string, @Body() dto: UpdateSubcategoriaTicketDto) { return this.updateSubcategoria(request, id, dto); }
   @Delete('chamados-subcategorias/:id') async removeSubcategoria(@Req() request: Request, @Param('id') id: string) {
-    await this.requireManagement((request.user as { id: string }).id, 'subcategoria', id);
+    await this.requireManagement((request.user as { id: string }).id, 'subcategorias', 'subcategoria', id);
     return this.service.remove('subcategoriaTicket', id);
   }
   @Delete('subcategorias-tickets/:id')
   removeSubcategoriaAlias(@Req() request: Request, @Param('id') id: string) { return this.removeSubcategoria(request, id); }
 
+  // Prioridades e status são taxonomia global (não pertencem a um setor específico);
+  // não há tela própria no catálogo, então ficam sob a mesma permissão de categorias.
   @Post('prioridades-tickets')
+  @RequirePermission(MODULO, TELA_CATEGORIES, 'editar')
   createPrioridade(@Body() dto: CreateCategoriaTicketDto) { return this.service.create('prioridadeTicket', dto as any); }
   @Get('chamados-prioridades')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
   findPrioridades() { return this.service.findAll('prioridadeTicket'); }
   @Get('prioridades-tickets')
   findPrioridadesAlias() { return this.findPrioridades(); }
-  @Get('chamados-prioridades/:id') findPrioridade(@Param('id') id: string) { return this.service.findOne('prioridadeTicket', id); }
+  @Get('chamados-prioridades/:id')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
+  findPrioridade(@Param('id') id: string) { return this.service.findOne('prioridadeTicket', id); }
   @Get('prioridades-tickets/:id')
   findPrioridadeAlias(@Param('id') id: string) { return this.findPrioridade(id); }
   @Patch('prioridades-tickets/:id')
+  @RequirePermission(MODULO, TELA_CATEGORIES, 'editar')
   updatePrioridade(@Param('id') id: string, @Body() dto: UpdateCategoriaTicketDto) { return this.service.update('prioridadeTicket', id, dto as any); }
   @Delete('prioridades-tickets/:id')
+  @RequirePermission(MODULO, TELA_CATEGORIES, 'editar')
   removePrioridade(@Param('id') id: string) { return this.service.remove('prioridadeTicket', id); }
 
   @Post('chamados-status')
+  @RequirePermission(MODULO, TELA_CATEGORIES, 'editar')
   createStatus(@Body() dto: CreateStatusTicketDto) { return this.service.create('statusTicket', dto); }
   @Post('status-tickets')
   createStatusAlias(@Body() dto: CreateStatusTicketDto) { return this.createStatus(dto); }
   @Get('chamados-status')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
   findStatus() { return this.service.findAll('statusTicket'); }
   @Get('status-tickets')
   findStatusAlias() { return this.findStatus(); }
-  @Get('chamados-status/:id') findOneStatus(@Param('id') id: string) { return this.service.findOne('statusTicket', id); }
+  @Get('chamados-status/:id')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
+  findOneStatus(@Param('id') id: string) { return this.service.findOne('statusTicket', id); }
   @Get('status-tickets/:id')
   findOneStatusAlias(@Param('id') id: string) { return this.findOneStatus(id); }
-  @Patch('chamados-status/:id') updateStatus(@Param('id') id: string, @Body() dto: UpdateStatusTicketDto) { return this.service.update('statusTicket', id, dto); }
+  @Patch('chamados-status/:id')
+  @RequirePermission(MODULO, TELA_CATEGORIES, 'editar')
+  updateStatus(@Param('id') id: string, @Body() dto: UpdateStatusTicketDto) { return this.service.update('statusTicket', id, dto); }
   @Patch('status-tickets/:id')
   updateStatusAlias(@Param('id') id: string, @Body() dto: UpdateStatusTicketDto) { return this.updateStatus(id, dto); }
-  @Delete('chamados-status/:id') removeStatus(@Param('id') id: string) { return this.service.remove('statusTicket', id); }
+  @Delete('chamados-status/:id')
+  @RequirePermission(MODULO, TELA_CATEGORIES, 'editar')
+  removeStatus(@Param('id') id: string) { return this.service.remove('statusTicket', id); }
   @Delete('status-tickets/:id')
   removeStatusAlias(@Param('id') id: string) { return this.removeStatus(id); }
 
   @Post('chamados')
+  @RequirePermission(MODULO, TELA_TICKETS, 'criar')
   @ApiOperation({ summary: 'Cria um chamado' })
   @ApiBody({ type: CreateTicketDto })
-  async createTicket(@Req() request: Request, @Headers('x-user-id') _headerUserId: string | undefined, @Body() dto: CreateTicketDto) {
-    const usuarioId = (request.user as { id: string } | undefined)?.id;
-    if (!usuarioId) throw new UnauthorizedException('Informe o usuário no cabeçalho x-user-id.');
-    if (!(await this.usuariosService.hasPermission(usuarioId, 'Rooster Desk', 'ticket', 'create'))) {
-      throw new ForbiddenException('Usuário sem permissão para criar tickets.');
-    }
+  async createTicket(@Req() request: Request, @Body() dto: CreateTicketDto) {
+    const usuarioId = (request.user as { id: string }).id;
     await this.service.validateTicketClassification(dto.categoriaId, dto.subcategoriaId);
     return this.service.createTicket({ ...dto, usuarioId });
   }
 
   @Post('tickets')
-  async createTicketAlias(@Req() request: Request, @Headers('x-user-id') headerUserId: string | undefined, @Body() dto: CreateTicketDto) {
-    return this.createTicket(request, headerUserId, dto);
+  @RequirePermission(MODULO, TELA_TICKETS, 'criar')
+  async createTicketAlias(@Req() request: Request, @Body() dto: CreateTicketDto) {
+    return this.createTicket(request, dto);
   }
 
   @Get('chamados')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
   @ApiOperation({ summary: 'Lista chamados' })
-  async findTickets(@Req() request: Request, @Headers('x-user-id') _headerUserId: string | undefined) {
-    const usuarioId = (request.user as { id: string } | undefined)?.id;
-    await this.requirePermission(usuarioId, 'view');
-    return this.service.findTicketsForUser(usuarioId!, await this.usuariosService.isAdmin(usuarioId!));
+  async findTickets(@Req() request: Request) {
+    const usuarioId = (request.user as { id: string }).id;
+    return this.service.findTicketsForUser(usuarioId, await this.usuariosService.isAdmin(usuarioId));
   }
 
   @Get('tickets')
-  async findTicketsAlias(@Req() request: Request, @Headers('x-user-id') headerUserId: string | undefined) {
-    return this.findTickets(request, headerUserId);
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
+  async findTicketsAlias(@Req() request: Request) {
+    return this.findTickets(request);
   }
 
   @Get('chamados/:id')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
   @ApiOperation({ summary: 'Consulta um chamado' })
-  async findTicket(@Req() request: Request, @Headers('x-user-id') _headerUserId: string | undefined, @Param('id') id: string) {
-    const usuarioId = (request.user as { id: string } | undefined)?.id;
-    await this.requirePermission(usuarioId, 'view');
-    if (!(await this.service.canViewTicket(id, usuarioId!, await this.usuariosService.isAdmin(usuarioId!)))) throw new NotFoundException('Chamado não encontrado.');
+  async findTicket(@Req() request: Request, @Param('id') id: string) {
+    const usuarioId = (request.user as { id: string }).id;
+    if (!(await this.service.canViewTicket(id, usuarioId, await this.usuariosService.isAdmin(usuarioId)))) throw new NotFoundException('Chamado não encontrado.');
     return this.service.findOne('ticket', id);
   }
 
   @Get('tickets/:id')
-  async findTicketAlias(@Req() request: Request, @Headers('x-user-id') headerUserId: string | undefined, @Param('id') id: string) {
-    return this.findTicket(request, headerUserId, id);
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
+  async findTicketAlias(@Req() request: Request, @Param('id') id: string) {
+    return this.findTicket(request, id);
   }
 
   @Patch('chamados/:id')
   @ApiOperation({ summary: 'Atualiza um chamado' })
   @ApiBody({ type: UpdateTicketDto })
-  async updateTicket(@Req() request: Request, @Headers('x-user-id') _headerUserId: string | undefined, @Param('id') id: string, @Body() dto: UpdateTicketDto) {
-    const usuarioId = (request.user as { id: string } | undefined)?.id;
-    if (!usuarioId) throw new UnauthorizedException('Informe o usuário no cabeçalho x-user-id.');
+  async updateTicket(@Req() request: Request, @Param('id') id: string, @Body() dto: UpdateTicketDto) {
+    const usuarioId = (request.user as { id: string }).id;
+    const current = await this.service.findOne('ticket', id);
     const status = dto.statusId ? await this.service.findStatus(dto.statusId) : null;
-    const sensitiveChange = dto.statusId || dto.categoriaId || dto.subcategoriaId || dto.encerradoEm;
+    const sensitiveChange = Boolean(dto.statusId || dto.categoriaId || dto.subcategoriaId || dto.encerradoEm);
     if (sensitiveChange && await this.service.isTicketOwner(id, usuarioId) && !(await this.usuariosService.isAdmin(usuarioId))) {
       throw new ForbiddenException('O solicitante não pode alterar status, categoria ou encerrar o próprio chamado.');
     }
     if (dto.categoriaId || dto.subcategoriaId) {
-      const current = await this.service.findOne('ticket', id);
       await this.service.validateTicketClassification(dto.categoriaId ?? current.categoriaId, dto.subcategoriaId ?? current.subcategoriaId);
     }
-    await this.requirePermission(usuarioId, status && ['Resolvido', 'Encerrado'].includes(status.nome) ? 'resolve' : 'update');
+    await this.requireTicketAction(usuarioId, await this.statusTransitionAction(current.status?.encerrado, status));
     return this.service.update('ticket', id, dto);
   }
 
   @Patch('tickets/:id')
-  async updateTicketAlias(@Req() request: Request, @Headers('x-user-id') headerUserId: string | undefined, @Param('id') id: string, @Body() dto: UpdateTicketDto) {
-    return this.updateTicket(request, headerUserId, id, dto);
+  async updateTicketAlias(@Req() request: Request, @Param('id') id: string, @Body() dto: UpdateTicketDto) {
+    return this.updateTicket(request, id, dto);
   }
 
   @Delete('chamados/:id')
+  @RequirePermission(MODULO, TELA_CATEGORIES, 'excluir')
   removeTicket(@Param('id') id: string) { return this.service.remove('ticket', id); }
 
   @Delete('tickets/:id')
@@ -209,20 +237,22 @@ export class RoosterDeskController {
   @Patch('chamados/:id/status')
   @ApiOperation({ summary: 'Atualiza somente o status de um chamado' })
   @ApiBody({ type: UpdateTicketDto })
-  async updateTicketStatus(@Req() request: Request, @Headers('x-user-id') _headerUserId: string | undefined, @Param('id') id: string, @Body() dto: UpdateTicketDto) {
-    const usuarioId = (request.user as { id: string } | undefined)?.id;
-    if (await this.service.isTicketOwner(id, usuarioId!) && !(await this.usuariosService.isAdmin(usuarioId!))) {
+  async updateTicketStatus(@Req() request: Request, @Param('id') id: string, @Body() dto: UpdateTicketDto) {
+    const usuarioId = (request.user as { id: string }).id;
+    if (await this.service.isTicketOwner(id, usuarioId) && !(await this.usuariosService.isAdmin(usuarioId))) {
       throw new ForbiddenException('O solicitante não pode alterar o status do próprio chamado.');
     }
-    await this.requirePermission(usuarioId, 'update');
+    const current = await this.service.findOne('ticket', id);
+    const status = dto.statusId ? await this.service.findStatus(dto.statusId) : null;
+    await this.requireTicketAction(usuarioId, await this.statusTransitionAction(current.status?.encerrado, status));
     return this.service.update('ticket', id, { statusId: dto.statusId, encerradoEm: dto.encerradoEm });
   }
 
   @Patch('chamados/:id/atribuir')
+  @RequirePermission(MODULO, TELA_TICKETS, 'transferir')
   async assignTicket(@Req() request: Request, @Param('id') id: string, @Body() dto: AssignTicketDto) {
-    const usuarioId = (request.user as { id: string } | undefined)?.id;
-    await this.requirePermission(usuarioId, 'update');
-    if (!(await this.service.canManageTicket(id, usuarioId!, dto.tecnicoId))) {
+    const usuarioId = (request.user as { id: string }).id;
+    if (!(await this.service.canManageTicket(id, usuarioId, dto.tecnicoId))) {
       throw new ForbiddenException('O atendente deve pertencer ao setor do chamado.');
     }
     return this.service.update('ticket', id, { tecnicoId: dto.tecnicoId });
@@ -231,24 +261,37 @@ export class RoosterDeskController {
   @Patch('chamados-subcategorias/:id/atendentes')
   async assignSubcategoryAgents(@Req() request: Request, @Param('id') id: string, @Body() dto: AssignSubcategoryAgentsDto) {
     const usuarioId = (request.user as { id: string } | undefined)?.id;
-    await this.requireManagement(usuarioId, 'atendentes', id);
+    await this.requireManagement(usuarioId, 'vincular-categoria', 'atendentes', id, TELA_TEAM);
     return this.service.setSubcategoryAgents(id, dto.usuarioIds, usuarioId!);
   }
 
-  private async requireManagement(usuarioId: string | undefined, resource: string, referenceId?: string) {
-    if (!usuarioId || !(await this.usuariosService.canManageDeskConfiguration(usuarioId))) throw new ForbiddenException('Sem permissão para gerenciar a configuração do Desk.');
+  /** Regra do Desk: o gestor precisa da permissão da tela e o recurso precisa pertencer ao setor dele. */
+  private async requireManagement(usuarioId: string | undefined, acao: string, resource: string, referenceId?: string, tela = TELA_CATEGORIES) {
+    if (!usuarioId || !(await this.usuariosService.hasPermission(usuarioId, MODULO, tela, acao))) {
+      throw new ForbiddenException('Sem permissão para gerenciar a configuração do Desk.');
+    }
     if (!referenceId) throw new ForbiddenException('Informe o setor ou recurso relacionado.');
-    if (referenceId && !(await this.service.isReferenceInUserSector(resource, referenceId, usuarioId))) throw new ForbiddenException('O recurso pertence a outro setor.');
-  }
-
-  private async requirePermission(usuarioId: string | undefined, acao: 'view' | 'update' | 'resolve') {
-    if (!usuarioId) throw new UnauthorizedException('Informe o usuário no cabeçalho x-user-id.');
-    if (!(await this.usuariosService.hasPermission(usuarioId, 'Rooster Desk', 'ticket', acao))) {
-      throw new ForbiddenException(`Usuário sem permissão para ${acao} tickets.`);
+    if (!(await this.service.isReferenceInUserSector(resource, referenceId, usuarioId))) {
+      throw new ForbiddenException('O recurso pertence a outro setor.');
     }
   }
 
+  private async requireTicketAction(usuarioId: string, acao: string) {
+    if (!(await this.usuariosService.hasPermission(usuarioId, MODULO, TELA_TICKETS, acao))) {
+      throw new ForbiddenException(`Sem permissão para ${acao} em chamados.`);
+    }
+  }
+
+  /** Traduz uma mudança de status em ação do catálogo: fechar, reabrir ou apenas editar. */
+  private async statusTransitionAction(estavaEncerrado: boolean | undefined, novoStatus: { encerrado: boolean } | null) {
+    if (!novoStatus) return 'editar';
+    if (novoStatus.encerrado) return 'encerrar';
+    if (estavaEncerrado) return 'reabrir';
+    return 'editar';
+  }
+
   @Get('chamados/:id/mensagens')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
   @ApiOperation({ summary: 'Lista a conversa do chamado, paginada (mais recentes primeiro internamente, devolvidas em ordem cronológica)' })
   async findMensagensChamado(
     @Req() request: Request,
@@ -256,8 +299,7 @@ export class RoosterDeskController {
     @Query('antes') antes?: string,
     @Query('limite') limite?: string,
   ) {
-    const usuarioId = (request.user as { id: string } | undefined)?.id;
-    if (!usuarioId) throw new UnauthorizedException('Informe o usuário no cabeçalho x-user-id.');
+    const usuarioId = (request.user as { id: string }).id;
     const isAdmin = await this.usuariosService.isAdmin(usuarioId);
     return this.service.getMensagensChamado(id, usuarioId, isAdmin, {
       antes,
@@ -266,6 +308,7 @@ export class RoosterDeskController {
   }
 
   @Post('chamados/:id/mensagens')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
   @ApiOperation({ summary: 'Envia uma mensagem (ou nota interna) no chamado' })
   @ApiBody({ type: CreateMensagemChamadoDto })
   async createMensagemChamado(
@@ -273,31 +316,64 @@ export class RoosterDeskController {
     @Param('id') id: string,
     @Body() dto: CreateMensagemChamadoDto,
   ) {
-    const usuarioId = (request.user as { id: string } | undefined)?.id;
-    if (!usuarioId) throw new UnauthorizedException('Informe o usuário no cabeçalho x-user-id.');
+    const usuarioId = (request.user as { id: string }).id;
     const isAdmin = await this.usuariosService.isAdmin(usuarioId);
-    const podeGerenciar = await this.usuariosService.hasPermission(usuarioId, 'Rooster Desk', 'ticket', 'update');
+    const podeGerenciar = await this.usuariosService.hasPermission(usuarioId, MODULO, TELA_TICKETS, 'editar');
+    if (dto.interno && !isAdmin && !(await this.usuariosService.hasPermission(usuarioId, MODULO, TELA_TICKETS, 'nota-interna'))) {
+      throw new ForbiddenException('Sem permissão para registrar nota interna.');
+    }
     const mensagem = await this.service.createMensagemChamado(id, usuarioId, isAdmin, podeGerenciar, dto);
     // emite depois que a transação já commitou — o REST continua sendo a fonte da verdade
     this.mensagensGateway.emitirNovaMensagem(id, mensagem);
     return mensagem;
   }
 
-  @Post('anexos-tickets') createAnexo(@Body() dto: CreateAnexoTicketDto) { return this.service.create('anexoTicket', dto); }
-  @Get('anexos-tickets') findAnexos() { return this.service.findAll('anexoTicket'); }
-  @Get('anexos-tickets/:id') findAnexo(@Param('id') id: string) { return this.service.findOne('anexoTicket', id); }
-  @Patch('anexos-tickets/:id') updateAnexo(@Param('id') id: string, @Body() dto: UpdateAnexoTicketDto) { return this.service.update('anexoTicket', id, dto); }
-  @Delete('anexos-tickets/:id') removeAnexo(@Param('id') id: string) { return this.service.remove('anexoTicket', id); }
+  @Post('anexos-tickets')
+  @RequirePermission(MODULO, TELA_TICKETS, 'anexar')
+  createAnexo(@Body() dto: CreateAnexoTicketDto) { return this.service.create('anexoTicket', dto); }
+  @Get('anexos-tickets')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
+  findAnexos() { return this.service.findAll('anexoTicket'); }
+  @Get('anexos-tickets/:id')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
+  findAnexo(@Param('id') id: string) { return this.service.findOne('anexoTicket', id); }
+  @Patch('anexos-tickets/:id')
+  @RequirePermission(MODULO, TELA_TICKETS, 'anexar')
+  updateAnexo(@Param('id') id: string, @Body() dto: UpdateAnexoTicketDto) { return this.service.update('anexoTicket', id, dto); }
+  @Delete('anexos-tickets/:id')
+  @RequirePermission(MODULO, TELA_TICKETS, 'anexar')
+  removeAnexo(@Param('id') id: string) { return this.service.remove('anexoTicket', id); }
 
-  @Post('historico-tickets') createHistorico(@Body() dto: CreateHistoricoTicketDto) { return this.service.create('historicoTicket', dto); }
-  @Get('historico-tickets') findHistorico() { return this.service.findAll('historicoTicket'); }
-  @Get('historico-tickets/:id') findOneHistorico(@Param('id') id: string) { return this.service.findOne('historicoTicket', id); }
-  @Patch('historico-tickets/:id') updateHistorico(@Param('id') id: string, @Body() dto: UpdateHistoricoTicketDto) { return this.service.update('historicoTicket', id, dto); }
-  @Delete('historico-tickets/:id') removeHistorico(@Param('id') id: string) { return this.service.remove('historicoTicket', id); }
+  // Histórico é gerado a partir de outras ações; a API crua fica restrita à gestão do Desk.
+  @Post('historico-tickets')
+  @RequirePermission(MODULO, TELA_CATEGORIES, 'editar')
+  createHistorico(@Body() dto: CreateHistoricoTicketDto) { return this.service.create('historicoTicket', dto); }
+  @Get('historico-tickets')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
+  findHistorico() { return this.service.findAll('historicoTicket'); }
+  @Get('historico-tickets/:id')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
+  findOneHistorico(@Param('id') id: string) { return this.service.findOne('historicoTicket', id); }
+  @Patch('historico-tickets/:id')
+  @RequirePermission(MODULO, TELA_CATEGORIES, 'editar')
+  updateHistorico(@Param('id') id: string, @Body() dto: UpdateHistoricoTicketDto) { return this.service.update('historicoTicket', id, dto); }
+  @Delete('historico-tickets/:id')
+  @RequirePermission(MODULO, TELA_CATEGORIES, 'editar')
+  removeHistorico(@Param('id') id: string) { return this.service.remove('historicoTicket', id); }
 
-  @Post('avaliacoes-tickets') createAvaliacao(@Body() dto: CreateAvaliacaoTicketDto) { return this.service.create('avaliacaoTicket', dto); }
-  @Get('avaliacoes-tickets') findAvaliacoes() { return this.service.findAll('avaliacaoTicket'); }
-  @Get('avaliacoes-tickets/:id') findAvaliacao(@Param('id') id: string) { return this.service.findOne('avaliacaoTicket', id); }
-  @Patch('avaliacoes-tickets/:id') updateAvaliacao(@Param('id') id: string, @Body() dto: UpdateAvaliacaoTicketDto) { return this.service.update('avaliacaoTicket', id, dto); }
-  @Delete('avaliacoes-tickets/:id') removeAvaliacao(@Param('id') id: string) { return this.service.remove('avaliacaoTicket', id); }
+  @Post('avaliacoes-tickets')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
+  createAvaliacao(@Body() dto: CreateAvaliacaoTicketDto) { return this.service.create('avaliacaoTicket', dto); }
+  @Get('avaliacoes-tickets')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
+  findAvaliacoes() { return this.service.findAll('avaliacaoTicket'); }
+  @Get('avaliacoes-tickets/:id')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
+  findAvaliacao(@Param('id') id: string) { return this.service.findOne('avaliacaoTicket', id); }
+  @Patch('avaliacoes-tickets/:id')
+  @RequirePermission(MODULO, TELA_CATEGORIES, 'editar')
+  updateAvaliacao(@Param('id') id: string, @Body() dto: UpdateAvaliacaoTicketDto) { return this.service.update('avaliacaoTicket', id, dto); }
+  @Delete('avaliacoes-tickets/:id')
+  @RequirePermission(MODULO, TELA_CATEGORIES, 'editar')
+  removeAvaliacao(@Param('id') id: string) { return this.service.remove('avaliacaoTicket', id); }
 }

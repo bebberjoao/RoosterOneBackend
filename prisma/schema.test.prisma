@@ -20,7 +20,7 @@ model Usuario {
   criadoEm      DateTime?
   atualizadoEm  DateTime?
 
-  perfis        UsuarioPerfil[]
+  permissoes    UsuarioPermissao[]
   setores       UsuarioSetor[]
   notificacoes  Notificacao[]
   sessoes       Sessao[]
@@ -41,17 +41,7 @@ model Setor {
   criadoEm    DateTime?
 
   usuarios    UsuarioSetor[]
-}
-
-model Perfil {
-  id          String   @id @default(uuid())
-  nome        String   @unique
-  descricao   String?
-  ativo       Boolean  @default(true)
-  criadoEm    DateTime?
-
-  usuarios    UsuarioPerfil[]
-  permissoes  PerfilPermissao[]
+  categorias  CategoriaTicket[]
 }
 
 model Modulo {
@@ -75,17 +65,19 @@ model Permissao {
   criadoEm    DateTime?
 
   modulo      Modulo? @relation(fields: [moduloId], references: [id])
-  perfis      PerfilPermissao[]
+  usuarios    UsuarioPermissao[]
 }
 
-model UsuarioPerfil {
+model UsuarioPermissao {
   id          String   @id @default(uuid())
   usuarioId   String
-  perfilId    String
+  permissaoId String
   criadoEm    DateTime?
 
-  usuario     Usuario @relation(fields: [usuarioId], references: [id])
-  perfil      Perfil @relation(fields: [perfilId], references: [id])
+  usuario     Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  permissao   Permissao @relation(fields: [permissaoId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, permissaoId])
 }
 
 model UsuarioSetor {
@@ -96,16 +88,6 @@ model UsuarioSetor {
 
   usuario     Usuario @relation(fields: [usuarioId], references: [id])
   setor       Setor   @relation(fields: [setorId], references: [id])
-}
-
-model PerfilPermissao {
-  id            String   @id @default(uuid())
-  perfilId      String
-  permissaoId   String
-  criadoEm      DateTime?
-
-  perfil        Perfil     @relation(fields: [perfilId], references: [id])
-  permissao     Permissao  @relation(fields: [permissaoId], references: [id])
 }
 
 model Notificacao {
@@ -151,9 +133,12 @@ model CategoriaTicket {
   nome String
   descricao String?
   ativo Boolean @default(true)
+  slaHoras Int @default(8)
+  setorId String?
   criadoEm DateTime?
   subcategorias SubcategoriaTicket[]
   tickets Ticket[]
+  setor Setor? @relation(fields: [setorId], references: [id])
 }
 
 model SubcategoriaTicket {

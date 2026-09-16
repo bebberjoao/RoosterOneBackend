@@ -4,9 +4,10 @@ import { AuthController, UsuariosController } from './usuarios.controller';
 import { UsuariosService } from './usuarios.service';
 import { PermissionGuard } from '../../auth/permission.guard';
 import { JwtModule } from '@nestjs/jwt';
+import { jwtModuleOptions } from '../../auth/jwt-config';
 
 @Module({
-  imports: [PrismaModule, JwtModule.register({ secret: process.env.JWT_SECRET ?? 'rooster-dev-secret-change-me' })],
+  imports: [PrismaModule, JwtModule.register(jwtModuleOptions())],
   controllers: [AuthController, UsuariosController],
   providers: [UsuariosService, PermissionGuard],
   exports: [UsuariosService],

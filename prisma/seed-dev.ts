@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
+const SALT_ROUNDS = 10;
 
 const ids = {
   users: {
@@ -14,18 +16,6 @@ const ids = {
     coordenadorSecretaria: '10000000-0000-4000-8000-000000000008',
     coordenadorSuporte: '10000000-0000-4000-8000-000000000009',
     coordenadorCoordenacao: '10000000-0000-4000-8000-000000000010',
-  },
-  profiles: {
-    solicitante: '20000000-0000-0000-0000-000000000001',
-    atendente: '20000000-0000-0000-0000-000000000002',
-    visualizador: '20000000-0000-0000-0000-000000000003',
-    admin: '20000000-0000-4000-8000-000000000004',
-    atendenteSecretaria: '20000000-0000-4000-8000-000000000005',
-    atendenteSuporte: '20000000-0000-4000-8000-000000000006',
-    atendenteCoordenacao: '20000000-0000-4000-8000-000000000007',
-    coordenadorSecretaria: '20000000-0000-4000-8000-000000000008',
-    coordenadorSuporte: '20000000-0000-4000-8000-000000000009',
-    coordenadorCoordenacao: '20000000-0000-4000-8000-000000000010',
   },
   sectors: {
     secretaria: '30000000-0000-0000-0000-000000000001',
@@ -102,68 +92,85 @@ function diaFuturo(diasAdiante: number): Date {
   return d;
 }
 
-const permissionDefinitions = [
-  ['ticket.view', 'Visualizar tickets', 'ticket', 'view'],
-  ['ticket.create', 'Criar tickets', 'ticket', 'create'],
-  ['ticket.update', 'Atualizar tickets', 'ticket', 'update'],
-  ['ticket.resolve', 'Resolver tickets', 'ticket', 'resolve'],
-  ['ticket.assign', 'Atribuir tickets', 'ticket', 'assign'],
-  ['category.view', 'Visualizar categorias', 'categoria-ticket', 'view'],
-  ['subcategory.view', 'Visualizar subcategorias', 'subcategoria-ticket', 'view'],
-  ['priority.view', 'Visualizar prioridades', 'prioridade-ticket', 'view'],
-  ['status.view', 'Visualizar status', 'status-ticket', 'view'],
-  ['message.view', 'Visualizar mensagens', 'mensagem-ticket', 'view'],
-  ['message.create', 'Adicionar mensagens', 'mensagem-ticket', 'create'],
-  ['attachment.view', 'Visualizar anexos', 'anexo-ticket', 'view'],
-  ['attachment.create', 'Adicionar anexos', 'anexo-ticket', 'create'],
-  ['history.view', 'Visualizar histórico', 'historico-ticket', 'view'],
-  ['history.create', 'Registrar histórico', 'historico-ticket', 'create'],
-  ['evaluation.view', 'Visualizar avaliações', 'avaliacao-ticket', 'view'],
-  ['evaluation.create', 'Avaliar tickets', 'avaliacao-ticket', 'create'],
-  ['category.create', 'Criar categorias', 'categoria-ticket', 'create'],
-  ['subcategory.create', 'Criar subcategorias', 'subcategoria-ticket', 'create'],
-  ['desk-config.manage', 'Gerenciar configuração do Desk', 'desk-config', 'manage'],
-] as const;
-
 /**
- * Rooms e Assets não tinham autorização nenhuma (qualquer usuário logado
- * aprovava reserva, dava baixa em patrimônio, etc). Este conjunto fecha
- * isso: view/create/manage por recurso, mais duas ações de negócio
- * (`approve` em reserva, `baixa` em patrimônio) que ficam reservadas pra
- * quem coordena, não pra quem só opera no dia a dia.
+ * Catálogo de permissões: usuário -> permissão direta (sem Perfil
+ * intermediário). `recurso` é sempre a rota da tela no frontend e `acao` o
+ * id da ação, igual ao catálogo em
+ * src/components/rooster/hub/permission-catalog.ts do frontend — é o que
+ * cada @RequirePermission(modulo, recurso, acao) do backend compara.
  */
-function roomsAssetsPermissionDefinitions(roomsModulo: { id: string }, assetsModulo: { id: string }) {
+function permissionDefinitions(hubModulo: { id: string }, deskModulo: { id: string }, roomsModulo: { id: string }, assetsModulo: { id: string }) {
   return [
-    ['rooms.campus.view', 'Visualizar campi', roomsModulo, 'campus', 'view'],
-    ['rooms.campus.manage', 'Gerenciar campi', roomsModulo, 'campus', 'manage'],
-    ['rooms.bloco.view', 'Visualizar blocos', roomsModulo, 'bloco', 'view'],
-    ['rooms.bloco.manage', 'Gerenciar blocos', roomsModulo, 'bloco', 'manage'],
-    ['rooms.ambiente.view', 'Visualizar ambientes', roomsModulo, 'ambiente', 'view'],
-    ['rooms.ambiente.manage', 'Gerenciar ambientes', roomsModulo, 'ambiente', 'manage'],
-    ['rooms.reserva.view', 'Visualizar reservas', roomsModulo, 'reserva', 'view'],
-    ['rooms.reserva.create', 'Criar reservas', roomsModulo, 'reserva', 'create'],
-    ['rooms.reserva.manage', 'Editar ou cancelar reservas', roomsModulo, 'reserva', 'manage'],
-    ['rooms.reserva.approve', 'Aprovar ou recusar reservas', roomsModulo, 'reserva', 'approve'],
-    ['assets.categoria.view', 'Visualizar categorias de patrimônio', assetsModulo, 'categoria-patrimonio', 'view'],
-    ['assets.categoria.manage', 'Gerenciar categorias de patrimônio', assetsModulo, 'categoria-patrimonio', 'manage'],
-    ['assets.setor.view', 'Visualizar setores de patrimônio', assetsModulo, 'setor-patrimonio', 'view'],
-    ['assets.setor.manage', 'Gerenciar setores de patrimônio', assetsModulo, 'setor-patrimonio', 'manage'],
-    ['assets.patrimonio.view', 'Visualizar patrimônio', assetsModulo, 'patrimonio', 'view'],
-    ['assets.patrimonio.create', 'Criar patrimônio', assetsModulo, 'patrimonio', 'create'],
-    ['assets.patrimonio.manage', 'Editar patrimônio', assetsModulo, 'patrimonio', 'manage'],
-    ['assets.patrimonio.baixa', 'Dar baixa em patrimônio', assetsModulo, 'patrimonio', 'baixa'],
-    ['assets.movimentacao.view', 'Visualizar movimentações', assetsModulo, 'movimentacao-patrimonio', 'view'],
-    ['assets.movimentacao.create', 'Registrar movimentações', assetsModulo, 'movimentacao-patrimonio', 'create'],
-    ['assets.movimentacao.manage', 'Editar movimentações', assetsModulo, 'movimentacao-patrimonio', 'manage'],
+    // Rooster Hub
+    ['hub.usuarios.acessar', 'Acessar Usuários', hubModulo, '/hub/usuarios', 'acessar'],
+    ['hub.usuarios.criar', 'Criar usuário', hubModulo, '/hub/usuarios', 'criar'],
+    ['hub.usuarios.editar', 'Editar usuário', hubModulo, '/hub/usuarios', 'editar'],
+    ['hub.usuarios.excluir', 'Excluir usuário', hubModulo, '/hub/usuarios', 'excluir'],
+    ['hub.setores.acessar', 'Acessar Setores', hubModulo, '/hub/setores', 'acessar'],
+    ['hub.setores.criar', 'Criar setor', hubModulo, '/hub/setores', 'criar'],
+    ['hub.setores.editar', 'Editar setor', hubModulo, '/hub/setores', 'editar'],
+    ['hub.setores.excluir', 'Excluir setor', hubModulo, '/hub/setores', 'excluir'],
+    ['hub.setores.gerenciar-usuarios', 'Gerenciar usuários do setor', hubModulo, '/hub/setores', 'gerenciar-usuarios'],
+    ['hub.acessos.acessar', 'Acessar Acessos e permissões', hubModulo, '/hub/acessos', 'acessar'],
+    ['hub.acessos.gerenciar-permissoes', 'Gerenciar permissões', hubModulo, '/hub/acessos', 'gerenciar-permissoes'],
+    ['hub.acessos.conceder', 'Conceder permissões a usuário', hubModulo, '/hub/acessos', 'conceder'],
+    ['hub.acessos.revogar', 'Revogar permissões de usuário', hubModulo, '/hub/acessos', 'revogar'],
+    ['hub.dashboard.acessar', 'Acessar Rooster Hub', hubModulo, '/hub', 'acessar'],
+
+    // Rooster Desk
+    ['desk.tickets.acessar', 'Acessar Chamados', deskModulo, '/desk/tickets', 'acessar'],
+    ['desk.tickets.criar', 'Abrir chamado', deskModulo, '/desk/tickets', 'criar'],
+    ['desk.tickets.editar', 'Editar chamado', deskModulo, '/desk/tickets', 'editar'],
+    ['desk.tickets.encerrar', 'Encerrar chamado', deskModulo, '/desk/tickets', 'encerrar'],
+    ['desk.tickets.reabrir', 'Reabrir chamado', deskModulo, '/desk/tickets', 'reabrir'],
+    ['desk.tickets.transferir', 'Transferir chamado', deskModulo, '/desk/tickets', 'transferir'],
+    ['desk.tickets.anexar', 'Anexar arquivo', deskModulo, '/desk/tickets', 'anexar'],
+    ['desk.tickets.nota-interna', 'Registrar nota interna', deskModulo, '/desk/tickets', 'nota-interna'],
+    ['desk.categories.criar', 'Criar categoria', deskModulo, '/desk/categories', 'criar'],
+    ['desk.categories.editar', 'Editar categoria', deskModulo, '/desk/categories', 'editar'],
+    ['desk.categories.excluir', 'Excluir categoria', deskModulo, '/desk/categories', 'excluir'],
+    ['desk.categories.subcategorias', 'Gerenciar subcategorias', deskModulo, '/desk/categories', 'subcategorias'],
+    ['desk.team.vincular-categoria', 'Vincular atendente a categoria', deskModulo, '/desk/team', 'vincular-categoria'],
+
+    // Rooster Rooms
+    ['rooms.dashboard.acessar', 'Acessar Rooster Rooms', roomsModulo, '/rooms', 'acessar'],
+    ['rooms.structure.criar', 'Criar estrutura física', roomsModulo, '/rooms/structure', 'criar'],
+    ['rooms.structure.editar', 'Editar estrutura física', roomsModulo, '/rooms/structure', 'editar'],
+    ['rooms.structure.excluir', 'Excluir estrutura física', roomsModulo, '/rooms/structure', 'excluir'],
+    ['rooms.book.solicitar', 'Solicitar reserva', roomsModulo, '/rooms/book', 'solicitar'],
+    ['rooms.manage.aprovar', 'Aprovar reserva', roomsModulo, '/rooms/manage', 'aprovar'],
+    ['rooms.manage.alterar-horario', 'Alterar horário (equipe)', roomsModulo, '/rooms/manage', 'alterar-horario'],
+    ['rooms.manage.cancelar', 'Cancelar com motivo (equipe)', roomsModulo, '/rooms/manage', 'cancelar'],
+    ['rooms.reservations.alterar-horario', 'Solicitar alteração de horário', roomsModulo, '/rooms/reservations', 'alterar-horario'],
+    ['rooms.reservations.cancelar', 'Cancelar reserva própria', roomsModulo, '/rooms/reservations', 'cancelar'],
+
+    // Rooster Assets
+    ['assets.dashboard.acessar', 'Acessar Rooster Assets', assetsModulo, '/assets', 'acessar'],
+    ['assets.inventory.criar', 'Criar patrimônio', assetsModulo, '/assets/inventory', 'criar'],
+    ['assets.inventory.editar', 'Editar patrimônio', assetsModulo, '/assets/inventory', 'editar'],
+    ['assets.inventory.excluir', 'Excluir patrimônio', assetsModulo, '/assets/inventory', 'excluir'],
+    ['assets.inventory.gerenciar-categorias', 'Gerenciar categorias de patrimônio', assetsModulo, '/assets/inventory', 'gerenciar-categorias'],
+    ['assets.inventory.movimentar', 'Registrar movimentação', assetsModulo, '/assets/inventory', 'movimentar'],
   ] as const;
 }
 
-const roomsViewKeys = ['rooms.campus.view', 'rooms.bloco.view', 'rooms.ambiente.view', 'rooms.reserva.view'];
-const assetsViewKeys = ['assets.categoria.view', 'assets.setor.view', 'assets.patrimonio.view', 'assets.movimentacao.view'];
-const roomsOperationalKeys = ['rooms.reserva.create', 'rooms.reserva.manage'];
-const assetsOperationalKeys = ['assets.patrimonio.create', 'assets.patrimonio.manage', 'assets.movimentacao.create', 'assets.movimentacao.manage'];
-const roomsApprovalKeys = ['rooms.campus.manage', 'rooms.bloco.manage', 'rooms.ambiente.manage', 'rooms.reserva.approve'];
-const assetsApprovalKeys = ['assets.categoria.manage', 'assets.setor.manage', 'assets.patrimonio.baixa'];
+const deskTicketOperationKeys = [
+  'desk.tickets.acessar', 'desk.tickets.criar', 'desk.tickets.editar', 'desk.tickets.encerrar',
+  'desk.tickets.reabrir', 'desk.tickets.transferir', 'desk.tickets.anexar', 'desk.tickets.nota-interna',
+];
+const deskManagementKeys = [
+  'desk.categories.criar', 'desk.categories.editar', 'desk.categories.excluir',
+  'desk.categories.subcategorias', 'desk.team.vincular-categoria',
+];
+const roomsViewKeys = ['rooms.dashboard.acessar'];
+const roomsSelfServiceKeys = ['rooms.book.solicitar', 'rooms.reservations.alterar-horario', 'rooms.reservations.cancelar'];
+const roomsManagementKeys = [
+  'rooms.structure.criar', 'rooms.structure.editar', 'rooms.structure.excluir',
+  'rooms.manage.aprovar', 'rooms.manage.alterar-horario', 'rooms.manage.cancelar',
+];
+const assetsViewKeys = ['assets.dashboard.acessar'];
+const assetsOperationalKeys = ['assets.inventory.criar', 'assets.inventory.editar', 'assets.inventory.movimentar'];
+const assetsManagementKeys = ['assets.inventory.excluir', 'assets.inventory.gerenciar-categorias'];
 
 async function clearDatabase() {
   await prisma.$transaction([
@@ -187,12 +194,10 @@ async function clearDatabase() {
     prisma.logAuditoria.deleteMany(),
     prisma.sessao.deleteMany(),
     prisma.notificacao.deleteMany(),
-    prisma.perfilPermissao.deleteMany(),
+    prisma.usuarioPermissao.deleteMany(),
     prisma.usuarioSetor.deleteMany(),
-    prisma.usuarioPerfil.deleteMany(),
     prisma.permissao.deleteMany(),
     prisma.modulo.deleteMany(),
-    prisma.perfil.deleteMany(),
     prisma.setor.deleteMany(),
     prisma.usuario.deleteMany(),
   ]);
@@ -209,70 +214,23 @@ async function main() {
   const hubModulo = await prisma.modulo.create({ data: { id: ids.hubModule, nome: 'Rooster Hub', rota: '/hub', icone: 'ShieldCheck', ativo: true } });
 
   const permissions = new Map<string, { id: string }>();
-  for (const [key, nome, recurso, acao] of permissionDefinitions) {
+  for (const [key, nome, moduloAlvo, recurso, acao] of permissionDefinitions(hubModulo, modulo, roomsModulo, assetsModulo)) {
     const permission = await prisma.permissao.create({
-      data: {
-        moduloId: modulo.id,
-        nome,
-        descricao: `${nome} no Rooster Desk.`,
-        recurso,
-        acao,
-      },
+      data: { moduloId: moduloAlvo.id, nome: key, descricao: nome, recurso, acao },
       select: { id: true },
     });
     permissions.set(key, permission);
   }
-  for (const [key, nome, moduloAlvo, recurso, acao] of roomsAssetsPermissionDefinitions(roomsModulo, assetsModulo)) {
-    const permission = await prisma.permissao.create({
-      data: { moduloId: moduloAlvo.id, nome, descricao: `${nome}.`, recurso, acao },
-      select: { id: true },
+
+  const senha = (raw: string) => bcrypt.hash(raw, SALT_ROUNDS);
+
+  /** Concede ao usuário exatamente as chaves de permissão informadas (sem Perfil intermediário). */
+  async function grant(usuarioId: string, keys: string[]) {
+    await prisma.usuarioPermissao.createMany({
+      data: keys.map((key) => ({ usuarioId, permissaoId: permissions.get(key)!.id })),
+      skipDuplicates: true,
     });
-    permissions.set(key, permission);
   }
-  // Gerenciar usuários/perfis/permissões é coisa de administrador, ponto —
-  // ninguém mais recebe esta permissão em lugar nenhum do seed.
-  const hubManagePermission = await prisma.permissao.create({
-    data: { moduloId: hubModulo.id, nome: 'Gerenciar usuários, perfis e permissões', descricao: 'Gerenciar usuários, perfis e permissões do sistema.', recurso: 'hub', acao: 'manage' },
-    select: { id: true },
-  });
-  permissions.set('hub.manage', hubManagePermission);
-
-  const profiles = await Promise.all([
-    prisma.perfil.create({ data: { id: ids.profiles.solicitante, nome: 'Solicitante', descricao: 'Pode consultar e abrir seus tickets, e reservar ambientes.', ativo: true } }),
-    prisma.perfil.create({ data: { id: ids.profiles.atendente, nome: 'Atendente', descricao: 'Pode consultar, assumir, atualizar e resolver tickets, e operar Rooms/Assets no dia a dia.', ativo: true } }),
-    prisma.perfil.create({ data: { id: ids.profiles.visualizador, nome: 'Visualizador', descricao: 'Pode apenas consultar informações do Desk, Rooms e Assets.', ativo: true } }),
-  ]);
-
-  const readPermissions = [...permissions.keys()].filter((key) => key.endsWith('.view'));
-  const deskPermissionKeys = permissionDefinitions.map(([key]) => key);
-  const solicitantePermissions = [
-    'ticket.view', 'ticket.create', 'category.view', 'subcategory.view', 'priority.view', 'status.view', 'message.view', 'message.create', 'attachment.view', 'attachment.create', 'history.view', 'evaluation.view', 'evaluation.create',
-    ...roomsViewKeys, 'rooms.reserva.create',
-  ];
-  const atendentePermissions = [...deskPermissionKeys, ...roomsViewKeys, ...assetsViewKeys, ...roomsOperationalKeys, ...assetsOperationalKeys];
-  const profilePermissionKeys = new Map([
-    [ids.profiles.solicitante, solicitantePermissions],
-    [ids.profiles.atendente, atendentePermissions],
-    [ids.profiles.visualizador, readPermissions],
-  ]);
-
-  for (const profile of profiles) {
-    for (const key of profilePermissionKeys.get(profile.id) ?? []) {
-      const permission = permissions.get(key);
-      if (permission) await prisma.perfilPermissao.create({ data: { perfilId: profile.id, permissaoId: permission.id } });
-    }
-  }
-
-  await prisma.perfil.create({
-    data: { id: ids.profiles.admin, nome: 'Administrador', descricao: 'Acesso total ao sistema.', ativo: true },
-  });
-  await prisma.usuario.create({
-    data: { id: ids.users.admin, nome: 'Administrador Rooster', email: 'admin@rooster.local', senhaHash: 'Admin123!', ativo: true },
-  });
-  await prisma.perfilPermissao.createMany({
-    data: [...permissions.values()].map((permission) => ({ perfilId: ids.profiles.admin, permissaoId: permission.id })),
-  });
-  await prisma.usuarioPerfil.create({ data: { usuarioId: ids.users.admin, perfilId: ids.profiles.admin } });
 
   await prisma.setor.createMany({
     data: [
@@ -282,51 +240,53 @@ async function main() {
     ],
   });
 
-  const attendantProfiles = [
-    { id: ids.profiles.atendenteSecretaria, name: 'Atendente Secretaria', userId: ids.users.atendenteSecretaria, userName: 'Atendente Secretaria', email: 'atendente.secretaria@rooster.local', sectorId: ids.sectors.secretaria },
-    { id: ids.profiles.atendenteSuporte, name: 'Atendente Suporte', userId: ids.users.atendenteSuporte, userName: 'Atendente Suporte', email: 'atendente.suporte@rooster.local', sectorId: ids.sectors.suporte },
-    { id: ids.profiles.atendenteCoordenacao, name: 'Atendente Coordenação', userId: ids.users.atendenteCoordenacao, userName: 'Atendente Coordenação', email: 'atendente.coordenacao@rooster.local', sectorId: ids.sectors.coordenacao },
+  // Administrador: acesso total, concedido explicitamente (sem bypass mágico) —
+  // ele é admin porque tem hub.acessos.gerenciar-permissoes, igual a qualquer usuário.
+  await prisma.usuario.create({
+    data: { id: ids.users.admin, nome: 'Administrador Rooster', email: 'admin@rooster.local', senhaHash: await senha('Admin123!'), ativo: true },
+  });
+  await grant(ids.users.admin, [...permissions.keys()]);
+
+  const solicitantePermissions = [...deskTicketOperationKeys.filter((k) => k !== 'desk.tickets.encerrar' && k !== 'desk.tickets.reabrir' && k !== 'desk.tickets.transferir'), ...roomsViewKeys, ...roomsSelfServiceKeys];
+  const atendentePermissions = [...deskTicketOperationKeys, ...roomsViewKeys, ...assetsViewKeys, ...assetsOperationalKeys];
+  const visualizadorPermissions = ['desk.tickets.acessar', ...roomsViewKeys, ...assetsViewKeys];
+  const coordenadorPermissions = [
+    ...deskTicketOperationKeys, ...deskManagementKeys,
+    ...roomsViewKeys, ...roomsSelfServiceKeys, ...roomsManagementKeys,
+    ...assetsViewKeys, ...assetsOperationalKeys, ...assetsManagementKeys,
   ];
-  for (const attendant of attendantProfiles) {
-    await prisma.perfil.create({ data: { id: attendant.id, nome: attendant.name, descricao: 'Acesso operacional a Desk, Rooms e Assets.', ativo: true } });
-    await prisma.perfilPermissao.createMany({
-      data: atendentePermissions.map((key) => ({ perfilId: attendant.id, permissaoId: permissions.get(key)!.id })),
-    });
-    await prisma.usuario.create({ data: { id: attendant.userId, nome: attendant.userName, email: attendant.email, senhaHash: 'Atendente123!', ativo: true } });
-    await prisma.usuarioPerfil.create({ data: { usuarioId: attendant.userId, perfilId: attendant.id } });
-    await prisma.usuarioSetor.create({ data: { usuarioId: attendant.userId, setorId: attendant.sectorId } });
+
+  const attendantSeeds = [
+    { id: ids.users.atendenteSecretaria, name: 'Atendente Secretaria', email: 'atendente.secretaria@rooster.local', sectorId: ids.sectors.secretaria },
+    { id: ids.users.atendenteSuporte, name: 'Atendente Suporte', email: 'atendente.suporte@rooster.local', sectorId: ids.sectors.suporte },
+    { id: ids.users.atendenteCoordenacao, name: 'Atendente Coordenação', email: 'atendente.coordenacao@rooster.local', sectorId: ids.sectors.coordenacao },
+  ];
+  for (const attendant of attendantSeeds) {
+    await prisma.usuario.create({ data: { id: attendant.id, nome: attendant.name, email: attendant.email, senhaHash: await senha('Atendente123!'), ativo: true } });
+    await grant(attendant.id, atendentePermissions);
+    await prisma.usuarioSetor.create({ data: { usuarioId: attendant.id, setorId: attendant.sectorId } });
   }
 
-  const coordinatorProfiles = [
-    { id: ids.profiles.coordenadorSecretaria, name: 'Coordenador Secretaria', userId: ids.users.coordenadorSecretaria, email: 'coordenador.secretaria@rooster.local', sectorId: ids.sectors.secretaria },
-    { id: ids.profiles.coordenadorSuporte, name: 'Coordenador Suporte', userId: ids.users.coordenadorSuporte, email: 'coordenador.suporte@rooster.local', sectorId: ids.sectors.suporte },
-    { id: ids.profiles.coordenadorCoordenacao, name: 'Coordenador Coordenação', userId: ids.users.coordenadorCoordenacao, email: 'coordenador.coordenacao@rooster.local', sectorId: ids.sectors.coordenacao },
+  const coordinatorSeeds = [
+    { id: ids.users.coordenadorSecretaria, name: 'Coordenador Secretaria', email: 'coordenador.secretaria@rooster.local', sectorId: ids.sectors.secretaria },
+    { id: ids.users.coordenadorSuporte, name: 'Coordenador Suporte', email: 'coordenador.suporte@rooster.local', sectorId: ids.sectors.suporte },
+    { id: ids.users.coordenadorCoordenacao, name: 'Coordenador Coordenação', email: 'coordenador.coordenacao@rooster.local', sectorId: ids.sectors.coordenacao },
   ];
-  for (const coordinator of coordinatorProfiles) {
-    await prisma.perfil.create({ data: { id: coordinator.id, nome: coordinator.name, descricao: 'Gerencia categorias, subcategorias e atendentes do próprio setor; aprova reservas e dá baixa em patrimônio.', ativo: true } });
-    const coordinatorPermissionKeys = [
-      'category.create', 'subcategory.create', 'desk-config.manage', ...readPermissions,
-      ...roomsOperationalKeys, ...assetsOperationalKeys, ...roomsApprovalKeys, ...assetsApprovalKeys,
-    ];
-    await prisma.perfilPermissao.createMany({ data: coordinatorPermissionKeys.map((key) => ({ perfilId: coordinator.id, permissaoId: permissions.get(key)!.id })) });
-    await prisma.usuario.create({ data: { id: coordinator.userId, nome: coordinator.name, email: coordinator.email, senhaHash: 'Coordenador123!', ativo: true } });
-    await prisma.usuarioPerfil.create({ data: { usuarioId: coordinator.userId, perfilId: coordinator.id } });
-    await prisma.usuarioSetor.create({ data: { usuarioId: coordinator.userId, setorId: coordinator.sectorId } });
+  for (const coordinator of coordinatorSeeds) {
+    await prisma.usuario.create({ data: { id: coordinator.id, nome: coordinator.name, email: coordinator.email, senhaHash: await senha('Coordenador123!'), ativo: true } });
+    await grant(coordinator.id, coordenadorPermissions);
+    await prisma.usuarioSetor.create({ data: { usuarioId: coordinator.id, setorId: coordinator.sectorId } });
   }
 
   const users = await Promise.all([
-    prisma.usuario.create({ data: { id: ids.users.solicitante, nome: 'Ana Solicitante', email: 'ana.solicitante@rooster.local', senhaHash: 'Senha123', ativo: true } }),
-    prisma.usuario.create({ data: { id: ids.users.atendente, nome: 'Bruno Atendente', email: 'bruno.atendente@rooster.local', senhaHash: 'Senha123', ativo: true } }),
-    prisma.usuario.create({ data: { id: ids.users.visualizador, nome: 'Carla Visualizadora', email: 'carla.visualizadora@rooster.local', senhaHash: 'Senha123', ativo: true } }),
+    prisma.usuario.create({ data: { id: ids.users.solicitante, nome: 'Ana Solicitante', email: 'ana.solicitante@rooster.local', senhaHash: await senha('Senha123'), ativo: true } }),
+    prisma.usuario.create({ data: { id: ids.users.atendente, nome: 'Bruno Atendente', email: 'bruno.atendente@rooster.local', senhaHash: await senha('Senha123'), ativo: true } }),
+    prisma.usuario.create({ data: { id: ids.users.visualizador, nome: 'Carla Visualizadora', email: 'carla.visualizadora@rooster.local', senhaHash: await senha('Senha123'), ativo: true } }),
   ]);
+  await grant(users[0].id, solicitantePermissions);
+  await grant(users[1].id, atendentePermissions);
+  await grant(users[2].id, visualizadorPermissions);
 
-  await prisma.usuarioPerfil.createMany({
-    data: [
-      { usuarioId: users[0].id, perfilId: ids.profiles.solicitante },
-      { usuarioId: users[1].id, perfilId: ids.profiles.atendente },
-      { usuarioId: users[2].id, perfilId: ids.profiles.visualizador },
-    ],
-  });
   await prisma.usuarioSetor.createMany({
     data: [
       { usuarioId: users[0].id, setorId: ids.sectors.secretaria },

@@ -5,14 +5,16 @@ import { RoosterDeskController } from './rooster-desk.controller';
 import { RoosterDeskService } from './rooster-desk.service';
 import { MensagensGateway } from './mensagens.gateway';
 import { UsuariosModule } from '../roster-hub/usuarios/usuarios.module';
+import { jwtModuleOptions } from '../auth/jwt-config';
+import { PermissionGuard } from '../auth/permission.guard';
 
 @Module({
   imports: [
     PrismaModule,
     UsuariosModule,
-    JwtModule.register({ secret: process.env.JWT_SECRET ?? 'rooster-dev-secret-change-me' }),
+    JwtModule.register(jwtModuleOptions()),
   ],
   controllers: [RoosterDeskController],
-  providers: [RoosterDeskService, MensagensGateway],
+  providers: [RoosterDeskService, MensagensGateway, PermissionGuard],
 })
 export class RoosterDeskModule {}

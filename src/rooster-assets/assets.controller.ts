@@ -31,7 +31,7 @@ export class AssetsController {
   constructor(private readonly service: AssetsService) {}
 
   @Post('patrimonio-categorias')
-  @RequirePermission(MODULO, 'categoria-patrimonio', 'manage')
+  @RequirePermission(MODULO, '/assets/inventory', 'gerenciar-categorias')
   @ApiOperation({ summary: 'Cria uma categoria de patrimônio' })
   @ApiBody({ type: CreateAssetCategoryDto })
   createCategory(@Body() dto: CreateAssetCategoryDto) {
@@ -39,19 +39,19 @@ export class AssetsController {
   }
 
   @Get('patrimonio-categorias')
-  @RequirePermission(MODULO, 'categoria-patrimonio', 'view')
+  @RequirePermission(MODULO, '/assets', 'acessar')
   findAllCategories() {
     return this.service.findAllCategories();
   }
 
   @Get('patrimonio-categorias/:id')
-  @RequirePermission(MODULO, 'categoria-patrimonio', 'view')
+  @RequirePermission(MODULO, '/assets', 'acessar')
   findOneCategory(@Param('id') id: string) {
     return this.service.findOneCategory(id);
   }
 
   @Patch('patrimonio-categorias/:id')
-  @RequirePermission(MODULO, 'categoria-patrimonio', 'manage')
+  @RequirePermission(MODULO, '/assets/inventory', 'gerenciar-categorias')
   @ApiOperation({ summary: 'Atualiza uma categoria de patrimônio' })
   @ApiBody({ type: UpdateAssetCategoryDto })
   updateCategory(@Param('id') id: string, @Body() dto: UpdateAssetCategoryDto) {
@@ -59,13 +59,13 @@ export class AssetsController {
   }
 
   @Delete('patrimonio-categorias/:id')
-  @RequirePermission(MODULO, 'categoria-patrimonio', 'manage')
+  @RequirePermission(MODULO, '/assets/inventory', 'gerenciar-categorias')
   removeCategory(@Param('id') id: string) {
     return this.service.removeCategory(id);
   }
 
   @Post('patrimonio-setores')
-  @RequirePermission(MODULO, 'setor-patrimonio', 'manage')
+  @RequirePermission(MODULO, '/assets/inventory', 'gerenciar-categorias')
   @ApiOperation({ summary: 'Cria um setor de patrimônio' })
   @ApiBody({ type: CreateAssetSectorDto })
   createSector(@Body() dto: CreateAssetSectorDto) {
@@ -73,19 +73,19 @@ export class AssetsController {
   }
 
   @Get('patrimonio-setores')
-  @RequirePermission(MODULO, 'setor-patrimonio', 'view')
+  @RequirePermission(MODULO, '/assets', 'acessar')
   findAllSectors() {
     return this.service.findAllSectors();
   }
 
   @Get('patrimonio-setores/:id')
-  @RequirePermission(MODULO, 'setor-patrimonio', 'view')
+  @RequirePermission(MODULO, '/assets', 'acessar')
   findOneSector(@Param('id') id: string) {
     return this.service.findOneSector(id);
   }
 
   @Patch('patrimonio-setores/:id')
-  @RequirePermission(MODULO, 'setor-patrimonio', 'manage')
+  @RequirePermission(MODULO, '/assets/inventory', 'gerenciar-categorias')
   @ApiOperation({ summary: 'Atualiza um setor de patrimônio' })
   @ApiBody({ type: UpdateAssetSectorDto })
   updateSector(@Param('id') id: string, @Body() dto: UpdateAssetSectorDto) {
@@ -93,13 +93,13 @@ export class AssetsController {
   }
 
   @Delete('patrimonio-setores/:id')
-  @RequirePermission(MODULO, 'setor-patrimonio', 'manage')
+  @RequirePermission(MODULO, '/assets/inventory', 'gerenciar-categorias')
   removeSector(@Param('id') id: string) {
     return this.service.removeSector(id);
   }
 
   @Post('patrimonio')
-  @RequirePermission(MODULO, 'patrimonio', 'create')
+  @RequirePermission(MODULO, '/assets/inventory', 'criar')
   @ApiOperation({ summary: 'Cadastra um patrimônio' })
   @ApiBody({ type: CreateAssetDto })
   createAsset(@Body() dto: CreateAssetDto) {
@@ -107,19 +107,19 @@ export class AssetsController {
   }
 
   @Get('patrimonio')
-  @RequirePermission(MODULO, 'patrimonio', 'view')
+  @RequirePermission(MODULO, '/assets', 'acessar')
   findAllAssets(@Query('categoriaId') categoriaId?: string, @Query('setorId') setorId?: string, @Query('status') status?: string) {
     return this.service.findAllAssets(categoriaId, setorId, status);
   }
 
   @Get('patrimonio/:id')
-  @RequirePermission(MODULO, 'patrimonio', 'view')
+  @RequirePermission(MODULO, '/assets', 'acessar')
   findOneAsset(@Param('id') id: string) {
     return this.service.findOneAsset(id);
   }
 
   @Patch('patrimonio/:id')
-  @RequirePermission(MODULO, 'patrimonio', 'manage')
+  @RequirePermission(MODULO, '/assets/inventory', 'editar')
   @ApiOperation({ summary: 'Atualiza um patrimônio' })
   @ApiBody({ type: UpdateAssetDto })
   updateAsset(@Param('id') id: string, @Body() dto: UpdateAssetDto) {
@@ -127,20 +127,20 @@ export class AssetsController {
   }
 
   @Delete('patrimonio/:id')
-  @RequirePermission(MODULO, 'patrimonio', 'manage')
+  @RequirePermission(MODULO, '/assets/inventory', 'excluir')
   removeAsset(@Param('id') id: string) {
     return this.service.removeAsset(id);
   }
 
   @Patch('patrimonio/:id/baixa')
-  @RequirePermission(MODULO, 'patrimonio', 'baixa')
+  @RequirePermission(MODULO, '/assets/inventory', 'editar')
   @ApiOperation({ summary: 'Dá baixa em um patrimônio' })
   baixaAsset(@Param('id') id: string, @Body() body: { motivo?: string; usuario?: string }) {
     return this.service.baixaAsset(id, body?.motivo, body?.usuario);
   }
 
   @Post('patrimonio-movimentacoes')
-  @RequirePermission(MODULO, 'movimentacao-patrimonio', 'create')
+  @RequirePermission(MODULO, '/assets/inventory', 'movimentar')
   @ApiOperation({ summary: 'Registra uma movimentação de patrimônio' })
   @ApiBody({ type: CreateAssetMovementDto })
   createMovement(@Body() dto: CreateAssetMovementDto) {
@@ -148,19 +148,19 @@ export class AssetsController {
   }
 
   @Get('patrimonio-movimentacoes')
-  @RequirePermission(MODULO, 'movimentacao-patrimonio', 'view')
+  @RequirePermission(MODULO, '/assets', 'acessar')
   findAllMovements(@Query('patrimonioId') patrimonioId?: string) {
     return this.service.findAllMovements(patrimonioId);
   }
 
   @Get('patrimonio-movimentacoes/:id')
-  @RequirePermission(MODULO, 'movimentacao-patrimonio', 'view')
+  @RequirePermission(MODULO, '/assets', 'acessar')
   findOneMovement(@Param('id') id: string) {
     return this.service.findOneMovement(id);
   }
 
   @Patch('patrimonio-movimentacoes/:id')
-  @RequirePermission(MODULO, 'movimentacao-patrimonio', 'manage')
+  @RequirePermission(MODULO, '/assets/inventory', 'movimentar')
   @ApiOperation({ summary: 'Atualiza uma movimentação de patrimônio' })
   @ApiBody({ type: UpdateAssetMovementDto })
   updateMovement(@Param('id') id: string, @Body() dto: UpdateAssetMovementDto) {
@@ -168,7 +168,7 @@ export class AssetsController {
   }
 
   @Delete('patrimonio-movimentacoes/:id')
-  @RequirePermission(MODULO, 'movimentacao-patrimonio', 'manage')
+  @RequirePermission(MODULO, '/assets/inventory', 'movimentar')
   removeMovement(@Param('id') id: string) {
     return this.service.removeMovement(id);
   }

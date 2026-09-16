@@ -16,24 +16,28 @@ import { SessoesService } from './sessoes.service';
 import { PermissionGuard } from '../../auth/permission.guard';
 import { RequirePermission } from '../../auth/require-permission.decorator';
 
+const MODULO = 'Rooster Hub';
+
 @ApiTags('Rooster Hub - Sessões')
 @Controller('sessoes')
 @UseGuards(PermissionGuard)
-@RequirePermission('Rooster Hub', 'hub', 'manage')
 export class SessoesController {
   constructor(private readonly sessoesService: SessoesService) {}
 
   @Post()
+  @RequirePermission(MODULO, '/hub/acessos', 'gerenciar-permissoes')
   create(@Body() createSessaoDto: CreateSessaoDto) {
     return this.sessoesService.create(createSessaoDto);
   }
 
   @Get()
+  @RequirePermission(MODULO, '/hub/acessos', 'gerenciar-permissoes')
   findAll() {
     return this.sessoesService.findAll();
   }
 
   @Get(':id')
+  @RequirePermission(MODULO, '/hub/acessos', 'gerenciar-permissoes')
   async findOne(@Param('id') id: string) {
     const sessao = await this.sessoesService.findOne(id);
     if (!sessao) {
@@ -43,6 +47,7 @@ export class SessoesController {
   }
 
   @Patch(':id')
+  @RequirePermission(MODULO, '/hub/acessos', 'gerenciar-permissoes')
   async update(@Param('id') id: string, @Body() updateSessaoDto: UpdateSessaoDto) {
     const sessao = await this.sessoesService.update(id, updateSessaoDto);
     if (!sessao) {
@@ -52,6 +57,7 @@ export class SessoesController {
   }
 
   @Delete(':id')
+  @RequirePermission(MODULO, '/hub/acessos', 'gerenciar-permissoes')
   async remove(@Param('id') id: string) {
     const sessao = await this.sessoesService.remove(id);
     if (!sessao) {

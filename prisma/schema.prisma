@@ -19,7 +19,7 @@ model Usuario {
   criadoEm      DateTime? @map("criado_em") @db.Timestamp()
   atualizadoEm  DateTime? @map("atualizado_em") @db.Timestamp()
 
-  perfis        UsuarioPerfil[]
+  permissoes    UsuarioPermissao[]
   setores       UsuarioSetor[]
   notificacoes  Notificacao[]
   sessoes       Sessao[]
@@ -48,19 +48,6 @@ model Setor {
   @@map("setores")
 }
 
-model Perfil {
-  id          String  @id @default(uuid()) @db.Uuid
-  nome        String  @unique @db.VarChar(80)
-  descricao   String?
-  ativo       Boolean @default(true)
-  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
-
-  usuarios    UsuarioPerfil[]
-  permissoes  PerfilPermissao[]
-
-  @@map("perfis")
-}
-
 model Modulo {
   id          String  @id @default(uuid()) @db.Uuid
   nome        String  @unique @db.VarChar(80)
@@ -84,23 +71,23 @@ model Permissao {
   criadoEm    DateTime? @map("criado_em") @db.Timestamp()
 
   modulo      Modulo? @relation(fields: [moduloId], references: [id])
-  perfis      PerfilPermissao[]
+  usuarios    UsuarioPermissao[]
 
   @@map("permissoes")
 }
 
-model UsuarioPerfil {
+model UsuarioPermissao {
   id          String  @id @default(uuid()) @db.Uuid
   usuarioId   String  @map("usuario_id") @db.Uuid
-  perfilId    String  @map("perfil_id") @db.Uuid
+  permissaoId String  @map("permissao_id") @db.Uuid
   criadoEm    DateTime? @map("criado_em") @db.Timestamp()
 
-  usuario     Usuario @relation(fields: [usuarioId], references: [id])
-  perfil      Perfil @relation(fields: [perfilId], references: [id])
+  usuario     Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  permissao   Permissao @relation(fields: [permissaoId], references: [id], onDelete: Cascade)
 
-  @@unique([usuarioId, perfilId])
+  @@unique([usuarioId, permissaoId])
 
-  @@map("usuarios_perfis")
+  @@map("usuarios_permissoes")
 }
 
 model UsuarioSetor {
@@ -115,20 +102,6 @@ model UsuarioSetor {
   @@unique([usuarioId, setorId])
 
   @@map("usuarios_setores")
-}
-
-model PerfilPermissao {
-  id            String  @id @default(uuid()) @db.Uuid
-  perfilId      String  @map("perfil_id") @db.Uuid
-  permissaoId   String  @map("permissao_id") @db.Uuid
-  criadoEm      DateTime? @map("criado_em") @db.Timestamp()
-
-  perfil        Perfil @relation(fields: [perfilId], references: [id])
-  permissao     Permissao @relation(fields: [permissaoId], references: [id])
-
-  @@unique([perfilId, permissaoId])
-
-  @@map("perfis_permissoes")
 }
 
 model Notificacao {

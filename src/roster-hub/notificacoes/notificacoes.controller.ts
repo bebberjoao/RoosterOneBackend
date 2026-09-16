@@ -16,24 +16,28 @@ import { NotificacoesService } from './notificacoes.service';
 import { PermissionGuard } from '../../auth/permission.guard';
 import { RequirePermission } from '../../auth/require-permission.decorator';
 
+const MODULO = 'Rooster Hub';
+
 @ApiTags('Rooster Hub - Notificações')
 @Controller('notificacoes')
 @UseGuards(PermissionGuard)
-@RequirePermission('Rooster Hub', 'hub', 'manage')
 export class NotificacoesController {
   constructor(private readonly notificacoesService: NotificacoesService) {}
 
   @Post()
+  @RequirePermission(MODULO, '/hub/acessos', 'gerenciar-permissoes')
   create(@Body() createNotificacaoDto: CreateNotificacaoDto) {
     return this.notificacoesService.create(createNotificacaoDto);
   }
 
   @Get()
+  @RequirePermission(MODULO, '/hub', 'acessar')
   findAll() {
     return this.notificacoesService.findAll();
   }
 
   @Get(':id')
+  @RequirePermission(MODULO, '/hub', 'acessar')
   async findOne(@Param('id') id: string) {
     const notificacao = await this.notificacoesService.findOne(id);
     if (!notificacao) {
@@ -43,6 +47,7 @@ export class NotificacoesController {
   }
 
   @Patch(':id')
+  @RequirePermission(MODULO, '/hub', 'acessar')
   async update(@Param('id') id: string, @Body() updateNotificacaoDto: UpdateNotificacaoDto) {
     const notificacao = await this.notificacoesService.update(id, updateNotificacaoDto);
     if (!notificacao) {
@@ -52,6 +57,7 @@ export class NotificacoesController {
   }
 
   @Delete(':id')
+  @RequirePermission(MODULO, '/hub/acessos', 'gerenciar-permissoes')
   async remove(@Param('id') id: string) {
     const notificacao = await this.notificacoesService.remove(id);
     if (!notificacao) {

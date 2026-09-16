@@ -16,24 +16,29 @@ import { UsuariosSetoresService } from './usuarios-setores.service';
 import { PermissionGuard } from '../../auth/permission.guard';
 import { RequirePermission } from '../../auth/require-permission.decorator';
 
+const MODULO = 'Rooster Hub';
+const TELA = '/hub/setores';
+
 @ApiTags('Rooster Hub - Usuários e Setores')
 @Controller('usuarios-setores')
 @UseGuards(PermissionGuard)
-@RequirePermission('Rooster Hub', 'hub', 'manage')
 export class UsuariosSetoresController {
   constructor(private readonly usuariosSetoresService: UsuariosSetoresService) {}
 
   @Post()
+  @RequirePermission(MODULO, TELA, 'gerenciar-usuarios')
   create(@Body() createUsuarioSetorDto: CreateUsuarioSetorDto) {
     return this.usuariosSetoresService.create(createUsuarioSetorDto);
   }
 
   @Get()
+  @RequirePermission(MODULO, TELA, 'acessar')
   findAll() {
     return this.usuariosSetoresService.findAll();
   }
 
   @Get(':id')
+  @RequirePermission(MODULO, TELA, 'acessar')
   async findOne(@Param('id') id: string) {
     const vinculo = await this.usuariosSetoresService.findOne(id);
     if (!vinculo) {
@@ -43,6 +48,7 @@ export class UsuariosSetoresController {
   }
 
   @Patch(':id')
+  @RequirePermission(MODULO, TELA, 'gerenciar-usuarios')
   async update(@Param('id') id: string, @Body() updateUsuarioSetorDto: UpdateUsuarioSetorDto) {
     const vinculo = await this.usuariosSetoresService.update(id, updateUsuarioSetorDto);
     if (!vinculo) {
@@ -52,6 +58,7 @@ export class UsuariosSetoresController {
   }
 
   @Delete(':id')
+  @RequirePermission(MODULO, TELA, 'gerenciar-usuarios')
   async remove(@Param('id') id: string) {
     const vinculo = await this.usuariosSetoresService.remove(id);
     if (!vinculo) {

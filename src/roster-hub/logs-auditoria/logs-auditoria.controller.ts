@@ -16,24 +16,28 @@ import { LogsAuditoriaService } from './logs-auditoria.service';
 import { PermissionGuard } from '../../auth/permission.guard';
 import { RequirePermission } from '../../auth/require-permission.decorator';
 
+const MODULO = 'Rooster Hub';
+
 @ApiTags('Rooster Hub - Logs de Auditoria')
 @Controller('logs-auditoria')
 @UseGuards(PermissionGuard)
-@RequirePermission('Rooster Hub', 'hub', 'manage')
 export class LogsAuditoriaController {
   constructor(private readonly logsAuditoriaService: LogsAuditoriaService) {}
 
   @Post()
+  @RequirePermission(MODULO, '/hub/acessos', 'gerenciar-permissoes')
   create(@Body() createLogAuditoriaDto: CreateLogAuditoriaDto) {
     return this.logsAuditoriaService.create(createLogAuditoriaDto);
   }
 
   @Get()
+  @RequirePermission(MODULO, '/hub/acessos', 'gerenciar-permissoes')
   findAll() {
     return this.logsAuditoriaService.findAll();
   }
 
   @Get(':id')
+  @RequirePermission(MODULO, '/hub/acessos', 'gerenciar-permissoes')
   async findOne(@Param('id') id: string) {
     const log = await this.logsAuditoriaService.findOne(id);
     if (!log) {
@@ -43,6 +47,7 @@ export class LogsAuditoriaController {
   }
 
   @Patch(':id')
+  @RequirePermission(MODULO, '/hub/acessos', 'gerenciar-permissoes')
   async update(@Param('id') id: string, @Body() updateLogAuditoriaDto: UpdateLogAuditoriaDto) {
     const log = await this.logsAuditoriaService.update(id, updateLogAuditoriaDto);
     if (!log) {
@@ -52,6 +57,7 @@ export class LogsAuditoriaController {
   }
 
   @Delete(':id')
+  @RequirePermission(MODULO, '/hub/acessos', 'gerenciar-permissoes')
   async remove(@Param('id') id: string) {
     const log = await this.logsAuditoriaService.remove(id);
     if (!log) {

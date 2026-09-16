@@ -16,7 +16,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:db:push:test": "prisma db push --schema ./prisma/schema.test.prisma",
-    "test:e2e": "cross-env DATABASE_URL=file:./prisma/dev-test.db npm run prisma:db:push:test && cross-env DATABASE_URL=file:./prisma/dev-test.db jest --config ./jest-e2e.json"
+    "test:e2e": "cross-env DATABASE_URL=file:./prisma/dev-test.db npm run prisma:db:push:test && cross-env DATABASE_URL=file:./prisma/dev-test.db JWT_SECRET=rooster-e2e-test-secret jest --config ./jest-e2e.json"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -29,8 +29,10 @@
     "@nestjs/swagger": "^11.4.5",
     "@nestjs/websockets": "^11.2.3",
     "@prisma/client": "^6.0.0",
+    "bcryptjs": "^3.0.3",
     "class-transformer": "^0.5.0",
     "class-validator": "^0.14.2",
+    "dotenv": "^17.4.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",

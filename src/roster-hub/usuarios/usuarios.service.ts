@@ -5,10 +5,13 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../shared/prisma.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { JwtService } from '@nestjs/jwt';
+
+const SALT_ROUNDS = 10;
 
 /**
  * Serviço responsável pelo gerenciamento de usuários do Rooster Hub.
@@ -25,6 +28,7 @@ export class UsuariosService {
   async create(createUsuarioDto: CreateUsuarioDto) {
     const data: Prisma.UsuarioCreateInput = {
       ...createUsuarioDto,
+      senhaHash: await bcrypt.hash(createUsuarioDto.senhaHash, SALT_ROUNDS),
       criadoEm: new Date(),
       atualizadoEm: new Date(),
     };
@@ -55,7 +59,7 @@ export class UsuariosService {
 
   async login(email: string, senha: string) {
     const usuario = await this.prisma.usuario.findUnique({ where: { email } });
-    if (!usuario || !usuario.ativo || usuario.senhaHash !== senha) {
+    if (!usuario || !usuario.ativo || !(await bcrypt.compare(senha, usuario.senhaHash))) {
       throw new UnauthorizedException('Login ou senha inválidos.');
     }
 
@@ -71,31 +75,25 @@ export class UsuariosService {
     };
   }
 
+  /**
+   * Permissões concedidas diretamente ao usuário (sem Perfil intermediário).
+   * Fonte única: usuarios_permissoes -> permissoes -> modulos.
+   */
   async getAccess(id: string) {
     const usuario = await this.prisma.usuario.findUnique({
       where: { id },
       include: {
-        perfis: {
-          include: {
-            perfil: {
-              include: {
-                permissoes: {
-                  include: { permissao: { include: { modulo: true } } },
-                },
-              },
-            },
-          },
+        permissoes: {
+          include: { permissao: { include: { modulo: true } } },
         },
       },
     });
 
     if (!usuario || !usuario.ativo) return null;
 
-    const permissions = new Map<string, (typeof usuario.perfis)[number]['perfil']['permissoes'][number]['permissao']>();
-    for (const userProfile of usuario.perfis) {
-      for (const profilePermission of userProfile.perfil.permissoes) {
-        permissions.set(profilePermission.permissao.id, profilePermission.permissao);
-      }
+    const permissions = new Map<string, (typeof usuario.permissoes)[number]['permissao']>();
+    for (const userPermission of usuario.permissoes) {
+      permissions.set(userPermission.permissao.id, userPermission.permissao);
     }
 
     const modules = new Map<string, { id: string; nome: string; rota: string | null; icone: string | null; ativo: boolean; permissoes: typeof permissions extends Map<string, infer P> ? P[] : never[] }>();
@@ -115,7 +113,6 @@ export class UsuariosService {
 
     return {
       usuarioId: usuario.id,
-      perfis: usuario.perfis.map(({ perfil }) => perfil),
       permissoes: [...permissions.values()],
       modulos: [...modules.values()],
     };
@@ -143,16 +140,15 @@ export class UsuariosService {
     );
   }
 
+  /**
+   * "Administrador" deixou de ser um Perfil especial: é quem recebeu (via
+   * usuarios_permissoes, igual a qualquer outra permissão) o direito de
+   * gerenciar o próprio sistema de permissões. Usado para o bypass total do
+   * PermissionGuard e para decisões de escopo (ex.: ver chamados de todos os
+   * setores no Desk) que hoje dependem desse conceito.
+   */
   async isAdmin(usuarioId: string) {
-    const access = await this.getAccess(usuarioId);
-    return Boolean(access?.perfis.some((profile) => profile.nome === 'Administrador'));
-  }
-
-  async canManageDeskConfiguration(usuarioId: string) {
-    const access = await this.getAccess(usuarioId);
-    return Boolean(access?.permissoes.some((permission) =>
-      permission.modulo?.nome === 'Rooster Desk' && permission.recurso === 'desk-config' && permission.acao === 'manage',
-    ));
+    return this.hasPermission(usuarioId, 'Rooster Hub', '/hub/acessos', 'gerenciar-permissoes');
   }
 
   async update(id: string, updateUsuarioDto: UpdateUsuarioDto) {
@@ -163,6 +159,7 @@ export class UsuariosService {
 
     const data: Prisma.UsuarioUpdateInput = {
       ...updateUsuarioDto,
+      ...(updateUsuarioDto.senhaHash ? { senhaHash: await bcrypt.hash(updateUsuarioDto.senhaHash, SALT_ROUNDS) } : {}),
       atualizadoEm: new Date(),
     };
 
