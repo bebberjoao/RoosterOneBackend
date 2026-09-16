@@ -50,6 +50,10 @@ export class CreateAmbienteDto {
   galerias?: string[];
 
   @IsOptional()
+  @IsArray()
+  recursos?: string[];
+
+  @IsOptional()
   @IsString()
   @IsIn(['disponivel', 'em-uso', 'manutencao', 'bloqueado'])
   status?: string;

@@ -1,7 +1,7 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { Transform } from 'class-transformer';
 import {
-  IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min,
+  IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min,
 } from 'class-validator';
 
 const booleanTransform = ({ value }: { value: unknown }) => value === true || value === 'true';
@@ -56,6 +56,8 @@ export class CreateTicketDto {
   @IsOptional() @IsIn(['1', '2', '3', '4']) prioridadeId?: string;
   @IsOptional() @IsString() @Length(36, 36) statusId?: string;
   @IsOptional() @IsDateString() encerradoEm?: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
+  @IsOptional() @Transform(booleanTransform) @IsBoolean() favorito?: boolean;
 }
 export class UpdateTicketDto extends PartialType(CreateTicketDto) {}
 

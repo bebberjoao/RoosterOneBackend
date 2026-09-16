@@ -219,7 +219,9 @@ export class RoosterDeskController {
       await this.service.validateTicketClassification(dto.categoriaId ?? current.categoriaId, dto.subcategoriaId ?? current.subcategoriaId);
     }
     await this.requireTicketAction(usuarioId, await this.statusTransitionAction(current.status?.encerrado, status));
-    return this.service.update('ticket', id, dto);
+    const atualizado = await this.service.update('ticket', id, dto);
+    await this.registrarHistoricoTicket(id, usuarioId, current, dto, status);
+    return atualizado;
   }
 
   @Patch('tickets/:id')
@@ -245,7 +247,9 @@ export class RoosterDeskController {
     const current = await this.service.findOne('ticket', id);
     const status = dto.statusId ? await this.service.findStatus(dto.statusId) : null;
     await this.requireTicketAction(usuarioId, await this.statusTransitionAction(current.status?.encerrado, status));
-    return this.service.update('ticket', id, { statusId: dto.statusId, encerradoEm: dto.encerradoEm });
+    const atualizado = await this.service.update('ticket', id, { statusId: dto.statusId, encerradoEm: dto.encerradoEm });
+    await this.registrarHistoricoTicket(id, usuarioId, current, { statusId: dto.statusId }, status);
+    return atualizado;
   }
 
   @Patch('chamados/:id/atribuir')
@@ -255,7 +259,10 @@ export class RoosterDeskController {
     if (!(await this.service.canManageTicket(id, usuarioId, dto.tecnicoId))) {
       throw new ForbiddenException('O atendente deve pertencer ao setor do chamado.');
     }
-    return this.service.update('ticket', id, { tecnicoId: dto.tecnicoId });
+    const current = await this.service.findOne('ticket', id);
+    const atualizado = await this.service.update('ticket', id, { tecnicoId: dto.tecnicoId });
+    await this.registrarHistoricoTicket(id, usuarioId, current, { tecnicoId: dto.tecnicoId }, null);
+    return atualizado;
   }
 
   @Patch('chamados-subcategorias/:id/atendentes')
@@ -279,6 +286,43 @@ export class RoosterDeskController {
   private async requireTicketAction(usuarioId: string, acao: string) {
     if (!(await this.usuariosService.hasPermission(usuarioId, MODULO, TELA_TICKETS, acao))) {
       throw new ForbiddenException(`Sem permissão para ${acao} em chamados.`);
+    }
+  }
+
+  /**
+   * Grava em historico_tickets cada campo que de fato mudou (status,
+   * prioridade, categoria, técnico) — antes só a mensagem virava histórico.
+   * `novoStatus` é reaproveitado das chamadas que já o buscaram para
+   * validar a transição; os demais campos são resolvidos aqui só quando
+   * aparecem no corpo da requisição (troca rara comparada a status).
+   */
+  private async registrarHistoricoTicket(
+    ticketId: string,
+    usuarioId: string,
+    current: any,
+    dto: { statusId?: string; prioridadeId?: string; categoriaId?: string; tecnicoId?: string },
+    novoStatus: { nome: string } | null,
+  ) {
+    const entradas: Array<{ campo: string; valorAntigo?: string; valorNovo?: string }> = [];
+
+    if (dto.statusId && dto.statusId !== current.statusId) {
+      entradas.push({ campo: 'status', valorAntigo: current.status?.nome, valorNovo: novoStatus?.nome });
+    }
+    if (dto.prioridadeId && dto.prioridadeId !== current.prioridadeId) {
+      const nova = await this.service.findOne('prioridadeTicket', dto.prioridadeId).catch(() => null);
+      entradas.push({ campo: 'prioridade', valorAntigo: current.prioridade?.nome, valorNovo: nova?.nome });
+    }
+    if (dto.categoriaId && dto.categoriaId !== current.categoriaId) {
+      const nova = await this.service.findOne('categoriaTicket', dto.categoriaId).catch(() => null);
+      entradas.push({ campo: 'categoria', valorAntigo: current.categoria?.nome, valorNovo: nova?.nome });
+    }
+    if (dto.tecnicoId !== undefined && dto.tecnicoId !== current.tecnicoId) {
+      const novo = dto.tecnicoId ? await this.usuariosService.findOne(dto.tecnicoId) : null;
+      entradas.push({ campo: 'tecnico', valorAntigo: current.tecnico?.nome, valorNovo: novo?.nome });
+    }
+
+    for (const entrada of entradas) {
+      await this.service.create('historicoTicket', { ticketId, usuarioId, ...entrada, criadoEm: new Date() });
     }
   }
 

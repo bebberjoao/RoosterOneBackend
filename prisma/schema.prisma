@@ -31,6 +31,8 @@ model Usuario {
   historicoTickets HistoricoTicket[]
   avaliacoesTickets AvaliacaoTicket[]
   subcategoriasAtendidas AtendimentoSubcategoria[]
+  mensagensReservas ReservaMensagem[]
+  historicoReservas ReservaHistorico[]
 
   @@map("usuarios")
 }
@@ -227,6 +229,8 @@ model Ticket {
   subcategoriaId String? @map("subcategoria_id") @db.Uuid
   prioridadeId   String? @map("prioridade_id")
   statusId       String? @map("status_id") @db.Uuid
+  tags           String[] @default([])
+  favorito       Boolean  @default(false)
   criadoEm       DateTime? @map("criado_em") @db.Timestamp()
   atualizadoEm   DateTime? @map("atualizado_em") @db.Timestamp()
   encerradoEm    DateTime? @map("encerrado_em") @db.Timestamp()
@@ -359,6 +363,7 @@ model Ambiente {
   descricao         String?
   capa              String?
   galeria           String[]  @default([])
+  recursos          String[]  @default([])
   status            String    @default("disponivel") @db.VarChar(30)
   horarioAbertura   String?   @map("horario_abertura") @db.VarChar(20)
   diasFuncionamento String[]  @default([]) @map("dias_funcionamento")
@@ -392,12 +397,44 @@ model Reserva {
   observacoes   String?
   decididoPor   String?   @map("decidido_por") @db.Uuid
   decididoEm    DateTime? @map("decidido_em") @db.Timestamp()
+  motivoCancelamento String? @map("motivo_cancelamento")
   criadoEm      DateTime? @map("criado_em") @db.Timestamp()
   atualizadoEm  DateTime? @map("atualizado_em") @db.Timestamp()
 
-  ambiente Ambiente @relation(fields: [ambienteId], references: [id], onDelete: Restrict)
+  ambiente  Ambiente @relation(fields: [ambienteId], references: [id], onDelete: Restrict)
+  mensagens ReservaMensagem[]
+  historico ReservaHistorico[]
 
   @@map("reservas")
+}
+
+model ReservaMensagem {
+  id         String    @id @default(uuid()) @db.Uuid
+  reservaId  String    @map("reserva_id") @db.Uuid
+  usuarioId  String    @map("usuario_id") @db.Uuid
+  mensagem   String
+  criadoEm   DateTime  @default(now()) @map("criado_em") @db.Timestamp()
+
+  reserva Reserva @relation(fields: [reservaId], references: [id], onDelete: Cascade)
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([reservaId, criadoEm])
+  @@map("reservas_mensagens")
+}
+
+model ReservaHistorico {
+  id          String    @id @default(uuid()) @db.Uuid
+  reservaId   String    @map("reserva_id") @db.Uuid
+  usuarioId   String?   @map("usuario_id") @db.Uuid
+  campo       String?   @db.VarChar(100)
+  valorAntigo String?   @map("valor_antigo")
+  valorNovo   String?   @map("valor_novo")
+  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+
+  reserva Reserva  @relation(fields: [reservaId], references: [id], onDelete: Cascade)
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@map("reservas_historico")
 }
 
 model PatrimonioCategoria {

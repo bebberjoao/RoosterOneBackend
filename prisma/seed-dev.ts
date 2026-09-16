@@ -139,8 +139,10 @@ function permissionDefinitions(hubModulo: { id: string }, deskModulo: { id: stri
     ['rooms.structure.excluir', 'Excluir estrutura física', roomsModulo, '/rooms/structure', 'excluir'],
     ['rooms.book.solicitar', 'Solicitar reserva', roomsModulo, '/rooms/book', 'solicitar'],
     ['rooms.manage.aprovar', 'Aprovar reserva', roomsModulo, '/rooms/manage', 'aprovar'],
+    ['rooms.manage.responder', 'Responder solicitante (equipe)', roomsModulo, '/rooms/manage', 'responder'],
     ['rooms.manage.alterar-horario', 'Alterar horário (equipe)', roomsModulo, '/rooms/manage', 'alterar-horario'],
     ['rooms.manage.cancelar', 'Cancelar com motivo (equipe)', roomsModulo, '/rooms/manage', 'cancelar'],
+    ['rooms.reservations.mensagem', 'Enviar mensagem na reserva própria', roomsModulo, '/rooms/reservations', 'mensagem'],
     ['rooms.reservations.alterar-horario', 'Solicitar alteração de horário', roomsModulo, '/rooms/reservations', 'alterar-horario'],
     ['rooms.reservations.cancelar', 'Cancelar reserva própria', roomsModulo, '/rooms/reservations', 'cancelar'],
 
@@ -163,10 +165,10 @@ const deskManagementKeys = [
   'desk.categories.subcategorias', 'desk.team.vincular-categoria',
 ];
 const roomsViewKeys = ['rooms.dashboard.acessar'];
-const roomsSelfServiceKeys = ['rooms.book.solicitar', 'rooms.reservations.alterar-horario', 'rooms.reservations.cancelar'];
+const roomsSelfServiceKeys = ['rooms.book.solicitar', 'rooms.reservations.mensagem', 'rooms.reservations.alterar-horario', 'rooms.reservations.cancelar'];
 const roomsManagementKeys = [
   'rooms.structure.criar', 'rooms.structure.editar', 'rooms.structure.excluir',
-  'rooms.manage.aprovar', 'rooms.manage.alterar-horario', 'rooms.manage.cancelar',
+  'rooms.manage.aprovar', 'rooms.manage.responder', 'rooms.manage.alterar-horario', 'rooms.manage.cancelar',
 ];
 const assetsViewKeys = ['assets.dashboard.acessar'];
 const assetsOperationalKeys = ['assets.inventory.criar', 'assets.inventory.editar', 'assets.inventory.movimentar'];

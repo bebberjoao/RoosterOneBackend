@@ -294,13 +294,17 @@ export class RoosterDeskService implements OnModuleInit {
     // solicitante fala -> notifica o técnico responsável; equipe fala (não interna) -> notifica o solicitante.
     const destinatarioId = souDono ? ticket.tecnicoId : !interno ? ticket.usuarioId : null;
 
-    const operacoes: Prisma.PrismaPromise<unknown>[] = [
-      this.prisma.mensagemTicket.create({
+    // Forma interativa (não array de promises): o teste em SQLite envolve o
+    // delegate `ticket` para converter `tags` de/para JSON (ver
+    // prisma-test.service.ts), o que quebra a forma `$transaction([...])`
+    // porque o valor deixa de ser um PrismaPromise "de verdade".
+    const mensagemCriada = await this.prisma.$transaction(async (tx) => {
+      const mensagem = await tx.mensagemTicket.create({
         data: { ticketId, usuarioId, mensagem: dto.mensagem, interno },
         include: { usuario: { select: { id: true, nome: true } } },
-      }),
-      this.prisma.ticket.update({ where: { id: ticketId }, data: { atualizadoEm: new Date() } }),
-      this.prisma.historicoTicket.create({
+      });
+      await tx.ticket.update({ where: { id: ticketId }, data: { atualizadoEm: new Date() } });
+      await tx.historicoTicket.create({
         data: {
           ticketId,
           usuarioId,
@@ -308,23 +312,19 @@ export class RoosterDeskService implements OnModuleInit {
           valorNovo: interno ? 'nota interna adicionada' : 'mensagem adicionada',
           criadoEm: new Date(),
         },
-      }),
-    ];
-
-    if (destinatarioId) {
-      operacoes.push(
-        this.prisma.notificacao.create({
+      });
+      if (destinatarioId) {
+        await tx.notificacao.create({
           data: {
             usuarioId: destinatarioId,
             titulo: 'Nova mensagem no seu chamado',
             mensagem: dto.mensagem.slice(0, 140),
             criadoEm: new Date(),
           },
-        }),
-      );
-    }
-
-    const [mensagemCriada] = await this.prisma.$transaction(operacoes);
+        });
+      }
+      return mensagem;
+    });
     return mensagemCriada;
   }
 

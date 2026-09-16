@@ -49,8 +49,10 @@ const PERMISSION_CATALOG: Array<[modulo: string, recurso: string, acao: string]>
   ['Rooster Rooms', '/rooms/structure', 'excluir'],
   ['Rooster Rooms', '/rooms/book', 'solicitar'],
   ['Rooster Rooms', '/rooms/manage', 'aprovar'],
+  ['Rooster Rooms', '/rooms/manage', 'responder'],
   ['Rooster Rooms', '/rooms/manage', 'alterar-horario'],
   ['Rooster Rooms', '/rooms/manage', 'cancelar'],
+  ['Rooster Rooms', '/rooms/reservations', 'mensagem'],
   ['Rooster Assets', '/assets', 'acessar'],
   ['Rooster Assets', '/assets/inventory', 'criar'],
   ['Rooster Assets', '/assets/inventory', 'editar'],
@@ -420,6 +422,23 @@ describe('Full API e2e tests', () => {
       .expect(201);
     expect(mensagemRes.body.id).toBeDefined();
 
+    const statusEncerradoRes = await request(app.getHttpServer())
+      .post('/status-tickets')
+      .set('Authorization', authHeader)
+      .send({ nome: 'Encerrado', ordem: 2, encerrado: true })
+      .expect(201);
+    await request(app.getHttpServer())
+      .patch(`/chamados/${ticketId}/status`)
+      .set('Authorization', authHeader)
+      .send({ statusId: statusEncerradoRes.body.id })
+      .expect(200);
+
+    const ticketDetalheRes = await request(app.getHttpServer())
+      .get(`/chamados/${ticketId}`)
+      .set('Authorization', authHeader)
+      .expect(200);
+    expect(ticketDetalheRes.body.historico.some((h: any) => h.campo === 'status' && h.valorNovo === 'Encerrado')).toBe(true);
+
     const avaliacaoRes = await request(app.getHttpServer())
       .post('/avaliacoes-tickets')
       .set('Authorization', authHeader)
@@ -468,6 +487,32 @@ describe('Full API e2e tests', () => {
       .send({ status: 'confirmada' })
       .expect(200);
     expect(statusRes.body.status).toBe('confirmada');
+
+    const mensagemRes = await request(app.getHttpServer())
+      .post(`/reservas/${reservaRes.body.id}/mensagens`)
+      .set('Authorization', authHeader)
+      .send({ mensagem: 'Sala liberada para o evento.' })
+      .expect(201);
+    expect(mensagemRes.body.mensagem).toBe('Sala liberada para o evento.');
+
+    const mensagensListRes = await request(app.getHttpServer())
+      .get(`/reservas/${reservaRes.body.id}/mensagens`)
+      .set('Authorization', authHeader)
+      .expect(200);
+    expect(mensagensListRes.body.length).toBe(1);
+
+    const canceladaRes = await request(app.getHttpServer())
+      .patch(`/reservas/${reservaRes.body.id}/status`)
+      .set('Authorization', authHeader)
+      .send({ status: 'cancelada', motivo: 'Evento adiado' })
+      .expect(200);
+    expect(canceladaRes.body.motivoCancelamento).toBe('Evento adiado');
+
+    const reservaDetalheRes = await request(app.getHttpServer())
+      .get(`/reservas/${reservaRes.body.id}`)
+      .set('Authorization', authHeader)
+      .expect(200);
+    expect(reservaDetalheRes.body.historico.some((h: any) => h.campo === 'status' && h.valorNovo === 'cancelada')).toBe(true);
   });
 
   it('Rooster Assets should register an asset and a movement', async () => {

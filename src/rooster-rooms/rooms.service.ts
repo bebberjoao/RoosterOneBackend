@@ -11,6 +11,7 @@ import { CreateAmbienteDto } from './dto/create-ambiente.dto';
 import { CreateBlocoDto } from './dto/create-bloco.dto';
 import { CreateCampusDto } from './dto/create-campus.dto';
 import { CreateReservaDto } from './dto/create-reserva.dto';
+import { CreateMensagemReservaDto } from './dto/create-mensagem-reserva.dto';
 import { UpdateAmbienteDto } from './dto/update-ambiente.dto';
 import { UpdateBlocoDto } from './dto/update-bloco.dto';
 import { UpdateCampusDto } from './dto/update-campus.dto';
@@ -156,6 +157,7 @@ export class RoomsService {
       descricao: dto.descricao,
       capa: dto.capa,
       galeria: dto.galerias ?? [],
+      recursos: dto.recursos ?? [],
       status: dto.status ?? 'disponivel',
       horarioAbertura: dto.horarioAbertura,
       diasFuncionamento: dto.diasSemana ?? [],
@@ -221,6 +223,7 @@ export class RoomsService {
       ...(dto.tipo ? { tipo: dto.tipo } : {}),
       ...(dto.area !== undefined ? { area: new Prisma.Decimal(dto.area) } : {}),
       ...(dto.galerias ? { galeria: dto.galerias } : {}),
+      ...(dto.recursos ? { recursos: dto.recursos } : {}),
       ...(dto.diasSemana ? { diasFuncionamento: dto.diasSemana } : {}),
       atualizadoEm: new Date(),
     } as any;
@@ -296,7 +299,7 @@ export class RoomsService {
   async findOneReserva(id: string) {
     const reserva = await this.prisma.reserva.findUnique({
       where: { id },
-      include: { ambiente: true },
+      include: { ambiente: true, historico: { orderBy: { criadoEm: 'asc' } } },
     });
 
     if (!reserva) {
@@ -306,7 +309,7 @@ export class RoomsService {
     return reserva;
   }
 
-  async updateReserva(id: string, dto: UpdateReservaDto) {
+  async updateReserva(id: string, dto: UpdateReservaDto, usuarioIdAutor?: string) {
     const atual = await this.findOneReserva(id);
 
     const mexeNaAgenda =
@@ -338,7 +341,17 @@ export class RoomsService {
     } as any;
 
     try {
-      return await this.prisma.reserva.update({ where: { id }, data, include: { ambiente: true } });
+      const atualizada = await this.prisma.reserva.update({ where: { id }, data, include: { ambiente: true } });
+      if (mexeNaAgenda) {
+        const de = `${atual.data.toISOString().slice(0, 10)} ${atual.horarioInicio}–${atual.horarioFim}`;
+        const para = `${atualizada.data.toISOString().slice(0, 10)} ${atualizada.horarioInicio}–${atualizada.horarioFim}`;
+        if (de !== para) {
+          await this.prisma.reservaHistorico.create({
+            data: { reservaId: id, usuarioId: usuarioIdAutor, campo: 'horario', valorAntigo: de, valorNovo: para, criadoEm: new Date() },
+          });
+        }
+      }
+      return atualizada;
     } catch (error) {
       this.handleError(error, 'atualizar reserva');
     }
@@ -354,7 +367,7 @@ export class RoomsService {
     }
   }
 
-  async updateReservaStatus(id: string, status: string, decididoPor?: string) {
+  async updateReservaStatus(id: string, status: string, decididoPor?: string, motivo?: string) {
     if (!RoomsService.RESERVA_STATUS_VALIDOS.includes(status)) {
       throw new BadRequestException(
         `Status inválido: "${status}". Valores aceitos: ${RoomsService.RESERVA_STATUS_VALIDOS.join(', ')}.`,
@@ -378,17 +391,34 @@ export class RoomsService {
     }
 
     const ehDecisao = status === 'confirmada' || status === 'cancelada';
+    const statusAnterior = reserva.status;
 
-    return this.prisma.reserva.update({
+    const atualizada = await this.prisma.reserva.update({
       where: { id: reserva.id },
       data: {
         status,
         ...(ehDecisao ? { decididoEm: new Date() } : {}),
         ...(ehDecisao && decididoPor ? { decididoPor } : {}),
+        ...(status === 'cancelada' && motivo ? { motivoCancelamento: motivo } : {}),
         atualizadoEm: new Date(),
       },
       include: { ambiente: true },
     });
+
+    if (statusAnterior !== status) {
+      await this.prisma.reservaHistorico.create({
+        data: {
+          reservaId: id,
+          usuarioId: decididoPor,
+          campo: 'status',
+          valorAntigo: statusAnterior,
+          valorNovo: status,
+          criadoEm: new Date(),
+        },
+      });
+    }
+
+    return atualizada;
   }
 
   async getDisponibilidade(ambienteId: string, dataStr?: string) {
@@ -454,6 +484,24 @@ export class RoomsService {
         status: r.status,
       })),
     };
+  }
+
+  // Conversa da reserva
+  async getMensagensReserva(reservaId: string) {
+    await this.findOneReserva(reservaId);
+    return this.prisma.reservaMensagem.findMany({
+      where: { reservaId },
+      orderBy: { criadoEm: 'asc' },
+      include: { usuario: { select: { id: true, nome: true } } },
+    });
+  }
+
+  async createMensagemReserva(reservaId: string, usuarioId: string, dto: CreateMensagemReservaDto) {
+    await this.findOneReserva(reservaId);
+    return this.prisma.reservaMensagem.create({
+      data: { reservaId, usuarioId, mensagem: dto.mensagem },
+      include: { usuario: { select: { id: true, nome: true } } },
+    });
   }
 
   // =====================================================

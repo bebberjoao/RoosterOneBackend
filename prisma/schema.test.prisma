@@ -31,6 +31,8 @@ model Usuario {
   anexosTickets AnexoTicket[]
   historicoTickets HistoricoTicket[]
   avaliacoesTickets AvaliacaoTicket[]
+  mensagensReservas ReservaMensagem[]
+  historicoReservas ReservaHistorico[]
 }
 
 model Setor {
@@ -180,6 +182,8 @@ model Ticket {
   subcategoriaId String?
   prioridadeId String?
   statusId String?
+  tags String? // JSON — SQLite não suporta String[] nativo (ver prisma-test.service.ts)
+  favorito Boolean @default(false)
   criadoEm DateTime?
   atualizadoEm DateTime?
   encerradoEm DateTime?
@@ -293,6 +297,7 @@ model Ambiente {
   descricao String?
   capa String?
   galeria String?
+  recursos String? // JSON — mesmo shim de galeria
   status String @default("disponivel")
   horarioAbertura String?
   diasFuncionamento String?
@@ -323,9 +328,36 @@ model Reserva {
   observacoes String?
   decididoPor String?
   decididoEm DateTime?
+  motivoCancelamento String?
   criadoEm DateTime?
   atualizadoEm DateTime?
   ambiente Ambiente @relation(fields: [ambienteId], references: [id], onDelete: Restrict)
+  mensagens ReservaMensagem[]
+  historico ReservaHistorico[]
+}
+
+model ReservaMensagem {
+  id String @id @default(uuid())
+  reservaId String
+  usuarioId String
+  mensagem String
+  criadoEm DateTime @default(now())
+  reserva Reserva @relation(fields: [reservaId], references: [id], onDelete: Cascade)
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([reservaId, criadoEm])
+}
+
+model ReservaHistorico {
+  id String @id @default(uuid())
+  reservaId String
+  usuarioId String?
+  campo String?
+  valorAntigo String?
+  valorNovo String?
+  criadoEm DateTime?
+  reserva Reserva @relation(fields: [reservaId], references: [id], onDelete: Cascade)
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
 }
 
 model PatrimonioCategoria {

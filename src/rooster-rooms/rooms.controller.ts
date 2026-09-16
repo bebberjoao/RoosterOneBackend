@@ -20,6 +20,7 @@ import { CreateAmbienteDto } from './dto/create-ambiente.dto';
 import { CreateBlocoDto } from './dto/create-bloco.dto';
 import { CreateCampusDto } from './dto/create-campus.dto';
 import { CreateReservaDto } from './dto/create-reserva.dto';
+import { CreateMensagemReservaDto } from './dto/create-mensagem-reserva.dto';
 import { UpdateAmbienteDto } from './dto/update-ambiente.dto';
 import { UpdateBlocoDto } from './dto/update-bloco.dto';
 import { UpdateCampusDto } from './dto/update-campus.dto';
@@ -190,7 +191,8 @@ export class RoomsController {
   @ApiBody({ type: UpdateReservaDto })
   async updateReserva(@Req() request: Request, @Param('id') id: string, @Body() dto: UpdateReservaDto) {
     await this.requireReservaAccess(request, id, 'alterar-horario');
-    return this.roomsService.updateReserva(id, dto);
+    const usuarioId = (request.user as { id?: string } | undefined)?.id;
+    return this.roomsService.updateReserva(id, dto, usuarioId);
   }
 
   @Delete('reservas/:id')
@@ -206,17 +208,39 @@ export class RoomsController {
     @Req() request: Request,
     @Param('id') id: string,
     @Body('status') status: string,
+    @Body('motivo') motivo?: string,
   ) {
     const decididoPor = (request.user as { id?: string } | undefined)?.id;
-    return this.roomsService.updateReservaStatus(id, status, decididoPor);
+    return this.roomsService.updateReservaStatus(id, status, decididoPor, motivo);
   }
 
-  /** Libera se o usuário gerencia reservas, ou se é o dono e pode se auto-atender na ação informada. */
-  private async requireReservaAccess(request: Request, reservaId: string, acaoSolicitante: string) {
+  @Get('reservas/:id/mensagens')
+  @ApiOperation({ summary: 'Lista a conversa da reserva' })
+  async findMensagensReserva(@Req() request: Request, @Param('id') id: string) {
+    await this.requireReservaAccess(request, id, 'mensagem', 'responder');
+    return this.roomsService.getMensagensReserva(id);
+  }
+
+  @Post('reservas/:id/mensagens')
+  @ApiOperation({ summary: 'Envia uma mensagem na conversa da reserva' })
+  @ApiBody({ type: CreateMensagemReservaDto })
+  async createMensagemReserva(@Req() request: Request, @Param('id') id: string, @Body() dto: CreateMensagemReservaDto) {
+    await this.requireReservaAccess(request, id, 'mensagem', 'responder');
+    const usuarioId = (request.user as { id: string }).id;
+    return this.roomsService.createMensagemReserva(id, usuarioId, dto);
+  }
+
+  /**
+   * Libera se o usuário gerencia reservas (ação em `/rooms/manage`), ou se é
+   * o dono e pode se auto-atender (ação em `/rooms/reservations`). Os nomes
+   * das duas ações no catálogo às vezes divergem (ex.: "responder" para a
+   * equipe vs. "mensagem" para o solicitante) — por isso os dois parâmetros.
+   */
+  private async requireReservaAccess(request: Request, reservaId: string, acaoSolicitante: string, acaoGestor = acaoSolicitante) {
     const usuarioId = (request.user as { id?: string } | undefined)?.id;
     if (!usuarioId) throw new ForbiddenException('Usuário não autenticado.');
 
-    if (await this.usuariosService.hasPermission(usuarioId, MODULO, '/rooms/manage', acaoSolicitante)) return;
+    if (await this.usuariosService.hasPermission(usuarioId, MODULO, '/rooms/manage', acaoGestor)) return;
 
     const reserva = await this.roomsService.findOneReserva(reservaId);
     const isOwner = reserva.responsavelId === usuarioId;
