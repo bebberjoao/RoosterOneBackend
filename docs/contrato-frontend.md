@@ -19,7 +19,7 @@ Este documento registra a cobertura do contrato REST definido em `frontend_fag/s
 | Desk | `/chamados`, `/chamados-categorias`, `/chamados-subcategorias`, `/chamados-prioridades`, `/chamados-status` e recursos legados de mensagens/anexos/histórico/avaliações | Implementado |
 | Academy | `/disciplinas`, `/cursos`, `/periodos-letivos`, `/professores`, `/alunos`, `/turmas`, `/matriculas`, `/notas`, `/frequencias` | Pendente |
 | Learn | `/atividades`, `/entregas`, `/conteudos-aula` | Pendente |
-| Rooms | `/campus`, `/blocos`, `/ambientes`, `/ambientes/estrutura`, `/reservas` | Implementado |
+| Rooms | `/campus`, `/blocos`, `/ambientes`, `/ambientes/estrutura`, `/reservas`, `/reservas/:id/mensagens` | Implementado |
 | Assets | `/patrimonio-categorias`, `/patrimonio-setores`, `/patrimonio`, `/patrimonio-movimentacoes` | Implementado |
 | Finance | `/produtos`, `/servicos`, `/cobrancas`, `/mensalidades`, `/pagamentos`, `/notas-fiscais`, `/descontos` | Pendente |
 | Boost | `/boost-cursos`, `/boost-categorias`, `/boost-instrutores`, `/boost-videos`, `/boost-matriculas`, `/certificados` | Pendente |
@@ -59,6 +59,20 @@ Os módulos pendentes devem ser criados seguindo os modelos de dados do frontend
 
 - **Rooms** — regras de reserva (conflito de horário `409`; término/capacidade/janela de funcionamento `400`), aprovação via `PATCH /reservas/:id/status` com registro de `decididoPor`/`decididoEm`, disponibilidade real em `GET /ambientes/:id/disponibilidade`. Ver [modulos/rooms.md](modulos/rooms.md) e [RN008](regras-negocio/RN008-reservas-ambientes.md).
 - **Assets** — movimentação transacional que atualiza o item (`createMovement` devolve `{ movimentacao, patrimonio }`), baixa via `PATCH /patrimonio/:id/baixa`, tag única `409`. Ver [modulos/assets.md](modulos/assets.md) e [RN009](regras-negocio/RN009-movimentacao-patrimonio.md).
+
+## Conversa/histórico de reserva e histórico de chamado (09/2026)
+
+- **Rooms** ganhou `ReservaMensagem`/`ReservaHistorico` (ver
+  [RN010](regras-negocio/RN010-conversa-e-historico-reservas.md)):
+  `GET`/`POST /reservas/:id/mensagens`; `GET /reservas/:id` agora inclui
+  `historico`; `PATCH /reservas/:id/status` aceita `motivo` (gravado em
+  `motivoCancelamento` quando o status vira "cancelada"); `Ambiente` ganhou
+  `recursos: string[]`.
+- **Desk**: `Ticket` ganhou `tags: string[]` e `favorito: boolean`;
+  `historico_tickets` passou a ser gravado também em troca de
+  status/prioridade/categoria/técnico, não só em mensagem (ver
+  [RN011](regras-negocio/RN011-historico-de-chamados.md)); `GET /chamados/:id`
+  agora inclui `historico`.
 
 ## RBAC direto por usuário (09/2026)
 

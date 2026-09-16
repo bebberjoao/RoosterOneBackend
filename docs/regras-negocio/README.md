@@ -13,6 +13,8 @@ Esta pasta reúne as regras funcionais do sistema, identificadas por chave `RNxx
 - [RN007 - Notificações](RN007-notificacoes.md)
 - [RN008 - Reservas de ambientes](RN008-reservas-ambientes.md)
 - [RN009 - Movimentação e baixa de patrimônio](RN009-movimentacao-patrimonio.md)
+- [RN010 - Conversa e histórico de reservas](RN010-conversa-e-historico-reservas.md)
+- [RN011 - Histórico de campo alterado no chamado](RN011-historico-de-chamados.md)
 
 ## Formato de documentação
 

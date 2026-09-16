@@ -28,6 +28,9 @@ Servir como uma wiki interna para compreender rapidamente:
 ### Módulos
 - [Módulos do sistema](modulos/README.md)
 
+### Requisitos
+- [Requisitos funcionais e não funcionais](requisitos/README.md)
+
 ### Regras de negócio
 - [Regras de negócio](regras-negocio/README.md)
 
@@ -84,6 +87,7 @@ docs/
 ├── arquitetura/
 ├── banco/
 ├── modulos/
+├── requisitos/
 ├── regras-negocio/
 ├── fluxos/
 ├── adr/
