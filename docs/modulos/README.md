@@ -8,12 +8,10 @@ Esta pasta reúne a documentação detalhada de cada módulo implementado no bac
 
 - [Usuários](usuarios.md)
 - [Setores](setores.md)
-- [Perfis](perfis.md)
 - [Módulos](modulos.md)
 - [Permissões](permissoes.md)
-- [Usuários-Perfis](usuarios-perfis.md)
+- [Usuários-Permissões](usuarios-permissoes.md)
 - [Usuários-Setores](usuarios-setores.md)
-- [Perfis-Permissões](perfis-permissoes.md)
 - [Notificações](notificacoes.md)
 - [Sessões](sessoes.md)
 - [Logs de auditoria](logs-auditoria.md)

@@ -54,9 +54,11 @@ Servir como uma wiki interna para compreender rapidamente:
   — ver [CHANGELOG](CHANGELOG.md).
 - O Desk persiste SLA em `categorias_tickets.sla_horas` e
 	`subcategorias_tickets.sla_horas`, padrão de 8 horas e mínimo de 1.
-- O Hub mantém módulos, permissões, perfis e vínculos com índices únicos.
+- O Hub mantém módulos, permissões e concessões diretas por usuário
+  (`usuarios_permissoes`, sem Perfil) com índices únicos.
 - O acesso efetivo pode ser consultado por `/usuarios/:id/acesso`.
-- Guards e enforcement automático de RBAC estão adiados.
+- `JwtAuthGuard` (autenticação) e `PermissionGuard` (autorização por
+  `@RequirePermission`) estão registrados globalmente — ver [rbac.md](rbac.md).
 
 Após configurar o banco, aplique as migrations com:
 
@@ -68,7 +70,7 @@ npm run prisma:deploy
 
 O backend do Rooster One está organizado como uma API REST modular construída com NestJS e Prisma, com foco em:
 
-- gestão de usuários, setores, perfis e permissões;
+- gestão de usuários, setores e permissões (concedidas direto ao usuário);
 - controle de sessões e notificações;
 - auditoria de ações realizadas no sistema;
 - extensibilidade para novos módulos e regras de negócio.

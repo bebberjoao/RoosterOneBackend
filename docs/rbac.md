@@ -1,131 +1,111 @@
-# RBAC do Rooster One
+# RBAC e autenticação do Rooster One
 
 ## Objetivo
 
-O sistema controla o que cada usuário pode fazer por meio de quatro registros:
+O sistema controla o que cada usuário pode fazer por meio de uma concessão
+**direta**, sem intermediário:
 
 ```text
-Usuário -> UsuárioPerfil -> Perfil -> PerfilPermissao -> Permissão -> Módulo
+Usuário -> UsuárioPermissao -> Permissão -> Módulo
 ```
 
-Um usuário pode ter vários perfis. Um perfil pode agrupar várias permissões. A permissão informa o módulo, o recurso e a ação.
+Não existe mais o conceito de Perfil/Role. Um usuário recebe permissões
+individualmente; um administrador é apenas um usuário que recebeu (como
+qualquer outra) a permissão de gerenciar o próprio sistema de permissões
+(`Rooster Hub` / `/hub/acessos` / `gerenciar-permissoes`).
 
-Exemplo:
+Exemplo de permissão:
 
 | Campo | Valor |
 | --- | --- |
 | Módulo | `Rooster Desk` |
-| Recurso | `ticket` |
-| Ação | `create` |
-| Nome | `Criar tickets` |
+| Recurso | `/desk/tickets` |
+| Ação | `criar` |
+| Nome | `desk.tickets.criar` |
 
-Essa permissão significa: o usuário pode criar tickets no Rooster Desk.
+`recurso` é sempre a rota da tela no frontend e `acao` o id da ação — o
+mesmo catálogo que a tela `/hub/acessos` usa
+(`src/components/rooster/hub/permission-catalog.ts` no frontend) para
+conceder/revogar. Conceder essa permissão pela UI cria (sob demanda) o
+registro em `permissoes` e o vínculo em `usuarios_permissoes` — é
+literalmente a mesma tabela que o `@RequirePermission` do backend consulta,
+então o que é concedido na tela realmente controla a API.
 
-## Registros iniciais
+## Autenticação
 
-Ao iniciar o backend, o Rooster Desk cria ou atualiza automaticamente:
-
-- módulo `Rooster Desk`;
-- permissão `Criar tickets` (`ticket:create`);
-- perfil `Solicitante`, vinculado a essa permissão;
-- perfil `Atendente`, sem essa permissão.
-
-O seed usa `upsert`, portanto pode ser executado várias vezes sem duplicar registros.
-
-Para o cenário completo de demonstração, use `npm run db:seed:dev`. Esse comando
-limpa o banco configurado em `DATABASE_URL` e recria todos os registros descritos
-neste documento. Use-o somente no banco de desenvolvimento.
-
-## Como cadastrar um usuário
-
-```http
-POST /usuarios
-Content-Type: application/json
-
-{
-  "nome": "Ana Silva",
-  "email": "ana@instituicao.edu.br",
-  "senhaHash": "SenhaSegura123",
-  "ativo": true
-}
-```
-
-Apesar do nome histórico `senhaHash`, neste modo a senha ainda é armazenada e comparada diretamente. Isso é aceitável somente para desenvolvimento local.
-
-## Como associar o perfil
-
-1. Liste os usuários em `GET /usuarios`.
-2. Liste os perfis em `GET /perfis`.
-3. Associe o usuário ao perfil:
-
-```http
-POST /usuarios-perfis
-Content-Type: application/json
-
-{
-  "usuarioId": "ID_DO_USUARIO",
-  "perfilId": "ID_DO_PERFIL_SOLICITANTE"
-}
-```
-
-Para retirar o acesso, remova o vínculo correspondente em `DELETE /usuarios-perfis/:id`.
-
-## Login
-
-```http
-POST /auth/login
-Content-Type: application/json
-
-{
-  "email": "ana@instituicao.edu.br",
-  "senha": "SenhaSegura123"
-}
-```
-
-O retorno contém o usuário e o acesso calculado:
+Login é `POST /auth/login` (`{ email, senha }`), sem cabeçalho `x-user-id` —
+isso foi removido. A senha é comparada com `bcrypt.compare` contra o hash
+salvo (nunca em texto puro). A resposta traz um JWT:
 
 ```json
 {
   "usuario": { "id": "...", "nome": "Ana Silva", "email": "..." },
-  "acesso": {
-    "usuarioId": "...",
-    "perfis": [],
-    "permissoes": [],
-    "modulos": []
-  }
+  "acesso": { "usuarioId": "...", "permissoes": [...], "modulos": [...] },
+  "accessToken": "eyJhbGciOi..."
 }
 ```
 
-O frontend salva esse resultado localmente e envia o id do usuário no cabeçalho `x-user-id`.
+O token expira em 8h e precisa ser enviado em toda requisição protegida:
+
+```http
+GET /usuarios
+Authorization: Bearer eyJhbGciOi...
+```
+
+Sem o header (ou com token expirado/inválido), o `JwtAuthGuard` global
+responde `401` antes de qualquer checagem de permissão. `JWT_SECRET` é
+obrigatório — a aplicação não sobe sem essa variável de ambiente (não há mais
+fallback fixo no código).
+
+## Como cadastrar um usuário e conceder acesso
+
+```http
+POST /usuarios
+Content-Type: application/json
+Authorization: Bearer TOKEN_DE_ADMIN
+
+{ "nome": "Ana Silva", "email": "ana@instituicao.edu.br", "senhaHash": "SenhaSegura123", "ativo": true }
+```
+
+(o campo continua se chamando `senhaHash` por compatibilidade com o
+contrato existente, mas o valor enviado é a senha em texto puro — o hash é
+gerado no servidor.)
+
+Conceder uma permissão:
+
+```http
+POST /usuarios-permissoes
+Content-Type: application/json
+Authorization: Bearer TOKEN_DE_ADMIN
+
+{ "usuarioId": "ID_DO_USUARIO", "permissaoId": "ID_DA_PERMISSAO" }
+```
+
+Para retirar o acesso: `DELETE /usuarios-permissoes/:id`.
 
 ## Criação de tickets
 
-O endpoint `POST /tickets` exige:
+O endpoint `POST /chamados` (ou `/tickets`) exige:
 
-1. `x-user-id` com um usuário existente e ativo;
-2. o vínculo desse usuário com um perfil;
-3. uma permissão cujo módulo seja `Rooster Desk`, recurso `ticket` e ação `create`.
+1. token válido no `Authorization`;
+2. a permissão `Rooster Desk` / `/desk/tickets` / `criar`.
 
-O `usuarioId` enviado no corpo é ignorado/substituído pelo usuário do cabeçalho. Assim, um usuário não abre um ticket em nome de outra pessoa.
+O `usuarioId` do chamado vem do token (`request.user.id`), nunca do corpo —
+um usuário não abre um chamado em nome de outra pessoa.
 
 Respostas esperadas:
 
-- `401`: cabeçalho ausente ou login inválido;
-- `403`: usuário ativo, mas sem `ticket:create`;
-- `201`: ticket criado para o usuário autenticado.
-
-## O que a interface faz
-
-- O login chama `/auth/login`.
-- O botão `Novo chamado` só aparece quando o acesso contém `Rooster Desk/ticket/create`.
-- A API continua verificando a permissão, mesmo que alguém esconda o botão ou chame a API manualmente.
-- O indicador de perfil no topo é somente informativo; não existe mais troca de perfil em modo de desenvolvimento.
+- `401`: token ausente, inválido ou expirado;
+- `403`: token válido, mas sem `/desk/tickets:criar`;
+- `201`: chamado criado para o usuário autenticado.
 
 ## Desk por setor
 
-Cada categoria de ticket possui um `setorId`, que define o setor responsável pelo atendimento. A listagem de tickets usa esse vínculo, e não o setor de quem abriu o chamado.
-
-Coordenadores podem criar e editar categorias e subcategorias somente no próprio setor. Também podem associar atendentes do próprio setor às subcategorias por:
+Cada categoria de chamado tem um `setorId`. Coordenadores só gerenciam
+categorias/subcategorias do próprio setor (`isReferenceInUserSector`, em
+`rooster-desk.service.ts`) — essa regra é adicional à permissão de tela, não
+substitui: é preciso ter a permissão **e** o recurso precisa pertencer ao
+setor do usuário.
 
 ```http
 PATCH /chamados-subcategorias/:id/atendentes
@@ -135,8 +115,6 @@ Content-Type: application/json
 { "usuarioIds": ["ID_DO_ATENDENTE"] }
 ```
 
-Atendentes podem assumir um ticket do seu setor:
-
 ```http
 PATCH /chamados/:id/atribuir
 Authorization: Bearer TOKEN
@@ -145,18 +123,20 @@ Content-Type: application/json
 { "tecnicoId": "ID_DO_ATENDENTE" }
 ```
 
-O admin pode gerenciar categorias, subcategorias e associações globalmente. Tickets de um setor não aparecem para atendentes de outro setor.
+## Usuários de demonstração (`npm run db:seed:dev`)
 
-## Usuários de demonstração
+| Usuário | Senha | Acesso |
+| --- | --- | --- |
+| `admin@rooster.local` | `Admin123!` | todas as permissões do catálogo |
+| `ana.solicitante@rooster.local` | `Senha123` | abrir/acompanhar chamados, reservar salas |
+| `bruno.atendente@rooster.local` | `Senha123` | operar Desk/Rooms/Assets no dia a dia |
+| `carla.visualizadora@rooster.local` | `Senha123` | só leitura |
+| `coordenador.{secretaria,suporte,coordenacao}@rooster.local` | `Coordenador123!` | gerencia categorias/atendentes e aprova reservas/baixa do próprio setor |
 
-Os três coordenadores criados pelo seed usam a senha `Coordenador123!`:
+O seed recria o banco de `DATABASE_URL` do zero — só em desenvolvimento.
 
-- `coordenador.secretaria@rooster.local`
-- `coordenador.suporte@rooster.local`
-- `coordenador.coordenacao@rooster.local`
+## O que ainda não existe
 
-Cada coordenador possui `categoria:create`, `subcategoria:create` e `desk-config:manage`, além das permissões de leitura do Desk, e está vinculado a um único setor.
-
-## Limitação consciente
-
-Este é um RBAC parcial para desenvolvimento e demonstração. O cabeçalho `x-user-id` pode ser forjado porque não existe JWT, sessão segura ou middleware de autenticação. Antes de produção, é necessário implementar autenticação segura, hash de senha, sessão/token, expiração, revogação e auditoria.
+- Refresh token / revogação antes da expiração (8h é fixo).
+- Rate limiting no login.
+- Upload físico de anexos (`/anexos-tickets` só registra metadados).

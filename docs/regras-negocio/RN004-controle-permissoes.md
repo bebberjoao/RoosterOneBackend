@@ -2,9 +2,9 @@
 
 ## Descrição
 
-O Hub mantém o catálogo de módulos e permissões e permite associar:
+O Hub mantém o catálogo de módulos e permissões e a concessão direta:
 
-`Usuário -> Perfil -> Permissão -> Módulo`.
+`Usuário -> UsuárioPermissao -> Permissão -> Módulo`.
 
 O acesso efetivo pode ser consultado por `GET /usuarios/:id/acesso` e uma
 verificação específica por módulo/ação por
@@ -12,16 +12,21 @@ verificação específica por módulo/ação por
 
 ## Justificativa
 
-Garantir que o acesso ao sistema seja controlado e rastreável.
+Garantir que o acesso ao sistema seja controlado e rastreável, sem depender
+de um agrupamento (perfil) que poderia mascarar o que o usuário de fato tem
+concedido.
 
 ## Impacto
 
-O catálogo e as associações estão persistidos e possuem CRUD. A aplicação de
-guards, autenticação e bloqueio automático das rotas por RBAC fica adiada para
-uma etapa posterior.
+O catálogo e as concessões estão persistidos e têm CRUD. `JwtAuthGuard`
+(autenticação) e `PermissionGuard` (autorização por `@RequirePermission`)
+estão registrados globalmente e cobrem Hub, Desk, Rooms e Assets — não é
+mais uma etapa adiada.
 
 ## Observações
 
-A regra deve evoluir para um modelo fino, com avaliação por recurso, ação e
-contexto. Até lá, o endpoint de consulta é informativo e não substitui uma
-camada de autorização.
+A avaliação é por `modulo/recurso/acao`, onde `recurso` é a rota da tela do
+frontend e `acao` o id da ação (mesmo catálogo de `/hub/acessos`). Módulos
+ainda sem backend (Academy, Learn, Finance, Boost, Student) não têm
+permissões reais — só as que existirem no catálogo do frontend, sem nenhum
+endpoint que as valide.

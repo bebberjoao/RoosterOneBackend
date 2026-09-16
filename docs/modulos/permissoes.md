@@ -6,18 +6,18 @@ Definir as ações e recursos que podem ser autorizados dentro do sistema.
 
 ## Responsabilidades
 
-- criar permissões granulares;
-- associar permissões a perfis;
-- servir de base para autorização.
+- criar permissões granulares (`modulo` / `recurso` / `acao`);
+- ser concedida diretamente a usuários via `usuarios-permissoes`;
+- servir de base para o `PermissionGuard`.
 
 ## Entidades pertencentes
 
 - Permissao
-- PerfilPermissao
+- UsuarioPermissao (ver [Usuários-Permissões](usuarios-permissoes.md))
 
 ## Relacionamentos com outros módulos
 
-- uma permissão pode ser vinculada a vários perfis;
+- uma permissão pode ser concedida a vários usuários;
 - uma permissão está associada a um módulo.
 
 ## Fluxo de funcionamento
@@ -49,21 +49,17 @@ sequenceDiagram
 ## Dependências
 
 - Prisma Client
-- módulo de perfis-permissoes
+- módulo de usuários-permissões
 
 ## Regras de negócio relacionadas
 
-- cada permissão deve refletir um recurso e uma ação claros;
-- `moduloId`, `perfilId` e `permissaoId` devem ser UUIDs válidos;
-- vínculos duplicados são impedidos por índices únicos no banco.
-
-## Funcionalidades futuras
-
-- guards e autorização automática por endpoint;
-- avaliação dinâmica de acesso em cada requisição.
+- cada permissão deve refletir um recurso (rota da tela) e uma ação claros;
+- `moduloId` e `permissaoId` devem ser UUIDs válidos;
+- vínculos duplicados (`usuarioId` + `permissaoId`) são impedidos por índice
+  único no banco.
 
 ## Observações técnicas
 
-Este módulo fornece o catálogo necessário para RBAC e já participa da consulta
-de acesso efetivo do usuário. O bloqueio automático das rotas ainda não está
-ativado.
+Este módulo fornece o catálogo usado pelo `PermissionGuard`, registrado
+globalmente — o bloqueio automático das rotas por `@RequirePermission` já
+está ativo em Hub, Desk, Rooms e Assets (ver [rbac.md](../rbac.md)).

@@ -5,7 +5,7 @@ Esta pasta documenta os principais processos do backend do Rooster One, com foco
 ## Índice
 
 - [Autenticação e sessões](autenticacao-sessoes.md)
-- [Gestão de usuários e perfis](usuarios-perfis.md)
+- [Gestão de usuários e permissões](usuarios-permissoes.md)
 - [Gestão de setores e vinculações](setores-vinculacoes.md)
 - [Gestão de permissões](permissoes.md)
 - [Notificações](notificacoes.md)

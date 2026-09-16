@@ -5,7 +5,7 @@ Esta pasta reúne as regras funcionais do sistema, identificadas por chave `RNxx
 ## Índice
 
 - [RN001 - Cadastro de usuários](RN001-cadastro-usuarios.md)
-- [RN002 - Associação de perfis](RN002-associacao-perfis.md)
+- [RN002 - Concessão direta de permissões](RN002-concessao-permissoes.md)
 - [RN003 - Associação de setores](RN003-associacao-setores.md)
 - [RN004 - Controle de permissões](RN004-controle-permissoes.md)
 - [RN005 - Gestão de sessões](RN005-gestao-sessoes.md)

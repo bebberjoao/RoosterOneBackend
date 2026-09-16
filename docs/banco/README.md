@@ -8,10 +8,9 @@ O banco é modelado com Prisma e utiliza PostgreSQL. A estrutura atual prioriza 
 
 ```mermaid
 erDiagram
-    USUARIO ||--o{ USUARIO_PERFIL : possui
-    PERFIL ||--o{ USUARIO_PERFIL : recebe
-    PERFIL ||--o{ PERFIL_PERMISSAO : possui
-    PERMISSAO ||--o{ PERFIL_PERMISSAO : atribuida_a
+    USUARIO ||--o{ USUARIO_PERMISSAO : recebe
+    PERMISSAO ||--o{ USUARIO_PERMISSAO : concedida_em
+    MODULO ||--o{ PERMISSAO : agrupa
     USUARIO ||--o{ USUARIO_SETOR : alocado_em
     SETOR ||--o{ USUARIO_SETOR : recebe
     USUARIO ||--o{ NOTIFICACAO : recebe
@@ -25,12 +24,10 @@ erDiagram
 | --- | --- |
 | Usuario | Representa um usuário da plataforma |
 | Setor | Unidade organizacional ou área funcional |
-| Perfil | Agrupamento de permissões por função |
 | Modulo | Recurso ou módulo do sistema |
-| Permissao | Ação ou recurso autorizável |
-| UsuarioPerfil | Associação usuário-perfil |
-| UsuarioSetor | Associação usuário-setor |
-| PerfilPermissao | Associação perfil-permissão |
+| Permissao | Ação autorizável de uma tela (`recurso` = rota, `acao` = id da ação) |
+| UsuarioPermissao | Concessão direta de uma permissão a um usuário — não existe mais Perfil/Role como intermediário |
+| UsuarioSetor | Associação usuário-setor (organização, não autorização) |
 | Notificacao | Mensagem interna para o usuário |
 | Sessao | Registro de sessão ativa e refresh token |
 | LogAuditoria | Registro de eventos críticos |
@@ -46,9 +43,8 @@ erDiagram
 
 | Relação | Observação |
 | --- | --- |
-| Usuario x Perfil | Muitos para muitos via `usuarios_perfis` |
+| Usuario x Permissao | Muitos para muitos via `usuarios_permissoes` — concessão direta |
 | Usuario x Setor | Muitos para muitos via `usuarios_setores` |
-| Perfil x Permissao | Muitos para muitos via `perfis_permissoes` |
 | Usuario x Notificacao | Um usuário pode ter várias notificações |
 | Usuario x Sessao | Um usuário pode ter várias sessões |
 | Usuario x LogAuditoria | Um usuário pode gerar vários registros |
