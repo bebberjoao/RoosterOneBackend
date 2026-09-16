@@ -1,0 +1,501 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id            String  @id @default(uuid()) @db.Uuid
+  nome          String  @db.VarChar(150)
+  email         String  @unique @db.VarChar(150)
+  senhaHash     String  @map("senha_hash") @db.VarChar(255)
+  cpf           String? @db.VarChar(14)
+  telefone      String? @db.VarChar(20)
+  ativo         Boolean @default(true)
+  ultimoLogin   DateTime? @map("ultimo_login") @db.Timestamp()
+  criadoEm      DateTime? @map("criado_em") @db.Timestamp()
+  atualizadoEm  DateTime? @map("atualizado_em") @db.Timestamp()
+
+  perfis        UsuarioPerfil[]
+  setores       UsuarioSetor[]
+  notificacoes  Notificacao[]
+  sessoes       Sessao[]
+  logsAuditoria LogAuditoria[]
+  ticketsCriados Ticket[] @relation("TicketSolicitante")
+  ticketsTecnico Ticket[] @relation("TicketTecnico")
+  mensagensTickets MensagemTicket[]
+  anexosTickets AnexoTicket[]
+  historicoTickets HistoricoTicket[]
+  avaliacoesTickets AvaliacaoTicket[]
+  subcategoriasAtendidas AtendimentoSubcategoria[]
+
+  @@map("usuarios")
+}
+
+model Setor {
+  id          String  @id @default(uuid()) @db.Uuid
+  nome        String  @db.VarChar(100)
+  descricao   String?
+  ativo       Boolean @default(true)
+  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+
+  usuarios    UsuarioSetor[]
+  categorias  CategoriaTicket[]
+
+  @@map("setores")
+}
+
+model Perfil {
+  id          String  @id @default(uuid()) @db.Uuid
+  nome        String  @unique @db.VarChar(80)
+  descricao   String?
+  ativo       Boolean @default(true)
+  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+
+  usuarios    UsuarioPerfil[]
+  permissoes  PerfilPermissao[]
+
+  @@map("perfis")
+}
+
+model Modulo {
+  id          String  @id @default(uuid()) @db.Uuid
+  nome        String  @unique @db.VarChar(80)
+  rota        String? @db.VarChar(150)
+  icone       String? @db.VarChar(80)
+  ativo       Boolean @default(true)
+  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+
+  permissoes  Permissao[]
+
+  @@map("modulos")
+}
+
+model Permissao {
+  id          String  @id @default(uuid()) @db.Uuid
+  moduloId    String? @map("modulo_id") @db.Uuid
+  nome        String  @db.VarChar(120)
+  descricao   String?
+  recurso     String? @db.VarChar(120)
+  acao        String? @db.VarChar(50)
+  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+
+  modulo      Modulo? @relation(fields: [moduloId], references: [id])
+  perfis      PerfilPermissao[]
+
+  @@map("permissoes")
+}
+
+model UsuarioPerfil {
+  id          String  @id @default(uuid()) @db.Uuid
+  usuarioId   String  @map("usuario_id") @db.Uuid
+  perfilId    String  @map("perfil_id") @db.Uuid
+  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+
+  usuario     Usuario @relation(fields: [usuarioId], references: [id])
+  perfil      Perfil @relation(fields: [perfilId], references: [id])
+
+  @@unique([usuarioId, perfilId])
+
+  @@map("usuarios_perfis")
+}
+
+model UsuarioSetor {
+  id          String  @id @default(uuid()) @db.Uuid
+  usuarioId   String  @map("usuario_id") @db.Uuid
+  setorId     String  @map("setor_id") @db.Uuid
+  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+
+  usuario     Usuario @relation(fields: [usuarioId], references: [id])
+  setor       Setor @relation(fields: [setorId], references: [id])
+
+  @@unique([usuarioId, setorId])
+
+  @@map("usuarios_setores")
+}
+
+model PerfilPermissao {
+  id            String  @id @default(uuid()) @db.Uuid
+  perfilId      String  @map("perfil_id") @db.Uuid
+  permissaoId   String  @map("permissao_id") @db.Uuid
+  criadoEm      DateTime? @map("criado_em") @db.Timestamp()
+
+  perfil        Perfil @relation(fields: [perfilId], references: [id])
+  permissao     Permissao @relation(fields: [permissaoId], references: [id])
+
+  @@unique([perfilId, permissaoId])
+
+  @@map("perfis_permissoes")
+}
+
+model Notificacao {
+  id          String  @id @default(uuid()) @db.Uuid
+  usuarioId   String? @map("usuario_id") @db.Uuid
+  titulo      String? @db.VarChar(150)
+  mensagem    String?
+  lida        Boolean @default(false)
+  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+
+  usuario     Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@map("notificacoes")
+}
+
+model Sessao {
+  id            String  @id @default(uuid()) @db.Uuid
+  usuarioId     String? @map("usuario_id") @db.Uuid
+  refreshToken  String? @map("refresh_token") @db.VarChar(500)
+  ip            String? @db.VarChar(45)
+  navegador     String?
+  expiraEm      DateTime? @map("expira_em") @db.Timestamp()
+  revogada      Boolean @default(false)
+  criadoEm      DateTime? @map("criado_em") @db.Timestamp()
+
+  usuario       Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@map("sessoes")
+}
+
+model LogAuditoria {
+  id            String  @id @default(uuid()) @db.Uuid
+  usuarioId     String? @map("usuario_id") @db.Uuid
+  modulo        String? @db.VarChar(80)
+  acao          String? @db.VarChar(80)
+  entidade      String? @db.VarChar(100)
+  entidadeId    String? @map("entidade_id") @db.Uuid
+  ip            String? @db.VarChar(45)
+  navegador     String?
+  criadoEm      DateTime? @map("criado_em") @db.Timestamp()
+
+  usuario       Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@map("logs_auditoria")
+}
+
+model CategoriaTicket {
+  id          String  @id @default(uuid()) @db.Uuid
+  nome        String  @db.VarChar(100)
+  descricao   String?
+  ativo       Boolean @default(true)
+  slaHoras    Int     @default(8) @map("sla_horas")
+  setorId     String? @map("setor_id") @db.Uuid
+  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+
+  subcategorias SubcategoriaTicket[]
+  tickets       Ticket[]
+  setor         Setor? @relation(fields: [setorId], references: [id])
+
+  @@map("categorias_tickets")
+}
+
+model SubcategoriaTicket {
+  id          String  @id @default(uuid()) @db.Uuid
+  categoriaId String? @map("categoria_id") @db.Uuid
+  nome        String  @db.VarChar(100)
+  descricao   String?
+  ativo       Boolean @default(true)
+  slaHoras    Int     @default(8) @map("sla_horas")
+  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+
+  categoria CategoriaTicket? @relation(fields: [categoriaId], references: [id])
+  tickets   Ticket[]
+  atendentes AtendimentoSubcategoria[]
+
+  @@map("subcategorias_tickets")
+}
+
+model AtendimentoSubcategoria {
+  id             String @id @default(uuid()) @db.Uuid
+  subcategoriaId String @map("subcategoria_id") @db.Uuid
+  usuarioId      String @map("usuario_id") @db.Uuid
+  criadoEm       DateTime? @map("criado_em") @db.Timestamp()
+
+  subcategoria SubcategoriaTicket @relation(fields: [subcategoriaId], references: [id], onDelete: Cascade)
+  usuario      Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([subcategoriaId, usuarioId])
+  @@map("atendimentos_subcategorias")
+}
+
+model PrioridadeTicket {
+  id       String  @id
+  nome     String  @db.VarChar(50)
+  cor      String? @db.VarChar(20)
+  criadoEm DateTime? @map("criado_em") @db.Timestamp()
+
+  tickets Ticket[]
+
+  @@map("prioridades_tickets")
+}
+
+model StatusTicket {
+  id        String  @id @default(uuid()) @db.Uuid
+  nome      String  @db.VarChar(60)
+  ordem     Int?
+  encerrado Boolean @default(false)
+  criadoEm  DateTime? @map("criado_em") @db.Timestamp()
+
+  tickets Ticket[]
+
+  @@map("status_tickets")
+}
+
+model Ticket {
+  id             String  @id @default(uuid()) @db.Uuid
+  protocolo      String? @unique @db.VarChar(30)
+  titulo         String  @db.VarChar(200)
+  descricao      String
+  usuarioId      String? @map("usuario_id") @db.Uuid
+  tecnicoId      String? @map("tecnico_id") @db.Uuid
+  categoriaId    String? @map("categoria_id") @db.Uuid
+  subcategoriaId String? @map("subcategoria_id") @db.Uuid
+  prioridadeId   String? @map("prioridade_id")
+  statusId       String? @map("status_id") @db.Uuid
+  criadoEm       DateTime? @map("criado_em") @db.Timestamp()
+  atualizadoEm   DateTime? @map("atualizado_em") @db.Timestamp()
+  encerradoEm    DateTime? @map("encerrado_em") @db.Timestamp()
+
+  usuario      Usuario? @relation("TicketSolicitante", fields: [usuarioId], references: [id])
+  tecnico      Usuario? @relation("TicketTecnico", fields: [tecnicoId], references: [id])
+  categoria    CategoriaTicket? @relation(fields: [categoriaId], references: [id])
+  subcategoria SubcategoriaTicket? @relation(fields: [subcategoriaId], references: [id])
+  prioridade   PrioridadeTicket? @relation(fields: [prioridadeId], references: [id])
+  status       StatusTicket? @relation(fields: [statusId], references: [id])
+  mensagens    MensagemTicket[]
+  anexos       AnexoTicket[]
+  historico    HistoricoTicket[]
+  avaliacoes   AvaliacaoTicket[]
+
+  @@map("tickets")
+}
+
+model MensagemTicket {
+  id         String    @id @default(uuid()) @db.Uuid
+  ticketId   String    @map("ticket_id") @db.Uuid
+  usuarioId  String    @map("usuario_id") @db.Uuid
+  mensagem   String
+  interno    Boolean   @default(false)
+  criadoEm   DateTime  @default(now()) @map("criado_em") @db.Timestamp()
+  removidoEm DateTime? @map("removido_em") @db.Timestamp()
+
+  ticket  Ticket  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([ticketId, criadoEm])
+  @@map("mensagens_tickets")
+}
+
+model AnexoTicket {
+  id          String  @id @default(uuid()) @db.Uuid
+  ticketId    String? @map("ticket_id") @db.Uuid
+  usuarioId   String? @map("usuario_id") @db.Uuid
+  nomeArquivo String? @map("nome_arquivo") @db.VarChar(255)
+  caminho     String?
+  tipo        String? @db.VarChar(80)
+  tamanho     BigInt?
+  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+
+  ticket  Ticket? @relation(fields: [ticketId], references: [id])
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@map("anexos_tickets")
+}
+
+model HistoricoTicket {
+  id         String  @id @default(uuid()) @db.Uuid
+  ticketId   String? @map("ticket_id") @db.Uuid
+  usuarioId  String? @map("usuario_id") @db.Uuid
+  campo      String? @db.VarChar(100)
+  valorAntigo String? @map("valor_antigo")
+  valorNovo  String? @map("valor_novo")
+  criadoEm   DateTime? @map("criado_em") @db.Timestamp()
+
+  ticket  Ticket? @relation(fields: [ticketId], references: [id])
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@map("historico_tickets")
+}
+
+model AvaliacaoTicket {
+  id        String  @id @default(uuid()) @db.Uuid
+  ticketId  String? @map("ticket_id") @db.Uuid
+  usuarioId String? @map("usuario_id") @db.Uuid
+  nota      Int?
+  comentario String?
+  criadoEm  DateTime? @map("criado_em") @db.Timestamp()
+
+  ticket  Ticket? @relation(fields: [ticketId], references: [id])
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@map("avaliacoes_tickets")
+}
+
+model Campus {
+  id          String    @id @default(uuid()) @db.Uuid
+  nome        String    @db.VarChar(120)
+  codigo      String    @unique @db.VarChar(20)
+  endereco    String?
+  cidade      String?
+  estado      String?
+  cep         String?
+  responsavel String?
+  ativo       Boolean   @default(true)
+  observacoes String?
+  cor         String?
+  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+  atualizadoEm DateTime? @map("atualizado_em") @db.Timestamp()
+
+  blocos     Bloco[]
+  ambientes  Ambiente[]
+
+  @@map("campus")
+}
+
+model Bloco {
+  id          String    @id @default(uuid()) @db.Uuid
+  campusId    String    @map("campus_id") @db.Uuid
+  nome        String    @db.VarChar(120)
+  codigo      String    @db.VarChar(20)
+  andares     Int       @default(1)
+  responsavel String?
+  ativo       Boolean   @default(true)
+  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+  atualizadoEm DateTime? @map("atualizado_em") @db.Timestamp()
+
+  campus    Campus     @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  ambientes Ambiente[]
+
+  @@unique([campusId, codigo])
+  @@map("blocos")
+}
+
+model Ambiente {
+  id                String    @id @default(uuid()) @db.Uuid
+  campusId          String    @map("campus_id") @db.Uuid
+  blocoId           String    @map("bloco_id") @db.Uuid
+  nome              String    @db.VarChar(120)
+  codigo            String    @unique @db.VarChar(30)
+  andar             Int       @default(0)
+  numero            String?
+  tipo              String    @db.VarChar(40)
+  capacidade        Int       @default(0)
+  area              Decimal?  @db.Decimal(8, 2)
+  descricao         String?
+  capa              String?
+  galeria           String[]  @default([])
+  status            String    @default("disponivel") @db.VarChar(30)
+  horarioAbertura   String?   @map("horario_abertura") @db.VarChar(20)
+  diasFuncionamento String[]  @default([]) @map("dias_funcionamento")
+  duracaoMinutos    Int?      @map("duracao_minutos")
+  criadoEm          DateTime? @map("criado_em") @db.Timestamp()
+  atualizadoEm      DateTime? @map("atualizado_em") @db.Timestamp()
+
+  campus   Campus    @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  bloco    Bloco     @relation(fields: [blocoId], references: [id], onDelete: Cascade)
+  reservas Reserva[]
+
+  @@map("ambientes")
+}
+
+model Reserva {
+  id            String    @id @default(uuid()) @db.Uuid
+  codigo        String    @unique @db.VarChar(40)
+  ambienteId    String    @map("ambiente_id") @db.Uuid
+  responsavelId String?   @map("responsavel_id") @db.Uuid
+  responsavel   String    @db.VarChar(120)
+  setorId       String?   @map("setor_id") @db.Uuid
+  setor         String?   @db.VarChar(120)
+  evento        String    @db.VarChar(200)
+  finalidade    String?
+  data          DateTime  @db.Date
+  horarioInicio String    @map("horario_inicio") @db.VarChar(20)
+  horarioFim    String    @map("horario_fim") @db.VarChar(20)
+  participantes Int       @default(1)
+  status        String    @default("analise") @db.VarChar(20)
+  recorrencia   String    @default("unica") @db.VarChar(20)
+  observacoes   String?
+  decididoPor   String?   @map("decidido_por") @db.Uuid
+  decididoEm    DateTime? @map("decidido_em") @db.Timestamp()
+  criadoEm      DateTime? @map("criado_em") @db.Timestamp()
+  atualizadoEm  DateTime? @map("atualizado_em") @db.Timestamp()
+
+  ambiente Ambiente @relation(fields: [ambienteId], references: [id], onDelete: Restrict)
+
+  @@map("reservas")
+}
+
+model PatrimonioCategoria {
+  id          String       @id @default(uuid()) @db.Uuid
+  nome        String       @unique @db.VarChar(100)
+  descricao   String?
+  tom         String?      @db.VarChar(40)
+  sistema     Boolean      @default(false)
+  criadoEm    DateTime?    @map("criado_em") @db.Timestamp()
+  atualizadoEm DateTime?   @map("atualizado_em") @db.Timestamp()
+
+  patrimonios Patrimonio[]
+
+  @@map("patrimonio_categorias")
+}
+
+model PatrimonioSetor {
+  id          String      @id @default(uuid()) @db.Uuid
+  nome        String      @unique @db.VarChar(100)
+  descricao   String?
+  responsavel String?
+  criadoEm    DateTime?   @map("criado_em") @db.Timestamp()
+  atualizadoEm DateTime?  @map("atualizado_em") @db.Timestamp()
+
+  patrimonios Patrimonio[]
+
+  @@map("patrimonio_setores")
+}
+
+model Patrimonio {
+  id                   String               @id @default(uuid()) @db.Uuid
+  nome                 String               @db.VarChar(150)
+  tag                  String               @unique @db.VarChar(80)
+  categoriaId          String               @map("categoria_id") @db.Uuid
+  marca                String?
+  modelo               String?
+  serial               String?
+  localizacaoId        String?              @map("localizacao_id") @db.Uuid
+  localizacao          String?              @db.VarChar(200)
+  setorId              String?              @map("setor_id") @db.Uuid
+  setor                String?              @db.VarChar(120)
+  responsavelUserId    String?              @map("responsavel_user_id") @db.Uuid
+  responsavel          String?              @db.VarChar(120)
+  status               String               @default("disponivel") @db.VarChar(30)
+  condicao             String               @default("bom") @db.VarChar(30)
+  adquiridoEm          DateTime?            @map("adquirido_em") @db.Date
+  valor                Decimal              @default(0) @db.Decimal(12, 2)
+  observacoes          String?
+  foto                 String?
+  chamadoManutencaoId  String?              @map("chamado_manutencao_id") @db.Uuid
+  criadoEm             DateTime?            @map("criado_em") @db.Timestamp()
+  atualizadoEm         DateTime?            @map("atualizado_em") @db.Timestamp()
+
+  categoria   PatrimonioCategoria @relation(fields: [categoriaId], references: [id])
+  setorRef    PatrimonioSetor?    @relation(fields: [setorId], references: [id])
+  movimentacoes PatrimonioMovimento[]
+
+  @@map("patrimonio")
+}
+
+model PatrimonioMovimento {
+  id          String    @id @default(uuid()) @db.Uuid
+  patrimonioId String    @map("patrimonio_id") @db.Uuid
+  tipo        String    @db.VarChar(40)
+  origem      String?
+  destino     String?
+  usuario     String    @db.VarChar(120)
+  observacoes String?
+  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+
+  patrimonio Patrimonio @relation(fields: [patrimonioId], references: [id], onDelete: Cascade)
+
+  @@map("patrimonio_movimentacoes")
+}

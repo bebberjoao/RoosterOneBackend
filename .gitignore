@@ -1,0 +1,15 @@
+node_modules/
+dist/
+prisma-test-client/
+prisma/dev-test.db
+prisma/dev-test.db-journal
+*.db
+*.db-journal
+.env
+.env.*
+!.env.example
+coverage/
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

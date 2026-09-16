@@ -1,0 +1,1246 @@
+{
+  "info": {
+    "name": "Rooster One API",
+    "description": "Coleção Postman para a API NestJS do projeto Rooster One",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "usuarioId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "setorId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "perfilId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "moduloId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "permissaoId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "usuarioPerfilId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "usuarioSetorId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "perfilPermissaoId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "notificacaoId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "sessaoId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    {
+      "key": "logAuditoriaId",
+      "value": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  "item": [
+    {
+      "name": "Geral",
+      "item": [
+        {
+          "name": "GET /",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                ""
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Usuários",
+      "item": [
+        {
+          "name": "Listar usuários",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar usuário por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "{{usuarioId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar usuário",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"João Silva\",\n  \"email\": \"joao@email.com\",\n  \"senhaHash\": \"hash123\",\n  \"cpf\": \"12345678900\",\n  \"telefone\": \"11999999999\",\n  \"ativo\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Atualizar usuário",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"João Silva Atualizado\",\n  \"email\": \"joao.atualizado@email.com\",\n  \"ativo\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "{{usuarioId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excluir usuário",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios",
+                "{{usuarioId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Setores",
+      "item": [
+        {
+          "name": "Listar setores",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/setores",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "setores"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar setor por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/setores/{{setorId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "setores",
+                "{{setorId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar setor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"TI\",\n  \"descricao\": \"Setor de tecnologia\",\n  \"ativo\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/setores",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "setores"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Atualizar setor",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"TI Atualizado\",\n  \"ativo\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/setores/{{setorId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "setores",
+                "{{setorId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excluir setor",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/setores/{{setorId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "setores",
+                "{{setorId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Perfis",
+      "item": [
+        {
+          "name": "Listar perfis",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/perfis",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "perfis"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar perfil por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/perfis/{{perfilId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "perfis",
+                "{{perfilId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar perfil",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"ADMIN\",\n  \"descricao\": \"Administrador do sistema\",\n  \"ativo\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/perfis",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "perfis"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Atualizar perfil",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"descricao\": \"Perfil administrador atualizado\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/perfis/{{perfilId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "perfis",
+                "{{perfilId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excluir perfil",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/perfis/{{perfilId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "perfis",
+                "{{perfilId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Módulos",
+      "item": [
+        {
+          "name": "Listar módulos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/modulos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modulos"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar módulo por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/modulos/{{moduloId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modulos",
+                "{{moduloId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar módulo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Usuários\",\n  \"rota\": \"/usuarios\",\n  \"icone\": \"users\",\n  \"ativo\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/modulos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modulos"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Atualizar módulo",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rota\": \"/usuarios-admin\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/modulos/{{moduloId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modulos",
+                "{{moduloId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excluir módulo",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/modulos/{{moduloId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "modulos",
+                "{{moduloId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Permissões",
+      "item": [
+        {
+          "name": "Listar permissões",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/permissoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "permissoes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar permissão por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/permissoes/{{permissaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "permissoes",
+                "{{permissaoId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar permissão",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"moduloId\": \"00000000-0000-0000-0000-000000000000\",\n  \"nome\": \"Criar usuário\",\n  \"descricao\": \"Permite criar usuários\",\n  \"recurso\": \"usuarios\",\n  \"acao\": \"create\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/permissoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "permissoes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Atualizar permissão",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"descricao\": \"Permite CRUD de usuários\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/permissoes/{{permissaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "permissoes",
+                "{{permissaoId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excluir permissão",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/permissoes/{{permissaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "permissoes",
+                "{{permissaoId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Usuários x Perfis",
+      "item": [
+        {
+          "name": "Listar relação usuários-perfis",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios-perfis",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios-perfis"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar relação por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios-perfis/{{usuarioPerfilId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios-perfis",
+                "{{usuarioPerfilId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar relação usuário-perfil",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usuarioId\": \"00000000-0000-0000-0000-000000000000\",\n  \"perfilId\": \"00000000-0000-0000-0000-000000000000\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/usuarios-perfis",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios-perfis"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Atualizar relação usuário-perfil",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"perfilId\": \"00000000-0000-0000-0000-000000000000\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/usuarios-perfis/{{usuarioPerfilId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios-perfis",
+                "{{usuarioPerfilId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excluir relação usuário-perfil",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios-perfis/{{usuarioPerfilId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios-perfis",
+                "{{usuarioPerfilId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Usuários x Setores",
+      "item": [
+        {
+          "name": "Listar relação usuários-setores",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios-setores",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios-setores"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar relação por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios-setores/{{usuarioSetorId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios-setores",
+                "{{usuarioSetorId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar relação usuário-setor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usuarioId\": \"00000000-0000-0000-0000-000000000000\",\n  \"setorId\": \"00000000-0000-0000-0000-000000000000\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/usuarios-setores",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios-setores"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Atualizar relação usuário-setor",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"setorId\": \"00000000-0000-0000-0000-000000000000\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/usuarios-setores/{{usuarioSetorId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios-setores",
+                "{{usuarioSetorId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excluir relação usuário-setor",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/usuarios-setores/{{usuarioSetorId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "usuarios-setores",
+                "{{usuarioSetorId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Perfis x Permissões",
+      "item": [
+        {
+          "name": "Listar relação perfis-permissoes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/perfis-permissoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "perfis-permissoes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar relação por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/perfis-permissoes/{{perfilPermissaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "perfis-permissoes",
+                "{{perfilPermissaoId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar relação perfil-permissao",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"perfilId\": \"00000000-0000-0000-0000-000000000000\",\n  \"permissaoId\": \"00000000-0000-0000-0000-000000000000\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/perfis-permissoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "perfis-permissoes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Atualizar relação perfil-permissao",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissaoId\": \"00000000-0000-0000-0000-000000000000\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/perfis-permissoes/{{perfilPermissaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "perfis-permissoes",
+                "{{perfilPermissaoId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excluir relação perfil-permissao",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/perfis-permissoes/{{perfilPermissaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "perfis-permissoes",
+                "{{perfilPermissaoId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notificações",
+      "item": [
+        {
+          "name": "Listar notificações",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notificacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notificacoes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar notificação por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notificacoes/{{notificacaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notificacoes",
+                "{{notificacaoId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar notificação",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usuarioId\": \"00000000-0000-0000-0000-000000000000\",\n  \"titulo\": \"Nova mensagem\",\n  \"mensagem\": \"Olá, tudo bem?\",\n  \"lida\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/notificacoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notificacoes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Atualizar notificação",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"lida\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/notificacoes/{{notificacaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notificacoes",
+                "{{notificacaoId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excluir notificação",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notificacoes/{{notificacaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "notificacoes",
+                "{{notificacaoId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sessões",
+      "item": [
+        {
+          "name": "Listar sessões",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sessoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sessoes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar sessão por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sessoes/{{sessaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sessoes",
+                "{{sessaoId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar sessão",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usuarioId\": \"00000000-0000-0000-0000-000000000000\",\n  \"refreshToken\": \"token-123\",\n  \"ip\": \"127.0.0.1\",\n  \"navegador\": \"Postman\",\n  \"expiraEm\": \"2026-12-31T23:59:59.000Z\",\n  \"revogada\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sessoes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sessoes"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Atualizar sessão",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"revogada\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sessoes/{{sessaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sessoes",
+                "{{sessaoId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excluir sessão",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sessoes/{{sessaoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sessoes",
+                "{{sessaoId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Logs de Auditoria",
+      "item": [
+        {
+          "name": "Listar logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/logs-auditoria",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "logs-auditoria"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Buscar log por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/logs-auditoria/{{logAuditoriaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "logs-auditoria",
+                "{{logAuditoriaId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar log de auditoria",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usuarioId\": \"00000000-0000-0000-0000-000000000000\",\n  \"modulo\": \"Usuarios\",\n  \"acao\": \"CREATE\",\n  \"entidade\": \"Usuario\",\n  \"entidadeId\": \"00000000-0000-0000-0000-000000000000\",\n  \"ip\": \"127.0.0.1\",\n  \"navegador\": \"Postman\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/logs-auditoria",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "logs-auditoria"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Atualizar log de auditoria",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"acao\": \"UPDATE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/logs-auditoria/{{logAuditoriaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "logs-auditoria",
+                "{{logAuditoriaId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Excluir log de auditoria",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/logs-auditoria/{{logAuditoriaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "logs-auditoria",
+                "{{logAuditoriaId}}"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,405 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../prisma-test-client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev-test.db"
+}
+
+model Usuario {
+  id            String   @id @default(uuid())
+  nome          String
+  email         String   @unique
+  senhaHash     String
+  cpf           String?
+  telefone      String?
+  ativo         Boolean  @default(true)
+  ultimoLogin   DateTime?
+  criadoEm      DateTime?
+  atualizadoEm  DateTime?
+
+  perfis        UsuarioPerfil[]
+  setores       UsuarioSetor[]
+  notificacoes  Notificacao[]
+  sessoes       Sessao[]
+  logsAuditoria LogAuditoria[]
+  ticketsCriados Ticket[] @relation("TicketSolicitante")
+  ticketsTecnico Ticket[] @relation("TicketTecnico")
+  mensagensTickets MensagemTicket[]
+  anexosTickets AnexoTicket[]
+  historicoTickets HistoricoTicket[]
+  avaliacoesTickets AvaliacaoTicket[]
+}
+
+model Setor {
+  id          String   @id @default(uuid())
+  nome        String
+  descricao   String?
+  ativo       Boolean  @default(true)
+  criadoEm    DateTime?
+
+  usuarios    UsuarioSetor[]
+}
+
+model Perfil {
+  id          String   @id @default(uuid())
+  nome        String   @unique
+  descricao   String?
+  ativo       Boolean  @default(true)
+  criadoEm    DateTime?
+
+  usuarios    UsuarioPerfil[]
+  permissoes  PerfilPermissao[]
+}
+
+model Modulo {
+  id          String   @id @default(uuid())
+  nome        String   @unique
+  rota        String?
+  icone       String?
+  ativo       Boolean  @default(true)
+  criadoEm    DateTime?
+
+  permissoes  Permissao[]
+}
+
+model Permissao {
+  id          String   @id @default(uuid())
+  moduloId    String?
+  nome        String
+  descricao   String?
+  recurso     String?
+  acao        String?
+  criadoEm    DateTime?
+
+  modulo      Modulo? @relation(fields: [moduloId], references: [id])
+  perfis      PerfilPermissao[]
+}
+
+model UsuarioPerfil {
+  id          String   @id @default(uuid())
+  usuarioId   String
+  perfilId    String
+  criadoEm    DateTime?
+
+  usuario     Usuario @relation(fields: [usuarioId], references: [id])
+  perfil      Perfil @relation(fields: [perfilId], references: [id])
+}
+
+model UsuarioSetor {
+  id          String   @id @default(uuid())
+  usuarioId   String
+  setorId     String
+  criadoEm    DateTime?
+
+  usuario     Usuario @relation(fields: [usuarioId], references: [id])
+  setor       Setor   @relation(fields: [setorId], references: [id])
+}
+
+model PerfilPermissao {
+  id            String   @id @default(uuid())
+  perfilId      String
+  permissaoId   String
+  criadoEm      DateTime?
+
+  perfil        Perfil     @relation(fields: [perfilId], references: [id])
+  permissao     Permissao  @relation(fields: [permissaoId], references: [id])
+}
+
+model Notificacao {
+  id          String   @id @default(uuid())
+  usuarioId   String?
+  titulo      String?
+  mensagem    String?
+  lida        Boolean  @default(false)
+  criadoEm    DateTime?
+
+  usuario     Usuario? @relation(fields: [usuarioId], references: [id])
+}
+
+model Sessao {
+  id            String   @id @default(uuid())
+  usuarioId     String?
+  refreshToken  String?
+  ip            String?
+  navegador     String?
+  expiraEm      DateTime?
+  revogada      Boolean  @default(false)
+  criadoEm      DateTime?
+
+  usuario       Usuario? @relation(fields: [usuarioId], references: [id])
+}
+
+model LogAuditoria {
+  id            String   @id @default(uuid())
+  usuarioId     String?
+  modulo        String?
+  acao          String?
+  entidade      String?
+  entidadeId    String?
+  ip            String?
+  navegador     String?
+  criadoEm      DateTime?
+
+  usuario       Usuario? @relation(fields: [usuarioId], references: [id])
+}
+
+model CategoriaTicket {
+  id String @id @default(uuid())
+  nome String
+  descricao String?
+  ativo Boolean @default(true)
+  criadoEm DateTime?
+  subcategorias SubcategoriaTicket[]
+  tickets Ticket[]
+}
+
+model SubcategoriaTicket {
+  id String @id @default(uuid())
+  categoriaId String?
+  nome String
+  descricao String?
+  ativo Boolean @default(true)
+  criadoEm DateTime?
+  categoria CategoriaTicket? @relation(fields: [categoriaId], references: [id])
+  tickets Ticket[]
+}
+
+model PrioridadeTicket {
+  id String @id @default(uuid())
+  nome String
+  cor String?
+  criadoEm DateTime?
+  tickets Ticket[]
+}
+
+model StatusTicket {
+  id String @id @default(uuid())
+  nome String
+  ordem Int?
+  encerrado Boolean @default(false)
+  criadoEm DateTime?
+  tickets Ticket[]
+}
+
+model Ticket {
+  id String @id @default(uuid())
+  protocolo String? @unique
+  titulo String
+  descricao String
+  usuarioId String?
+  tecnicoId String?
+  categoriaId String?
+  subcategoriaId String?
+  prioridadeId String?
+  statusId String?
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  encerradoEm DateTime?
+  usuario Usuario? @relation("TicketSolicitante", fields: [usuarioId], references: [id])
+  tecnico Usuario? @relation("TicketTecnico", fields: [tecnicoId], references: [id])
+  categoria CategoriaTicket? @relation(fields: [categoriaId], references: [id])
+  subcategoria SubcategoriaTicket? @relation(fields: [subcategoriaId], references: [id])
+  prioridade PrioridadeTicket? @relation(fields: [prioridadeId], references: [id])
+  status StatusTicket? @relation(fields: [statusId], references: [id])
+  mensagens MensagemTicket[]
+  anexos AnexoTicket[]
+  historico HistoricoTicket[]
+  avaliacoes AvaliacaoTicket[]
+}
+
+model MensagemTicket {
+  id String @id @default(uuid())
+  ticketId String
+  usuarioId String
+  mensagem String
+  interno Boolean @default(false)
+  criadoEm DateTime @default(now())
+  removidoEm DateTime?
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+
+  @@index([ticketId, criadoEm])
+}
+
+model AnexoTicket {
+  id String @id @default(uuid())
+  ticketId String?
+  usuarioId String?
+  nomeArquivo String?
+  caminho String?
+  tipo String?
+  tamanho BigInt?
+  criadoEm DateTime?
+  ticket Ticket? @relation(fields: [ticketId], references: [id])
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+}
+
+model HistoricoTicket {
+  id String @id @default(uuid())
+  ticketId String?
+  usuarioId String?
+  campo String?
+  valorAntigo String?
+  valorNovo String?
+  criadoEm DateTime?
+  ticket Ticket? @relation(fields: [ticketId], references: [id])
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+}
+
+model AvaliacaoTicket {
+  id String @id @default(uuid())
+  ticketId String?
+  usuarioId String?
+  nota Int?
+  comentario String?
+  criadoEm DateTime?
+  ticket Ticket? @relation(fields: [ticketId], references: [id])
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+}
+
+model Campus {
+  id String @id @default(uuid())
+  nome String
+  codigo String @unique
+  endereco String?
+  cidade String?
+  estado String?
+  cep String?
+  responsavel String?
+  ativo Boolean @default(true)
+  observacoes String?
+  cor String?
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  blocos Bloco[]
+  ambientes Ambiente[]
+}
+
+model Bloco {
+  id String @id @default(uuid())
+  campusId String
+  nome String
+  codigo String
+  andares Int @default(1)
+  responsavel String?
+  ativo Boolean @default(true)
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  campus Campus @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  ambientes Ambiente[]
+
+  @@unique([campusId, codigo])
+}
+
+model Ambiente {
+  id String @id @default(uuid())
+  campusId String
+  blocoId String
+  nome String
+  codigo String @unique
+  andar Int @default(0)
+  numero String?
+  tipo String
+  capacidade Int @default(0)
+  area Decimal?
+  descricao String?
+  capa String?
+  galeria String?
+  status String @default("disponivel")
+  horarioAbertura String?
+  diasFuncionamento String?
+  duracaoMinutos Int?
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  campus Campus @relation(fields: [campusId], references: [id], onDelete: Cascade)
+  bloco Bloco @relation(fields: [blocoId], references: [id], onDelete: Cascade)
+  reservas Reserva[]
+}
+
+model Reserva {
+  id String @id @default(uuid())
+  codigo String @unique
+  ambienteId String
+  responsavelId String?
+  responsavel String
+  setorId String?
+  setor String?
+  evento String
+  finalidade String?
+  data DateTime
+  horarioInicio String
+  horarioFim String
+  participantes Int @default(1)
+  status String @default("analise")
+  recorrencia String @default("unica")
+  observacoes String?
+  decididoPor String?
+  decididoEm DateTime?
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  ambiente Ambiente @relation(fields: [ambienteId], references: [id], onDelete: Restrict)
+}
+
+model PatrimonioCategoria {
+  id String @id @default(uuid())
+  nome String @unique
+  descricao String?
+  tom String?
+  sistema Boolean @default(false)
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  patrimonios Patrimonio[]
+}
+
+model PatrimonioSetor {
+  id String @id @default(uuid())
+  nome String @unique
+  descricao String?
+  responsavel String?
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  patrimonios Patrimonio[]
+}
+
+model Patrimonio {
+  id String @id @default(uuid())
+  nome String
+  tag String @unique
+  categoriaId String
+  marca String?
+  modelo String?
+  serial String?
+  localizacaoId String?
+  localizacao String?
+  setorId String?
+  setor String?
+  responsavelUserId String?
+  responsavel String?
+  status String @default("disponivel")
+  condicao String @default("bom")
+  adquiridoEm DateTime?
+  valor Decimal @default(0)
+  observacoes String?
+  foto String?
+  chamadoManutencaoId String?
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  categoria PatrimonioCategoria @relation(fields: [categoriaId], references: [id])
+  setorRef PatrimonioSetor? @relation(fields: [setorId], references: [id])
+  movimentacoes PatrimonioMovimento[]
+}
+
+model PatrimonioMovimento {
+  id String @id @default(uuid())
+  patrimonioId String
+  tipo String
+  origem String?
+  destino String?
+  usuario String
+  observacoes String?
+  criadoEm DateTime?
+  patrimonio Patrimonio @relation(fields: [patrimonioId], references: [id], onDelete: Cascade)
+}
