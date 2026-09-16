@@ -299,7 +299,10 @@ export class RoomsService {
   async findOneReserva(id: string) {
     const reserva = await this.prisma.reserva.findUnique({
       where: { id },
-      include: { ambiente: true, historico: { orderBy: { criadoEm: 'asc' } } },
+      include: {
+        ambiente: true,
+        historico: { orderBy: { criadoEm: 'asc' }, include: { usuario: { select: { id: true, nome: true } } } },
+      },
     });
 
     if (!reserva) {

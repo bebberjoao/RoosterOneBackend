@@ -331,7 +331,7 @@ export class RoosterDeskService implements OnModuleInit {
   async findOne(model: DeskModel, id: string) {
     const result = await (this.prisma as any)[model].findUnique({
       where: { id },
-      ...(model === 'ticket' ? { include: { usuario: true, tecnico: true, categoria: true, subcategoria: true, prioridade: true, status: true, anexos: true, historico: true, avaliacoes: true } } : {}),
+      ...(model === 'ticket' ? { include: { usuario: true, tecnico: true, categoria: true, subcategoria: true, prioridade: true, status: true, anexos: true, historico: { orderBy: { criadoEm: 'asc' }, include: { usuario: { select: { id: true, nome: true } } } }, avaliacoes: true } } : {}),
     });
     if (!result) throw new NotFoundException('Registro não encontrado.');
     return result;
