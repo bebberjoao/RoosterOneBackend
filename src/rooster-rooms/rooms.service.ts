@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
 import { CreateAmbienteDto } from './dto/create-ambiente.dto';
 import { CreateBlocoDto } from './dto/create-bloco.dto';
@@ -282,6 +283,114 @@ export class RoomsService {
     } catch (error) {
       this.handleError(error, 'criar reserva');
     }
+  }
+
+  private static readonly MAX_OCORRENCIAS_SERIE = 26;
+
+  private proximaData(data: Date, recorrencia: string): Date {
+    const next = new Date(data);
+    if (recorrencia === 'diaria') next.setUTCDate(next.getUTCDate() + 1);
+    else if (recorrencia === 'mensal') next.setUTCMonth(next.getUTCMonth() + 1);
+    else next.setUTCDate(next.getUTCDate() + 7); // 'semanal' (default)
+    return next;
+  }
+
+  /**
+   * Gera uma série de reservas recorrentes (mesma sala/horário, uma linha por
+   * ocorrência) ligadas por `serieId`. Valida TODAS as datas antes de criar
+   * qualquer uma — ou a série inteira é criada, ou nenhuma (evita reserva
+   * "furada" no meio da série por causa de um conflito isolado).
+   */
+  async createReservaSerie(dto: CreateReservaDto & { repetirAte: string }) {
+    const dataInicial = new Date(dto.data.slice(0, 10));
+    const dataFinal = new Date(dto.repetirAte.slice(0, 10));
+    if (dataFinal < dataInicial) {
+      throw new BadRequestException('"repetirAte" deve ser igual ou posterior à data da reserva.');
+    }
+
+    const datas: Date[] = [];
+    for (let atual = dataInicial; atual <= dataFinal; atual = this.proximaData(atual, dto.recorrencia ?? 'semanal')) {
+      datas.push(new Date(atual));
+      if (datas.length > RoomsService.MAX_OCORRENCIAS_SERIE) {
+        throw new BadRequestException(`A série não pode ter mais que ${RoomsService.MAX_OCORRENCIAS_SERIE} ocorrências.`);
+      }
+    }
+    if (datas.length === 0) {
+      throw new BadRequestException('Nenhuma ocorrência gerada para o período informado.');
+    }
+
+    // valida cada ocorrência antes de criar qualquer uma (atômico)
+    for (const data of datas) {
+      await this.assertReservaDisponivel({
+        ambienteId: dto.ambienteId,
+        data: data.toISOString(),
+        horarioInicio: dto.horarioInicio,
+        horarioFim: dto.horarioFim,
+        participantes: dto.participantes,
+      });
+    }
+
+    const serieId = randomUUID();
+    const reservas = await this.prisma.$transaction(
+      datas.map((data, indice) =>
+        this.prisma.reserva.create({
+          data: {
+            codigo: datas.length > 1 ? `${dto.codigo}-${indice + 1}` : dto.codigo,
+            ambiente: { connect: { id: dto.ambienteId } },
+            responsavelId: dto.responsavelId,
+            responsavel: dto.responsavel,
+            setorId: dto.setorId,
+            setor: dto.setor,
+            evento: dto.evento,
+            finalidade: dto.finalidade,
+            data,
+            horarioInicio: dto.horarioInicio,
+            horarioFim: dto.horarioFim,
+            participantes: dto.participantes,
+            status: dto.status ?? 'analise',
+            recorrencia: dto.recorrencia ?? 'semanal',
+            serieId,
+            serieTotal: datas.length,
+            observacoes: dto.observacoes,
+            criadoEm: new Date(),
+            atualizadoEm: new Date(),
+          } as any,
+          include: { ambiente: true },
+        }),
+      ),
+    );
+
+    return { serieId, reservas };
+  }
+
+  async findReservasDaSerie(serieId: string) {
+    return this.prisma.reserva.findMany({
+      where: { serieId },
+      orderBy: { data: 'asc' },
+      include: { ambiente: true },
+    });
+  }
+
+  /** Cancela todas as ocorrências futuras/pendentes da série que ainda não estão canceladas. */
+  async cancelarSerie(serieId: string, motivo: string | undefined, decididoPor: string) {
+    const reservas = await this.prisma.reserva.findMany({ where: { serieId, status: { not: 'cancelada' } } });
+    if (reservas.length === 0) {
+      throw new NotFoundException('Série não encontrada ou já totalmente cancelada.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const reserva of reservas) {
+        await tx.reserva.update({
+          where: { id: reserva.id },
+          data: { status: 'cancelada', motivoCancelamento: motivo, decididoPor, decididoEm: new Date(), atualizadoEm: new Date() },
+        });
+        await tx.reservaHistorico.create({
+          data: { reservaId: reserva.id, usuarioId: decididoPor, campo: 'status', valorAntigo: reserva.status, valorNovo: 'cancelada', criadoEm: new Date() },
+        });
+      }
+    });
+
+    return { serieId, canceladas: reservas.length };
   }
 
   async findAllReservas(ambienteId?: string, data?: string, status?: string) {

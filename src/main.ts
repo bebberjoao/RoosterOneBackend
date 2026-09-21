@@ -2,10 +2,21 @@ import 'dotenv/config';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
+import { PrismaExceptionFilter } from './common/prisma-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  app.use(
+    helmet({
+      // Swagger UI (api/docs) usa <script>/<style> inline — CSP teria que ser
+      // customizado especificamente pra essa rota; desligado por ora pra não
+      // quebrar a doc interativa. Os demais headers do Helmet ficam ativos.
+      contentSecurityPolicy: false,
+    }),
+  );
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -14,6 +25,10 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // Rede de segurança: cada service já mapeia P2002/P2025 com mensagem contextual
+  // antes disso — ver `src/common/prisma-exception.filter.ts`.
+  app.useGlobalFilters(new PrismaExceptionFilter());
 
   const config = new DocumentBuilder()
     .setTitle('Roster One API')

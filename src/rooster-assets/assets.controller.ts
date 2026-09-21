@@ -153,6 +153,20 @@ export class AssetsController {
     return this.service.findAllMovements(patrimonioId);
   }
 
+  @Get('patrimonio-emprestimos-atrasados')
+  @RequirePermission(MODULO, '/assets', 'acessar')
+  @ApiOperation({ summary: 'Lista empréstimos com prazo de devolução vencido e ainda não devolvidos' })
+  findEmprestimosAtrasados() {
+    return this.service.findEmprestimosAtrasados();
+  }
+
+  @Patch('patrimonio-movimentacoes/:id/devolver')
+  @RequirePermission(MODULO, '/assets/inventory', 'movimentar')
+  @ApiOperation({ summary: 'Marca um empréstimo como devolvido e libera o patrimônio' })
+  devolverEmprestimo(@Param('id') id: string, @Body('usuario') usuario: string) {
+    return this.service.devolverEmprestimo(id, usuario?.trim() || 'sistema');
+  }
+
   @Get('patrimonio-movimentacoes/:id')
   @RequirePermission(MODULO, '/assets', 'acessar')
   findOneMovement(@Param('id') id: string) {

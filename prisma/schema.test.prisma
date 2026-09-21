@@ -33,6 +33,20 @@ model Usuario {
   avaliacoesTickets AvaliacaoTicket[]
   mensagensReservas ReservaMensagem[]
   historicoReservas ReservaHistorico[]
+  redefinicoesSenha RedefinicaoSenha[]
+  professorAcademico Professor?
+  alunoAcademico     Aluno?
+}
+
+model RedefinicaoSenha {
+  id        String    @id @default(uuid())
+  usuarioId String
+  tokenHash String    @unique
+  expiraEm  DateTime
+  usadoEm   DateTime?
+  criadoEm  DateTime  @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 }
 
 model Setor {
@@ -128,6 +142,8 @@ model LogAuditoria {
   criadoEm      DateTime?
 
   usuario       Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@index([criadoEm])
 }
 
 model CategoriaTicket {
@@ -141,6 +157,8 @@ model CategoriaTicket {
   subcategorias SubcategoriaTicket[]
   tickets Ticket[]
   setor Setor? @relation(fields: [setorId], references: [id])
+
+  @@index([setorId])
 }
 
 model SubcategoriaTicket {
@@ -197,6 +215,9 @@ model Ticket {
   anexos AnexoTicket[]
   historico HistoricoTicket[]
   avaliacoes AvaliacaoTicket[]
+
+  @@index([categoriaId])
+  @@index([criadoEm])
 }
 
 model MensagemTicket {
@@ -325,6 +346,8 @@ model Reserva {
   participantes Int @default(1)
   status String @default("analise")
   recorrencia String @default("unica")
+  serieId String?
+  serieTotal Int?
   observacoes String?
   decididoPor String?
   decididoEm DateTime?
@@ -417,6 +440,456 @@ model PatrimonioMovimento {
   destino String?
   usuario String
   observacoes String?
+  dataDevolucaoPrevista DateTime?
+  devolvidoEm DateTime?
   criadoEm DateTime?
   patrimonio Patrimonio @relation(fields: [patrimonioId], references: [id], onDelete: Cascade)
+}
+
+// Rooster Academy
+
+model Curso {
+  id String @id @default(uuid())
+  nome String
+  codigo String @unique
+  grau String
+  ativo Boolean @default(true)
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  disciplinas Disciplina[]
+  alunos Aluno[]
+}
+
+model PeriodoLetivo {
+  id String @id @default(uuid())
+  nome String @unique
+  dataInicio DateTime
+  dataFim DateTime
+  ativo Boolean @default(false)
+  criadoEm DateTime?
+  turmas Turma[]
+}
+
+model Disciplina {
+  id String @id @default(uuid())
+  codigo String @unique
+  nome String
+  descricao String?
+  cursoId String
+  cargaHoraria Int
+  status String @default("ativa")
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  curso Curso @relation(fields: [cursoId], references: [id])
+  turmas Turma[]
+  documentos DocumentoAcademico[]
+}
+
+model Professor {
+  id String @id @default(uuid())
+  usuarioId String @unique
+  titulacao String?
+  departamento String?
+  cargaHorariaSemanal Int?
+  status String @default("ativo")
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+  turmas Turma[]
+  atividades Atividade[]
+  cursosBoost CursoBoost[]
+  mensagensBoost MensagemBoost[]
+}
+
+model Aluno {
+  id String @id @default(uuid())
+  usuarioId String @unique
+  ra String @unique
+  cursoId String
+  semestre Int @default(1)
+  situacao String @default("ativo")
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  usuario Usuario @relation(fields: [usuarioId], references: [id])
+  curso Curso @relation(fields: [cursoId], references: [id])
+  matriculas Matricula[]
+  frequencias RegistroFrequencia[]
+  notas Nota[]
+  entregas Entrega[]
+  cobrancas Cobranca[]
+  descontos DescontoAluno[]
+}
+
+model Turma {
+  id String @id @default(uuid())
+  codigo String
+  disciplinaId String
+  periodoLetivoId String
+  professorId String?
+  turno String?
+  capacidade Int @default(0)
+  sala String?
+  horario String?
+  status String @default("aberta")
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  disciplina Disciplina @relation(fields: [disciplinaId], references: [id])
+  periodoLetivo PeriodoLetivo @relation(fields: [periodoLetivoId], references: [id])
+  professor Professor? @relation(fields: [professorId], references: [id])
+  matriculas Matricula[]
+  frequencias RegistroFrequencia[]
+  itensAvaliativos ItemAvaliativo[]
+  atividades Atividade[]
+
+  @@unique([codigo, periodoLetivoId])
+}
+
+model Matricula {
+  id String @id @default(uuid())
+  alunoId String
+  turmaId String
+  status String @default("ativa")
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  aluno Aluno @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  turma Turma @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+
+  @@unique([alunoId, turmaId])
+}
+
+model RegistroFrequencia {
+  id String @id @default(uuid())
+  turmaId String
+  alunoId String
+  data DateTime
+  presenca String
+  registradoPorId String?
+  criadoEm DateTime?
+  turma Turma @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  aluno Aluno @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+
+  @@unique([turmaId, alunoId, data])
+  @@index([alunoId])
+}
+
+model ItemAvaliativo {
+  id String @id @default(uuid())
+  turmaId String
+  nome String
+  peso Decimal
+  notaMaxima Decimal @default(10)
+  origem String @default("manual")
+  atividadeId String? @unique
+  criadoEm DateTime?
+  turma Turma @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  atividade Atividade? @relation(fields: [atividadeId], references: [id])
+  notas Nota[]
+}
+
+model Nota {
+  id String @id @default(uuid())
+  itemAvaliativoId String
+  alunoId String
+  valor Decimal?
+  lancadoPorId String?
+  atualizadoEm DateTime?
+  itemAvaliativo ItemAvaliativo @relation(fields: [itemAvaliativoId], references: [id], onDelete: Cascade)
+  aluno Aluno @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+
+  @@unique([itemAvaliativoId, alunoId])
+}
+
+model EventoCalendarioAcademico {
+  id String @id @default(uuid())
+  titulo String
+  data DateTime
+  dataFim DateTime?
+  horario String?
+  tipo String
+  publico String?
+  local String?
+  criadoEm DateTime?
+}
+
+model DocumentoAcademico {
+  id String @id @default(uuid())
+  nome String
+  tipo String
+  disciplinaId String?
+  autorId String?
+  caminho String?
+  tamanho BigInt?
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  disciplina Disciplina? @relation(fields: [disciplinaId], references: [id])
+}
+
+// Rooster Learn
+
+model Atividade {
+  id String @id @default(uuid())
+  codigo String? @unique
+  titulo String
+  tipo String
+  descricao String?
+  turmaId String
+  professorId String?
+  status String @default("rascunho")
+  peso Decimal @default(1)
+  notaMaxima Decimal @default(10)
+  abreEm DateTime?
+  prazoEm DateTime?
+  tempoLimiteMin Int?
+  permiteAtraso Boolean @default(true)
+  criadoEm DateTime?
+  publicadoEm DateTime?
+  turma Turma @relation(fields: [turmaId], references: [id])
+  professor Professor? @relation(fields: [professorId], references: [id])
+  itemAvaliativo ItemAvaliativo?
+  entregas Entrega[]
+}
+
+model Entrega {
+  id String @id @default(uuid())
+  atividadeId String
+  alunoId String
+  status String @default("pendente")
+  texto String?
+  enviadoEm DateTime?
+  nota Decimal?
+  feedback String?
+  corrigidoPorId String?
+  corrigidoEm DateTime?
+  atividade Atividade @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
+  aluno Aluno @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  anexos AnexoEntrega[]
+
+  @@unique([atividadeId, alunoId])
+}
+
+model AnexoEntrega {
+  id String @id @default(uuid())
+  entregaId String
+  nomeArquivo String?
+  caminho String?
+  tipo String?
+  tamanho BigInt?
+  criadoEm DateTime?
+  entrega Entrega @relation(fields: [entregaId], references: [id], onDelete: Cascade)
+}
+
+model BoostUsuario {
+  id String @id @default(uuid())
+  nome String
+  email String @unique
+  senhaHash String
+  ativo Boolean @default(true)
+  criadoEm DateTime?
+  matriculas MatriculaBoost[]
+  mensagens MensagemBoost[]
+}
+
+model CursoBoost {
+  id String @id @default(uuid())
+  titulo String
+  slug String @unique
+  descricao String?
+  categoria String?
+  nivel String @default("iniciante")
+  cargaHoraria Int
+  capa String?
+  status String @default("rascunho")
+  emiteCertificado Boolean @default(true)
+  professorId String
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  professor Professor @relation(fields: [professorId], references: [id])
+  modulos ModuloBoost[]
+  matriculas MatriculaBoost[]
+  mensagens MensagemBoost[]
+}
+
+model ModuloBoost {
+  id String @id @default(uuid())
+  cursoId String
+  titulo String
+  ordem Int @default(0)
+  curso CursoBoost @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  aulas AulaBoost[]
+}
+
+model AulaBoost {
+  id String @id @default(uuid())
+  moduloId String
+  titulo String
+  ordem Int @default(0)
+  tipo String @default("texto")
+  conteudoUrl String?
+  conteudoTexto String?
+  duracaoMin Int?
+  modulo ModuloBoost @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  materiais MaterialApoio[]
+  progresso ProgressoAula[]
+}
+
+model MaterialApoio {
+  id String @id @default(uuid())
+  aulaId String
+  nome String
+  caminho String
+  tipo String?
+  tamanho BigInt?
+  criadoEm DateTime?
+  aula AulaBoost @relation(fields: [aulaId], references: [id], onDelete: Cascade)
+}
+
+model MatriculaBoost {
+  id String @id @default(uuid())
+  boostUsuarioId String
+  cursoId String
+  status String @default("ativa")
+  progressoPct Int @default(0)
+  matriculadoEm DateTime?
+  concluidoEm DateTime?
+  boostUsuario BoostUsuario @relation(fields: [boostUsuarioId], references: [id], onDelete: Cascade)
+  curso CursoBoost @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  progresso ProgressoAula[]
+  certificado CertificadoBoost?
+
+  @@unique([boostUsuarioId, cursoId])
+}
+
+model ProgressoAula {
+  id String @id @default(uuid())
+  matriculaId String
+  aulaId String
+  concluidoEm DateTime?
+  matricula MatriculaBoost @relation(fields: [matriculaId], references: [id], onDelete: Cascade)
+  aula AulaBoost @relation(fields: [aulaId], references: [id], onDelete: Cascade)
+
+  @@unique([matriculaId, aulaId])
+}
+
+model MensagemBoost {
+  id String @id @default(uuid())
+  cursoId String
+  boostUsuarioId String?
+  professorId String?
+  mensagem String
+  criadoEm DateTime?
+  curso CursoBoost @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  boostUsuario BoostUsuario? @relation(fields: [boostUsuarioId], references: [id])
+  professor Professor? @relation(fields: [professorId], references: [id])
+}
+
+model CertificadoBoost {
+  id String @id @default(uuid())
+  matriculaId String @unique
+  codigo String @unique
+  caminhoPdf String
+  emitidoEm DateTime?
+  matricula MatriculaBoost @relation(fields: [matriculaId], references: [id], onDelete: Cascade)
+}
+
+model Produto {
+  id String @id @default(uuid())
+  codigo String @unique
+  nome String
+  categoria String?
+  descricao String?
+  preco Decimal
+  estoque Int @default(0)
+  estoqueMinimo Int @default(0)
+  unidade String @default("un")
+  ativo Boolean @default(true)
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  cobrancas Cobranca[]
+}
+
+model Servico {
+  id String @id @default(uuid())
+  nome String
+  descricao String?
+  preco Decimal
+  categoria String?
+  frequencia String @default("unico")
+  ativo Boolean @default(true)
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  cobrancas Cobranca[]
+}
+
+model Desconto {
+  id String @id @default(uuid())
+  nome String
+  tipo String
+  valor Decimal
+  unidade String
+  motivo String?
+  responsavel String?
+  vigenciaInicio DateTime?
+  vigenciaFim DateTime?
+  ativo Boolean @default(true)
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  cobrancas Cobranca[]
+  alunos DescontoAluno[]
+}
+
+model DescontoAluno {
+  id String @id @default(uuid())
+  alunoId String
+  descontoId String
+  atribuidoEm DateTime?
+  aluno Aluno @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  desconto Desconto @relation(fields: [descontoId], references: [id], onDelete: Cascade)
+
+  @@unique([alunoId, descontoId])
+}
+
+model Cobranca {
+  id String @id @default(uuid())
+  alunoId String
+  tipo String
+  descricao String
+  competencia String?
+  produtoId String?
+  servicoId String?
+  descontoId String?
+  valorOriginal Decimal
+  valorDesconto Decimal @default(0)
+  multa Decimal @default(0)
+  juros Decimal @default(0)
+  valorPago Decimal?
+  vencimento DateTime
+  status String @default("aberto")
+  formaPagamento String?
+  nossoNumero String? @unique
+  linhaDigitavel String?
+  pixCopiaECola String?
+  emitidoEm DateTime?
+  pagoEm DateTime?
+  negociadoEm DateTime?
+  motivoCancelamento String?
+  criadoEm DateTime? @default(now())
+  atualizadoEm DateTime?
+  aluno Aluno @relation(fields: [alunoId], references: [id])
+  produto Produto? @relation(fields: [produtoId], references: [id])
+  servico Servico? @relation(fields: [servicoId], references: [id])
+  desconto Desconto? @relation(fields: [descontoId], references: [id])
+  notaFiscal NotaFiscal?
+
+  @@index([alunoId])
+}
+
+model NotaFiscal {
+  id String @id @default(uuid())
+  numero String @unique
+  tipo String
+  cobrancaId String @unique
+  caminhoPdf String
+  status String @default("emitida")
+  emitidoEm DateTime?
+  cobranca Cobranca @relation(fields: [cobrancaId], references: [id], onDelete: Cascade)
 }

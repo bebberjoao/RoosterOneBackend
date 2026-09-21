@@ -1,5 +1,6 @@
 node_modules/
 dist/
+uploads/
 prisma-test-client/
 prisma/dev-test.db
 prisma/dev-test.db-journal

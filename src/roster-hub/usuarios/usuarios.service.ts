@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -6,12 +7,22 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { randomBytes, createHash } from 'crypto';
 import { PrismaService } from '../shared/prisma.service';
+import { AuditoriaService } from '../shared/auditoria.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { JwtService } from '@nestjs/jwt';
+import { MailService } from '../../mail/mail.service';
 
 const SALT_ROUNDS = 10;
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1h
+
+/** Nunca incluir `senhaHash` em uma resposta HTTP — aplicado em toda leitura/gravação de Usuario que retorna ao controller. */
+const USUARIO_SAFE_SELECT = {
+  id: true, nome: true, email: true, cpf: true, telefone: true,
+  ativo: true, ultimoLogin: true, criadoEm: true, atualizadoEm: true,
+} satisfies Prisma.UsuarioSelect;
 
 /**
  * Serviço responsável pelo gerenciamento de usuários do Rooster Hub.
@@ -19,7 +30,12 @@ const SALT_ROUNDS = 10;
  */
 @Injectable()
 export class UsuariosService {
-  constructor(private readonly prisma: PrismaService, private readonly jwt: JwtService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+    private readonly auditoria: AuditoriaService,
+    private readonly mail: MailService,
+  ) {}
 
   // =====================================================
   // CRUD
@@ -34,7 +50,15 @@ export class UsuariosService {
     };
 
     try {
-      return await this.prisma.usuario.create({ data });
+      const usuario = await this.prisma.usuario.create({ data, select: USUARIO_SAFE_SELECT });
+      await this.auditoria.registrar({
+        usuarioId: usuario.id,
+        modulo: 'Rooster Hub',
+        acao: 'usuario_criado',
+        entidade: 'usuario',
+        entidadeId: usuario.id,
+      });
+      return usuario;
     } catch (error) {
       this.handleError(error, 'criar usuário');
     }
@@ -50,22 +74,43 @@ export class UsuariosService {
     return this.prisma.usuario.findMany({
       where,
       orderBy: { criadoEm: 'desc' },
+      select: USUARIO_SAFE_SELECT,
     });
   }
 
   async findOne(id: string) {
-    return this.prisma.usuario.findUnique({ where: { id } });
+    return this.prisma.usuario.findUnique({ where: { id }, select: USUARIO_SAFE_SELECT });
   }
 
-  async login(email: string, senha: string) {
+  async login(email: string, senha: string, contexto?: { ip?: string; userAgent?: string }) {
     const usuario = await this.prisma.usuario.findUnique({ where: { email } });
-    if (!usuario || !usuario.ativo || !(await bcrypt.compare(senha, usuario.senhaHash))) {
+    const valido = usuario && usuario.ativo && (await bcrypt.compare(senha, usuario.senhaHash));
+
+    if (!valido) {
+      await this.auditoria.registrar({
+        usuarioId: usuario?.id ?? null,
+        modulo: 'Rooster Hub',
+        acao: 'login_falhou',
+        entidade: 'usuario',
+        entidadeId: usuario?.id ?? null,
+        ip: contexto?.ip,
+        navegador: contexto?.userAgent,
+      });
       throw new UnauthorizedException('Login ou senha inválidos.');
     }
 
     await this.prisma.usuario.update({
       where: { id: usuario.id },
       data: { ultimoLogin: new Date() },
+    });
+    await this.auditoria.registrar({
+      usuarioId: usuario.id,
+      modulo: 'Rooster Hub',
+      acao: 'login_sucesso',
+      entidade: 'usuario',
+      entidadeId: usuario.id,
+      ip: contexto?.ip,
+      navegador: contexto?.userAgent,
     });
 
     return {
@@ -164,10 +209,19 @@ export class UsuariosService {
     };
 
     try {
-      return await this.prisma.usuario.update({
+      const usuario = await this.prisma.usuario.update({
         where: { id },
         data,
+        select: USUARIO_SAFE_SELECT,
       });
+      await this.auditoria.registrar({
+        usuarioId: id,
+        modulo: 'Rooster Hub',
+        acao: updateUsuarioDto.senhaHash ? 'senha_redefinida_por_admin' : 'usuario_editado',
+        entidade: 'usuario',
+        entidadeId: id,
+      });
+      return usuario;
     } catch (error) {
       this.handleError(error, 'atualizar usuário');
     }
@@ -180,10 +234,89 @@ export class UsuariosService {
     }
 
     try {
-      return await this.prisma.usuario.delete({ where: { id } });
+      const usuario = await this.prisma.usuario.delete({ where: { id }, select: USUARIO_SAFE_SELECT });
+      await this.auditoria.registrar({
+        modulo: 'Rooster Hub',
+        acao: 'usuario_excluido',
+        entidade: 'usuario',
+        entidadeId: id,
+      });
+      return usuario;
     } catch (error) {
       this.handleError(error, 'remover usuário');
     }
+  }
+
+  // =====================================================
+  // Redefinição de senha por e-mail
+  // =====================================================
+
+  /**
+   * Sempre responde com sucesso "silencioso" no controller, exista ou não o
+   * e-mail — não deve ser possível descobrir quais e-mails têm conta só
+   * tentando esqueci-senha.
+   */
+  async requestPasswordReset(email: string, contexto?: { ip?: string; userAgent?: string }) {
+    const usuario = await this.prisma.usuario.findUnique({ where: { email } });
+    if (!usuario || !usuario.ativo) return;
+
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    await this.prisma.redefinicaoSenha.create({
+      data: {
+        usuarioId: usuario.id,
+        tokenHash,
+        expiraEm: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+      },
+    });
+
+    const link = `${process.env.FRONTEND_URL ?? 'http://localhost:8080'}/redefinir-senha?token=${rawToken}`;
+    await this.mail.send(
+      usuario.email,
+      'Redefinição de senha — Rooster One',
+      `<p>Olá, ${usuario.nome}.</p>
+       <p>Recebemos uma solicitação para redefinir sua senha no Rooster One.</p>
+       <p><a href="${link}">Clique aqui para definir uma nova senha</a></p>
+       <p>O link expira em 1 hora. Se você não fez essa solicitação, ignore este e-mail.</p>`,
+    );
+
+    await this.auditoria.registrar({
+      usuarioId: usuario.id,
+      modulo: 'Rooster Hub',
+      acao: 'redefinicao_senha_solicitada',
+      entidade: 'usuario',
+      entidadeId: usuario.id,
+      ip: contexto?.ip,
+      navegador: contexto?.userAgent,
+    });
+  }
+
+  async resetPasswordWithToken(token: string, novaSenha: string) {
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const registro = await this.prisma.redefinicaoSenha.findUnique({ where: { tokenHash } });
+
+    if (!registro || registro.usadoEm || registro.expiraEm < new Date()) {
+      throw new BadRequestException('Link de redefinição inválido ou expirado.');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.usuario.update({
+        where: { id: registro.usuarioId },
+        data: { senhaHash: await bcrypt.hash(novaSenha, SALT_ROUNDS), atualizadoEm: new Date() },
+      }),
+      this.prisma.redefinicaoSenha.update({
+        where: { id: registro.id },
+        data: { usadoEm: new Date() },
+      }),
+    ]);
+
+    await this.auditoria.registrar({
+      usuarioId: registro.usuarioId,
+      modulo: 'Rooster Hub',
+      acao: 'senha_redefinida_por_token',
+      entidade: 'usuario',
+      entidadeId: registro.usuarioId,
+    });
   }
 
   // =====================================================

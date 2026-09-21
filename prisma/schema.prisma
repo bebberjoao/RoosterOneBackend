@@ -33,8 +33,24 @@ model Usuario {
   subcategoriasAtendidas AtendimentoSubcategoria[]
   mensagensReservas ReservaMensagem[]
   historicoReservas ReservaHistorico[]
+  redefinicoesSenha RedefinicaoSenha[]
+  professorAcademico Professor?
+  alunoAcademico     Aluno?
 
   @@map("usuarios")
+}
+
+model RedefinicaoSenha {
+  id        String    @id @default(uuid()) @db.Uuid
+  usuarioId String    @map("usuario_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.VarChar(64)
+  expiraEm  DateTime  @map("expira_em") @db.Timestamp()
+  usadoEm   DateTime? @map("usado_em") @db.Timestamp()
+  criadoEm  DateTime  @default(now()) @map("criado_em") @db.Timestamp()
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@map("redefinicoes_senha")
 }
 
 model Setor {
@@ -147,6 +163,7 @@ model LogAuditoria {
 
   usuario       Usuario? @relation(fields: [usuarioId], references: [id])
 
+  @@index([criadoEm])
   @@map("logs_auditoria")
 }
 
@@ -163,6 +180,7 @@ model CategoriaTicket {
   tickets       Ticket[]
   setor         Setor? @relation(fields: [setorId], references: [id])
 
+  @@index([setorId])
   @@map("categorias_tickets")
 }
 
@@ -246,6 +264,8 @@ model Ticket {
   historico    HistoricoTicket[]
   avaliacoes   AvaliacaoTicket[]
 
+  @@index([categoriaId])
+  @@index([criadoEm])
   @@map("tickets")
 }
 
@@ -394,6 +414,8 @@ model Reserva {
   participantes Int       @default(1)
   status        String    @default("analise") @db.VarChar(20)
   recorrencia   String    @default("unica") @db.VarChar(20)
+  serieId       String?   @map("serie_id") @db.Uuid
+  serieTotal    Int?      @map("serie_total")
   observacoes   String?
   decididoPor   String?   @map("decidido_por") @db.Uuid
   decididoEm    DateTime? @map("decidido_em") @db.Timestamp()
@@ -405,6 +427,7 @@ model Reserva {
   mensagens ReservaMensagem[]
   historico ReservaHistorico[]
 
+  @@index([serieId])
   @@map("reservas")
 }
 
@@ -503,9 +526,580 @@ model PatrimonioMovimento {
   destino     String?
   usuario     String    @db.VarChar(120)
   observacoes String?
+  dataDevolucaoPrevista DateTime? @map("data_devolucao_prevista") @db.Date
+  devolvidoEm           DateTime? @map("devolvido_em") @db.Timestamp()
   criadoEm    DateTime? @map("criado_em") @db.Timestamp()
 
   patrimonio Patrimonio @relation(fields: [patrimonioId], references: [id], onDelete: Cascade)
 
   @@map("patrimonio_movimentacoes")
 }
+
+// =====================================================================
+// Rooster Academy
+//
+// Disciplina é o catálogo (curricular, independente de período) — corrige
+// o modelo do mock do frontend, que prendia termId/teacherId direto na
+// disciplina e travava a oferta a um único período/professor por vez.
+// A oferta de fato (período + professor + horário + sala + turno) é a
+// Turma. Aluno/Professor são entidades acadêmicas ligadas por FK a
+// Usuario (Hub) — não duplicam a tabela usuarios.
+// =====================================================================
+
+model Curso {
+  id           String    @id @default(uuid()) @db.Uuid
+  nome         String    @db.VarChar(150)
+  codigo       String    @unique @db.VarChar(30)
+  grau         String    @db.VarChar(30) // Graduação | Pós-graduação | Técnico | Extensão
+  ativo        Boolean   @default(true)
+  criadoEm     DateTime? @map("criado_em") @db.Timestamp()
+  atualizadoEm DateTime? @map("atualizado_em") @db.Timestamp()
+
+  disciplinas Disciplina[]
+  alunos      Aluno[]
+
+  @@map("cursos")
+}
+
+model PeriodoLetivo {
+  id         String    @id @default(uuid()) @db.Uuid
+  nome       String    @unique @db.VarChar(20) // "2026.1"
+  dataInicio DateTime  @map("data_inicio") @db.Date
+  dataFim    DateTime  @map("data_fim") @db.Date
+  ativo      Boolean   @default(false)
+  criadoEm   DateTime? @map("criado_em") @db.Timestamp()
+
+  turmas Turma[]
+
+  @@map("periodos_letivos")
+}
+
+model Disciplina {
+  id           String    @id @default(uuid()) @db.Uuid
+  codigo       String    @unique @db.VarChar(30)
+  nome         String    @db.VarChar(150)
+  descricao    String?
+  cursoId      String    @map("curso_id") @db.Uuid
+  cargaHoraria Int       @map("carga_horaria")
+  status       String    @default("ativa") @db.VarChar(20) // ativa | arquivada | inativa
+  criadoEm     DateTime? @map("criado_em") @db.Timestamp()
+  atualizadoEm DateTime? @map("atualizado_em") @db.Timestamp()
+
+  curso      Curso                @relation(fields: [cursoId], references: [id])
+  turmas     Turma[]
+  documentos DocumentoAcademico[]
+
+  @@map("disciplinas")
+}
+
+model Professor {
+  id                  String    @id @default(uuid()) @db.Uuid
+  usuarioId           String    @unique @map("usuario_id") @db.Uuid
+  titulacao           String?   @db.VarChar(50) // "Prof. Dr."
+  departamento        String?   @db.VarChar(100)
+  cargaHorariaSemanal Int?      @map("carga_horaria_semanal")
+  status              String    @default("ativo") @db.VarChar(20) // ativo | afastado | inativo
+  criadoEm            DateTime? @map("criado_em") @db.Timestamp()
+  atualizadoEm        DateTime? @map("atualizado_em") @db.Timestamp()
+
+  usuario    Usuario     @relation(fields: [usuarioId], references: [id])
+  turmas     Turma[]
+  atividades Atividade[]
+  cursosBoost    CursoBoost[]
+  mensagensBoost MensagemBoost[]
+
+  @@map("professores")
+}
+
+model Aluno {
+  id           String    @id @default(uuid()) @db.Uuid
+  usuarioId    String    @unique @map("usuario_id") @db.Uuid
+  ra           String    @unique @db.VarChar(20)
+  cursoId      String    @map("curso_id") @db.Uuid
+  semestre     Int       @default(1)
+  situacao     String    @default("ativo") @db.VarChar(20) // ativo | trancado | formado | inativo
+  criadoEm     DateTime? @map("criado_em") @db.Timestamp()
+  atualizadoEm DateTime? @map("atualizado_em") @db.Timestamp()
+
+  usuario     Usuario              @relation(fields: [usuarioId], references: [id])
+  curso       Curso                @relation(fields: [cursoId], references: [id])
+  matriculas  Matricula[]
+  frequencias RegistroFrequencia[]
+  notas       Nota[]
+  entregas    Entrega[]
+  cobrancas       Cobranca[]
+  descontos       DescontoAluno[]
+
+  @@map("alunos")
+}
+
+model Turma {
+  id              String    @id @default(uuid()) @db.Uuid
+  codigo          String    @db.VarChar(40)
+  disciplinaId    String    @map("disciplina_id") @db.Uuid
+  periodoLetivoId String    @map("periodo_letivo_id") @db.Uuid
+  professorId     String?   @map("professor_id") @db.Uuid
+  turno           String?   @db.VarChar(20) // Matutino | Vespertino | Noturno
+  capacidade      Int       @default(0)
+  sala            String?   @db.VarChar(150) // texto livre — ver docs/engineering (integração futura com Rooms)
+  horario         String?   @db.VarChar(100) // "Ter/Qui 19:00-22:30"
+  status          String    @default("aberta") @db.VarChar(20) // aberta | em-andamento | encerrada
+  criadoEm        DateTime? @map("criado_em") @db.Timestamp()
+  atualizadoEm    DateTime? @map("atualizado_em") @db.Timestamp()
+
+  disciplina       Disciplina         @relation(fields: [disciplinaId], references: [id])
+  periodoLetivo    PeriodoLetivo      @relation(fields: [periodoLetivoId], references: [id])
+  professor        Professor?         @relation(fields: [professorId], references: [id])
+  matriculas       Matricula[]
+  frequencias      RegistroFrequencia[]
+  itensAvaliativos ItemAvaliativo[]
+  atividades       Atividade[]
+
+  @@unique([codigo, periodoLetivoId])
+  @@map("turmas")
+}
+
+model Matricula {
+  id           String    @id @default(uuid()) @db.Uuid
+  alunoId      String    @map("aluno_id") @db.Uuid
+  turmaId      String    @map("turma_id") @db.Uuid
+  status       String    @default("ativa") @db.VarChar(20) // ativa | trancada | concluida | cancelada
+  criadoEm     DateTime? @map("criado_em") @db.Timestamp()
+  atualizadoEm DateTime? @map("atualizado_em") @db.Timestamp()
+
+  aluno Aluno @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  turma Turma @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+
+  @@unique([alunoId, turmaId])
+  @@map("matriculas")
+}
+
+model RegistroFrequencia {
+  id              String    @id @default(uuid()) @db.Uuid
+  turmaId         String    @map("turma_id") @db.Uuid
+  alunoId         String    @map("aluno_id") @db.Uuid
+  data            DateTime  @db.Date
+  presenca        String    @db.VarChar(20) // presente | falta | atraso | justificado
+  registradoPorId String?   @map("registrado_por_id") @db.Uuid
+  criadoEm        DateTime? @map("criado_em") @db.Timestamp()
+
+  turma Turma @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  aluno Aluno @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+
+  @@unique([turmaId, alunoId, data])
+  @@index([alunoId])
+  @@map("registros_frequencia")
+}
+
+model ItemAvaliativo {
+  id          String    @id @default(uuid()) @db.Uuid
+  turmaId     String    @map("turma_id") @db.Uuid
+  nome        String    @db.VarChar(120)
+  peso        Decimal   @db.Decimal(4, 3) // 0..1
+  notaMaxima  Decimal   @default(10) @map("nota_maxima") @db.Decimal(4, 2)
+  origem      String    @default("manual") @db.VarChar(10) // manual | learn
+  atividadeId String?   @unique @map("atividade_id") @db.Uuid
+  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+
+  turma     Turma      @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+  atividade Atividade? @relation(fields: [atividadeId], references: [id])
+  notas     Nota[]
+
+  @@map("itens_avaliativos")
+}
+
+model Nota {
+  id               String    @id @default(uuid()) @db.Uuid
+  itemAvaliativoId String    @map("item_avaliativo_id") @db.Uuid
+  alunoId          String    @map("aluno_id") @db.Uuid
+  valor            Decimal?  @db.Decimal(4, 2)
+  lancadoPorId     String?   @map("lancado_por_id") @db.Uuid
+  atualizadoEm     DateTime? @map("atualizado_em") @db.Timestamp()
+
+  itemAvaliativo ItemAvaliativo @relation(fields: [itemAvaliativoId], references: [id], onDelete: Cascade)
+  aluno          Aluno          @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+
+  @@unique([itemAvaliativoId, alunoId])
+  @@map("notas")
+}
+
+model EventoCalendarioAcademico {
+  id       String    @id @default(uuid()) @db.Uuid
+  titulo   String    @db.VarChar(150)
+  data     DateTime  @db.Date
+  dataFim  DateTime? @map("data_fim") @db.Date
+  horario  String?   @db.VarChar(30)
+  tipo     String    @db.VarChar(30) // semestre | prova | feriado | reuniao | apresentacao | semana | institucional
+  publico  String?   @db.VarChar(150)
+  local    String?   @db.VarChar(150)
+  criadoEm DateTime? @map("criado_em") @db.Timestamp()
+
+  @@map("eventos_calendario_academico")
+}
+
+model DocumentoAcademico {
+  id           String    @id @default(uuid()) @db.Uuid
+  nome         String    @db.VarChar(200)
+  tipo         String    @db.VarChar(30) // plano-de-ensino | ementa | regulamento | institucional
+  disciplinaId String?   @map("disciplina_id") @db.Uuid
+  autorId      String?   @map("autor_id") @db.Uuid
+  caminho      String?   @db.VarChar(255)
+  tamanho      BigInt?
+  criadoEm     DateTime? @map("criado_em") @db.Timestamp()
+  atualizadoEm DateTime? @map("atualizado_em") @db.Timestamp()
+
+  disciplina Disciplina? @relation(fields: [disciplinaId], references: [id])
+
+  @@map("documentos_academicos")
+}
+
+// =====================================================================
+// Rooster Learn
+//
+// Atividade referencia a Turma real do Academy (não duplica turma/aluno
+// próprios, ao contrário do mock do frontend). Quando a atividade tem
+// peso/nota, pode gerar um ItemAvaliativo (origem "learn") no Academy —
+// ver rooster-learn.service.ts.
+// =====================================================================
+
+model Atividade {
+  id             String    @id @default(uuid()) @db.Uuid
+  codigo         String?   @unique @db.VarChar(30)
+  titulo         String    @db.VarChar(200)
+  tipo           String    @db.VarChar(20) // prova | lista | trabalho | questionario | material
+  descricao      String?
+  turmaId        String    @map("turma_id") @db.Uuid
+  professorId    String?   @map("professor_id") @db.Uuid
+  status         String    @default("rascunho") @db.VarChar(20) // rascunho | agendada | publicada | encerrada | arquivada
+  peso           Decimal   @default(1) @db.Decimal(4, 3)
+  notaMaxima     Decimal   @default(10) @map("nota_maxima") @db.Decimal(4, 2)
+  abreEm         DateTime? @map("abre_em") @db.Timestamp()
+  prazoEm        DateTime? @map("prazo_em") @db.Timestamp()
+  tempoLimiteMin Int?      @map("tempo_limite_min")
+  permiteAtraso  Boolean   @default(true) @map("permite_atraso")
+  criadoEm       DateTime? @map("criado_em") @db.Timestamp()
+  publicadoEm    DateTime? @map("publicado_em") @db.Timestamp()
+
+  turma          Turma           @relation(fields: [turmaId], references: [id])
+  professor      Professor?      @relation(fields: [professorId], references: [id])
+  itemAvaliativo ItemAvaliativo?
+  entregas       Entrega[]
+
+  @@map("atividades")
+}
+
+model Entrega {
+  id             String    @id @default(uuid()) @db.Uuid
+  atividadeId    String    @map("atividade_id") @db.Uuid
+  alunoId        String    @map("aluno_id") @db.Uuid
+  status         String    @default("pendente") @db.VarChar(20) // pendente | enviada | corrigida | reenvio | atrasada
+  texto          String?
+  enviadoEm      DateTime? @map("enviado_em") @db.Timestamp()
+  nota           Decimal?  @db.Decimal(4, 2)
+  feedback       String?
+  corrigidoPorId String?   @map("corrigido_por_id") @db.Uuid
+  corrigidoEm    DateTime? @map("corrigido_em") @db.Timestamp()
+
+  atividade Atividade      @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
+  aluno     Aluno          @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  anexos    AnexoEntrega[]
+
+  @@unique([atividadeId, alunoId])
+  @@map("entregas")
+}
+
+model AnexoEntrega {
+  id          String    @id @default(uuid()) @db.Uuid
+  entregaId   String    @map("entrega_id") @db.Uuid
+  nomeArquivo String?   @map("nome_arquivo") @db.VarChar(255)
+  caminho     String?   @db.VarChar(255)
+  tipo        String?   @db.VarChar(80)
+  tamanho     BigInt?
+  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+
+  entrega Entrega @relation(fields: [entregaId], references: [id], onDelete: Cascade)
+
+  @@map("anexos_entrega")
+}
+
+// =====================================================================
+// Rooster Boost
+//
+// Plataforma de cursos pública, com cadastro/login PRÓPRIOS (BoostUsuario),
+// separados do login do Hub (Usuario) — ver src/rooster-boost-portal/ e
+// docs/security. Instrutor de um CursoBoost é sempre um Professor já
+// cadastrado no Academy (login do Hub); aluno é sempre um BoostUsuario
+// (login público, nunca ligado a Usuario).
+// =====================================================================
+
+model BoostUsuario {
+  id        String    @id @default(uuid()) @db.Uuid
+  nome      String    @db.VarChar(150)
+  email     String    @unique @db.VarChar(180)
+  senhaHash String    @map("senha_hash") @db.VarChar(255)
+  ativo     Boolean   @default(true)
+  criadoEm  DateTime? @map("criado_em") @db.Timestamp()
+
+  matriculas MatriculaBoost[]
+  mensagens  MensagemBoost[]
+
+  @@map("boost_usuarios")
+}
+
+model CursoBoost {
+  id               String    @id @default(uuid()) @db.Uuid
+  titulo           String    @db.VarChar(200)
+  slug             String    @unique @db.VarChar(220)
+  descricao        String?
+  categoria        String?   @db.VarChar(80)
+  nivel            String    @default("iniciante") @db.VarChar(20) // iniciante | intermediario | avancado
+  cargaHoraria     Int       @map("carga_horaria")
+  capa             String?   @db.VarChar(255)
+  status           String    @default("rascunho") @db.VarChar(20) // rascunho | publicado | arquivado
+  emiteCertificado Boolean   @default(true) @map("emite_certificado")
+  professorId      String    @map("professor_id") @db.Uuid
+  criadoEm         DateTime? @map("criado_em") @db.Timestamp()
+  atualizadoEm     DateTime? @map("atualizado_em") @db.Timestamp()
+
+  professor  Professor        @relation(fields: [professorId], references: [id])
+  modulos    ModuloBoost[]
+  matriculas MatriculaBoost[]
+  mensagens  MensagemBoost[]
+
+  @@map("cursos_boost")
+}
+
+model ModuloBoost {
+  id      String @id @default(uuid()) @db.Uuid
+  cursoId String @map("curso_id") @db.Uuid
+  titulo  String @db.VarChar(200)
+  ordem   Int    @default(0)
+
+  curso CursoBoost @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  aulas AulaBoost[]
+
+  @@map("modulos_boost")
+}
+
+model AulaBoost {
+  id            String  @id @default(uuid()) @db.Uuid
+  moduloId      String  @map("modulo_id") @db.Uuid
+  titulo        String  @db.VarChar(200)
+  ordem         Int     @default(0)
+  tipo          String  @default("texto") @db.VarChar(20) // video | texto | pdf | link
+  conteudoUrl   String? @map("conteudo_url") @db.VarChar(500)
+  conteudoTexto String? @map("conteudo_texto")
+  duracaoMin    Int?    @map("duracao_min")
+
+  modulo    ModuloBoost     @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  materiais MaterialApoio[]
+  progresso ProgressoAula[]
+
+  @@map("aulas_boost")
+}
+
+model MaterialApoio {
+  id       String    @id @default(uuid()) @db.Uuid
+  aulaId   String    @map("aula_id") @db.Uuid
+  nome     String    @db.VarChar(200)
+  caminho  String    @db.VarChar(255)
+  tipo     String?   @db.VarChar(80)
+  tamanho  BigInt?
+  criadoEm DateTime? @map("criado_em") @db.Timestamp()
+
+  aula AulaBoost @relation(fields: [aulaId], references: [id], onDelete: Cascade)
+
+  @@map("materiais_apoio_boost")
+}
+
+model MatriculaBoost {
+  id             String    @id @default(uuid()) @db.Uuid
+  boostUsuarioId String    @map("boost_usuario_id") @db.Uuid
+  cursoId        String    @map("curso_id") @db.Uuid
+  status         String    @default("ativa") @db.VarChar(20) // ativa | concluida | cancelada
+  progressoPct   Int       @default(0) @map("progresso_pct")
+  matriculadoEm  DateTime? @map("matriculado_em") @db.Timestamp()
+  concluidoEm    DateTime? @map("concluido_em") @db.Timestamp()
+
+  boostUsuario BoostUsuario       @relation(fields: [boostUsuarioId], references: [id], onDelete: Cascade)
+  curso        CursoBoost         @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  progresso    ProgressoAula[]
+  certificado  CertificadoBoost?
+
+  @@unique([boostUsuarioId, cursoId])
+  @@map("matriculas_boost")
+}
+
+model ProgressoAula {
+  id          String    @id @default(uuid()) @db.Uuid
+  matriculaId String    @map("matricula_id") @db.Uuid
+  aulaId      String    @map("aula_id") @db.Uuid
+  concluidoEm DateTime? @map("concluido_em") @db.Timestamp()
+
+  matricula MatriculaBoost @relation(fields: [matriculaId], references: [id], onDelete: Cascade)
+  aula      AulaBoost      @relation(fields: [aulaId], references: [id], onDelete: Cascade)
+
+  @@unique([matriculaId, aulaId])
+  @@map("progresso_aulas_boost")
+}
+
+model MensagemBoost {
+  id             String    @id @default(uuid()) @db.Uuid
+  cursoId        String    @map("curso_id") @db.Uuid
+  boostUsuarioId String?   @map("boost_usuario_id") @db.Uuid // autor se for aluno
+  professorId    String?   @map("professor_id") @db.Uuid // autor se for instrutor
+  mensagem       String
+  criadoEm       DateTime? @map("criado_em") @db.Timestamp()
+
+  curso        CursoBoost    @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  boostUsuario BoostUsuario? @relation(fields: [boostUsuarioId], references: [id])
+  professor    Professor?    @relation(fields: [professorId], references: [id])
+
+  @@map("mensagens_boost")
+}
+
+model CertificadoBoost {
+  id          String    @id @default(uuid()) @db.Uuid
+  matriculaId String    @unique @map("matricula_id") @db.Uuid
+  codigo      String    @unique @db.VarChar(30)
+  caminhoPdf  String    @map("caminho_pdf") @db.VarChar(255)
+  emitidoEm   DateTime? @map("emitido_em") @db.Timestamp()
+
+  matricula MatriculaBoost @relation(fields: [matriculaId], references: [id], onDelete: Cascade)
+
+  @@map("certificados_boost")
+}
+
+// =====================================================================
+// Rooster Finance
+//
+// Uma única entidade central, `Cobranca`, representa toda cobrança feita
+// a um aluno real do Academy (mensalidade, produto, serviço ou taxa) —
+// substitui o modelo fragmentado do mock do frontend, onde a mesma
+// informação existia sob quatro nomes (Tuition/Charge/Boleto/Payment).
+// Boleto/PIX são gerados e controlados 100% internamente (nossoNumero/
+// linhaDigitavel/pixCopiaECola), sem integração com banco/PSP real —
+// a baixa de pagamento é sempre manual pelo financeiro. NotaFiscal é um
+// documento interno gerado em PDF (mesmo padrão do certificado do Boost),
+// sem transmissão à SEFAZ — decisões confirmadas com o usuário.
+// =====================================================================
+
+model Produto {
+  id            String    @id @default(uuid()) @db.Uuid
+  codigo        String    @unique @db.VarChar(30)
+  nome          String    @db.VarChar(150)
+  categoria     String?   @db.VarChar(80)
+  descricao     String?
+  preco         Decimal   @db.Decimal(10, 2)
+  estoque       Int       @default(0)
+  estoqueMinimo Int       @default(0) @map("estoque_minimo")
+  unidade       String    @default("un") @db.VarChar(20)
+  ativo         Boolean   @default(true)
+  criadoEm      DateTime? @map("criado_em") @db.Timestamp()
+  atualizadoEm  DateTime? @map("atualizado_em") @db.Timestamp()
+
+  cobrancas Cobranca[]
+
+  @@map("produtos_financeiros")
+}
+
+model Servico {
+  id           String    @id @default(uuid()) @db.Uuid
+  nome         String    @db.VarChar(150)
+  descricao    String?
+  preco        Decimal   @db.Decimal(10, 2)
+  categoria    String?   @db.VarChar(80)
+  frequencia   String    @default("unico") @db.VarChar(20) // unico | mensal | anual | semestral
+  ativo        Boolean   @default(true)
+  criadoEm     DateTime? @map("criado_em") @db.Timestamp()
+  atualizadoEm DateTime? @map("atualizado_em") @db.Timestamp()
+
+  cobrancas Cobranca[]
+
+  @@map("servicos_financeiros")
+}
+
+model Desconto {
+  id              String    @id @default(uuid()) @db.Uuid
+  nome            String    @db.VarChar(150)
+  tipo            String    @db.VarChar(20) // bolsa-integral | bolsa-parcial | desc-percent | desc-fixo | convenio | promocao
+  valor           Decimal   @db.Decimal(10, 2)
+  unidade         String    @db.VarChar(10) // percent | fixo
+  motivo          String?
+  responsavel     String?   @db.VarChar(120)
+  vigenciaInicio  DateTime? @map("vigencia_inicio") @db.Date
+  vigenciaFim     DateTime? @map("vigencia_fim") @db.Date
+  ativo           Boolean   @default(true)
+  criadoEm        DateTime? @map("criado_em") @db.Timestamp()
+  atualizadoEm    DateTime? @map("atualizado_em") @db.Timestamp()
+
+  cobrancas Cobranca[]
+  alunos    DescontoAluno[]
+
+  @@map("descontos")
+}
+
+model DescontoAluno {
+  id          String    @id @default(uuid()) @db.Uuid
+  alunoId     String    @map("aluno_id") @db.Uuid
+  descontoId  String    @map("desconto_id") @db.Uuid
+  atribuidoEm DateTime? @map("atribuido_em") @db.Timestamp()
+
+  aluno    Aluno    @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+  desconto Desconto @relation(fields: [descontoId], references: [id], onDelete: Cascade)
+
+  @@unique([alunoId, descontoId])
+  @@map("descontos_alunos")
+}
+
+model Cobranca {
+  id                 String    @id @default(uuid()) @db.Uuid
+  alunoId            String    @map("aluno_id") @db.Uuid
+  tipo               String    @db.VarChar(20) // mensalidade | produto | servico | taxa
+  descricao          String    @db.VarChar(200)
+  competencia        String?   @db.VarChar(20) // "2026-03", só mensalidade
+  produtoId          String?   @map("produto_id") @db.Uuid
+  servicoId          String?   @map("servico_id") @db.Uuid
+  descontoId         String?   @map("desconto_id") @db.Uuid
+  valorOriginal      Decimal   @map("valor_original") @db.Decimal(10, 2)
+  valorDesconto      Decimal   @default(0) @map("valor_desconto") @db.Decimal(10, 2)
+  multa              Decimal   @default(0) @db.Decimal(10, 2)
+  juros              Decimal   @default(0) @db.Decimal(10, 2)
+  valorPago          Decimal?  @map("valor_pago") @db.Decimal(10, 2)
+  vencimento         DateTime  @db.Date
+  status             String    @default("aberto") @db.VarChar(20) // aberto | pago | vencido | negociado | cancelado | processando
+  formaPagamento     String?   @map("forma_pagamento") @db.VarChar(30)
+  nossoNumero        String?   @unique @map("nosso_numero") @db.VarChar(40)
+  linhaDigitavel     String?   @map("linha_digitavel") @db.VarChar(60)
+  pixCopiaECola      String?   @map("pix_copia_e_cola") @db.VarChar(255)
+  emitidoEm          DateTime? @map("emitido_em") @db.Timestamp()
+  pagoEm             DateTime? @map("pago_em") @db.Timestamp()
+  negociadoEm        DateTime? @map("negociado_em") @db.Timestamp()
+  motivoCancelamento String?   @map("motivo_cancelamento")
+  criadoEm           DateTime? @default(now()) @map("criado_em") @db.Timestamp()
+  atualizadoEm       DateTime? @map("atualizado_em") @db.Timestamp()
+
+  aluno      Aluno       @relation(fields: [alunoId], references: [id])
+  produto    Produto?    @relation(fields: [produtoId], references: [id])
+  servico    Servico?    @relation(fields: [servicoId], references: [id])
+  desconto   Desconto?   @relation(fields: [descontoId], references: [id])
+  notaFiscal NotaFiscal?
+
+  @@index([alunoId])
+  @@map("cobrancas")
+}
+
+model NotaFiscal {
+  id         String    @id @default(uuid()) @db.Uuid
+  numero     String    @unique @db.VarChar(30)
+  tipo       String    @db.VarChar(20) // produto | servico
+  cobrancaId String    @unique @map("cobranca_id") @db.Uuid
+  caminhoPdf String    @map("caminho_pdf") @db.VarChar(255)
+  status     String    @default("emitida") @db.VarChar(20) // emitida | cancelada
+  emitidoEm  DateTime? @map("emitido_em") @db.Timestamp()
+
+  cobranca Cobranca @relation(fields: [cobrancaId], references: [id], onDelete: Cascade)
+
+  @@map("notas_fiscais")
+}
+

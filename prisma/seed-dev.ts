@@ -16,6 +16,7 @@ const ids = {
     coordenadorSecretaria: '10000000-0000-4000-8000-000000000008',
     coordenadorSuporte: '10000000-0000-4000-8000-000000000009',
     coordenadorCoordenacao: '10000000-0000-4000-8000-000000000010',
+    financeiro: '10000000-0000-4000-8000-000000000011',
   },
   sectors: {
     secretaria: '30000000-0000-0000-0000-000000000001',
@@ -26,6 +27,11 @@ const ids = {
   roomsModule: '40000000-0000-4000-8000-000000000002',
   assetsModule: '40000000-0000-4000-8000-000000000003',
   hubModule: '40000000-0000-4000-8000-000000000004',
+  academyModule: '40000000-0000-4000-8000-000000000005',
+  learnModule: '40000000-0000-4000-8000-000000000006',
+  studentModule: '40000000-0000-4000-8000-000000000007',
+  boostModule: '40000000-0000-4000-8000-000000000008',
+  financeModule: '40000000-0000-4000-8000-000000000009',
   categories: {
     acesso: '50000000-0000-0000-0000-000000000001',
     sistemas: '50000000-0000-0000-0000-000000000002',
@@ -80,6 +86,53 @@ const ids = {
     switch: '92000000-0000-4000-8000-000000000005',
     monitor: '92000000-0000-4000-8000-000000000006',
   },
+  academyUsers: {
+    coordenador: '11000000-0000-4000-8000-000000000001',
+    professorLima: '11000000-0000-4000-8000-000000000002',
+    professorCosta: '11000000-0000-4000-8000-000000000003',
+    alunoJoao: '11000000-0000-4000-8000-000000000004',
+    alunoMaria: '11000000-0000-4000-8000-000000000005',
+  },
+  cursos: {
+    engenhariaSoftware: '12000000-0000-4000-8000-000000000001',
+    administracao: '12000000-0000-4000-8000-000000000002',
+  },
+  periodosLetivos: {
+    atual: '13000000-0000-4000-8000-000000000001',
+  },
+  disciplinas: {
+    algoritmos: '14000000-0000-4000-8000-000000000001',
+    bancoDados: '14000000-0000-4000-8000-000000000002',
+  },
+  professores: {
+    lima: '15000000-0000-4000-8000-000000000001',
+    costa: '15000000-0000-4000-8000-000000000002',
+  },
+  alunos: {
+    joao: '16000000-0000-4000-8000-000000000001',
+    maria: '16000000-0000-4000-8000-000000000002',
+  },
+  turmas: {
+    algoritmosA: '17000000-0000-4000-8000-000000000001',
+    bancoDadosA: '17000000-0000-4000-8000-000000000002',
+  },
+  itensAvaliativos: {
+    provaAlgoritmos: '18000000-0000-4000-8000-000000000001',
+  },
+  atividades: {
+    listaAlgoritmos: '19000000-0000-4000-8000-000000000001',
+  },
+  produtos: {
+    apostila: '20000000-0000-4000-8000-000000000001',
+    uniforme: '20000000-0000-4000-8000-000000000002',
+  },
+  servicos: {
+    mensalidadeGraduacao: '21000000-0000-4000-8000-000000000001',
+    segundaVia: '21000000-0000-4000-8000-000000000002',
+  },
+  descontos: {
+    bolsaMerito: '22000000-0000-4000-8000-000000000001',
+  },
 };
 
 /** Data futura (só dia, sem hora) N dias à frente, empurrada para fora do fim de semana. */
@@ -99,7 +152,17 @@ function diaFuturo(diasAdiante: number): Date {
  * src/components/rooster/hub/permission-catalog.ts do frontend — é o que
  * cada @RequirePermission(modulo, recurso, acao) do backend compara.
  */
-function permissionDefinitions(hubModulo: { id: string }, deskModulo: { id: string }, roomsModulo: { id: string }, assetsModulo: { id: string }) {
+function permissionDefinitions(
+  hubModulo: { id: string },
+  deskModulo: { id: string },
+  roomsModulo: { id: string },
+  assetsModulo: { id: string },
+  academyModulo: { id: string },
+  learnModulo: { id: string },
+  studentModulo: { id: string },
+  boostModulo: { id: string },
+  financeModulo: { id: string },
+) {
   return [
     // Rooster Hub
     ['hub.usuarios.acessar', 'Acessar Usuários', hubModulo, '/hub/usuarios', 'acessar'],
@@ -118,6 +181,7 @@ function permissionDefinitions(hubModulo: { id: string }, deskModulo: { id: stri
     ['hub.dashboard.acessar', 'Acessar Rooster Hub', hubModulo, '/hub', 'acessar'],
 
     // Rooster Desk
+    ['desk.dashboard.acessar', 'Acessar Rooster Desk', deskModulo, '/desk', 'acessar'],
     ['desk.tickets.acessar', 'Acessar Chamados', deskModulo, '/desk/tickets', 'acessar'],
     ['desk.tickets.criar', 'Abrir chamado', deskModulo, '/desk/tickets', 'criar'],
     ['desk.tickets.editar', 'Editar chamado', deskModulo, '/desk/tickets', 'editar'],
@@ -153,10 +217,101 @@ function permissionDefinitions(hubModulo: { id: string }, deskModulo: { id: stri
     ['assets.inventory.excluir', 'Excluir patrimônio', assetsModulo, '/assets/inventory', 'excluir'],
     ['assets.inventory.gerenciar-categorias', 'Gerenciar categorias de patrimônio', assetsModulo, '/assets/inventory', 'gerenciar-categorias'],
     ['assets.inventory.movimentar', 'Registrar movimentação', assetsModulo, '/assets/inventory', 'movimentar'],
+
+    // Rooster Academy
+    ['academy.dashboard.acessar', 'Acessar Rooster Academy', academyModulo, '/academy', 'acessar'],
+    ['academy.manage.acessar', 'Acessar gestão acadêmica', academyModulo, '/academy/manage', 'acessar'],
+    ['academy.manage.gerenciar-cursos', 'Gerenciar cursos', academyModulo, '/academy/manage', 'gerenciar-cursos'],
+    ['academy.manage.gerenciar-disciplinas', 'Gerenciar disciplinas', academyModulo, '/academy/manage', 'gerenciar-disciplinas'],
+    ['academy.manage.gerenciar-turmas', 'Gerenciar turmas', academyModulo, '/academy/manage', 'gerenciar-turmas'],
+    ['academy.manage.gerenciar-professores', 'Gerenciar professores', academyModulo, '/academy/manage', 'gerenciar-professores'],
+    ['academy.manage.gerenciar-alunos', 'Gerenciar alunos', academyModulo, '/academy/manage', 'gerenciar-alunos'],
+    ['academy.manage.gerenciar-calendario', 'Gerenciar calendário acadêmico', academyModulo, '/academy/manage', 'gerenciar-calendario'],
+    ['academy.manage.matricular', 'Matricular aluno', academyModulo, '/academy/manage', 'matricular'],
+    ['academy.attendance.acessar', 'Acessar frequência', academyModulo, '/academy/attendance', 'acessar'],
+    ['academy.attendance.registrar-chamada', 'Registrar chamada', academyModulo, '/academy/attendance', 'registrar-chamada'],
+    ['academy.attendance.editar-chamada', 'Editar chamada anterior', academyModulo, '/academy/attendance', 'editar-chamada'],
+    ['academy.grades.acessar', 'Acessar notas e conteúdos', academyModulo, '/academy/grades', 'acessar'],
+    ['academy.grades.lancar-notas', 'Lançar notas', academyModulo, '/academy/grades', 'lancar-notas'],
+    ['academy.grades.configurar-pesos', 'Configurar componentes e pesos', academyModulo, '/academy/grades', 'configurar-pesos'],
+
+    // Rooster Learn
+    ['learn.dashboard.acessar', 'Acessar Rooster Learn', learnModulo, '/learn', 'acessar'],
+    ['learn.classes.acessar', 'Acessar turmas e atividades', learnModulo, '/learn/classes', 'acessar'],
+    ['learn.classes.criar-atividade', 'Criar atividade', learnModulo, '/learn/classes', 'criar-atividade'],
+    ['learn.classes.editar-questoes', 'Editar questões', learnModulo, '/learn/classes', 'editar-questoes'],
+    ['learn.classes.corrigir', 'Corrigir entregas', learnModulo, '/learn/classes', 'corrigir'],
+    ['learn.classes.duplicar', 'Duplicar atividade', learnModulo, '/learn/classes', 'duplicar'],
+    ['learn.classes.excluir', 'Excluir atividade', learnModulo, '/learn/classes', 'excluir'],
+    ['learn.classes.gerenciar-turmas', 'Gerenciar turmas (coordenação)', learnModulo, '/learn/classes', 'gerenciar-turmas'],
+    ['learn.student.acessar', 'Acessar minhas atividades', learnModulo, '/learn/student', 'acessar'],
+    ['learn.student.responder', 'Responder atividade', learnModulo, '/learn/student', 'responder'],
+    ['learn.student.anexar', 'Anexar arquivo', learnModulo, '/learn/student', 'anexar'],
+    ['learn.student.ver-correcao', 'Ver correção do professor', learnModulo, '/learn/student', 'ver-correcao'],
+
+    // Rooster Student
+    ['student.dashboard.acessar', 'Acessar Rooster Student', studentModulo, '/student', 'acessar'],
+    ['student.profile.acessar', 'Acessar perfil acadêmico', studentModulo, '/student/profile', 'acessar'],
+    ['student.disciplines.acessar', 'Acessar disciplinas', studentModulo, '/student/disciplines', 'acessar'],
+    ['student.activities.acessar', 'Acessar atividades', studentModulo, '/student/activities', 'acessar'],
+    ['student.activities.entregar', 'Realizar entrega', studentModulo, '/student/activities', 'entregar'],
+    ['student.grades.acessar', 'Acessar notas e desempenho', studentModulo, '/student/grades', 'acessar'],
+    ['student.attendance.acessar', 'Acessar frequência', studentModulo, '/student/attendance', 'acessar'],
+    ['student.history.acessar', 'Acessar histórico', studentModulo, '/student/history', 'acessar'],
+    ['student.history.baixar', 'Baixar histórico', studentModulo, '/student/history', 'baixar'],
+    ['student.calendar.acessar', 'Acessar calendário', studentModulo, '/student/calendar', 'acessar'],
+    ['student.documents.acessar', 'Acessar documentos', studentModulo, '/student/documents', 'acessar'],
+    ['student.documents.enviar', 'Enviar documento', studentModulo, '/student/documents', 'enviar'],
+    ['student.documents.baixar', 'Baixar documento', studentModulo, '/student/documents', 'baixar'],
+    ['student.notifications.acessar', 'Acessar notificações', studentModulo, '/student/notifications', 'acessar'],
+    ['student.notifications.marcar-lida', 'Marcar como lida', studentModulo, '/student/notifications', 'marcar-lida'],
+    ['student.finance.acessar', 'Acessar financeiro do aluno', studentModulo, '/student/finance', 'acessar'],
+    ['student.finance.baixar-boleto', 'Baixar boleto (portal do aluno)', studentModulo, '/student/finance', 'baixar-boleto'],
+
+    // Rooster Boost (lado instrutor — o aluno do Boost usa login próprio, fora deste catálogo)
+    ['boost.dashboard.acessar', 'Acessar Rooster Boost', boostModulo, '/boost', 'acessar'],
+    ['boost.manage.acessar', 'Acessar gestão de cursos Boost', boostModulo, '/boost/manage', 'acessar'],
+    ['boost.manage.gerenciar-cursos', 'Gerenciar cursos Boost', boostModulo, '/boost/manage', 'gerenciar-cursos'],
+    ['boost.manage.gerenciar-conteudo', 'Gerenciar módulos, aulas e materiais', boostModulo, '/boost/manage', 'gerenciar-conteudo'],
+    ['boost.manage.ver-progresso', 'Ver progresso dos alunos', boostModulo, '/boost/manage', 'ver-progresso'],
+    ['boost.manage.mensagem', 'Conversar com alunos', boostModulo, '/boost/manage', 'mensagem'],
+
+    // Rooster Finance
+    ['finance.dashboard.acessar', 'Acessar Rooster Finance', financeModulo, '/finance', 'acessar'],
+    ['finance.charges.acessar', 'Acessar Cobranças', financeModulo, '/finance/charges', 'acessar'],
+    ['finance.charges.criar', 'Nova cobrança', financeModulo, '/finance/charges', 'criar'],
+    ['finance.charges.marcar-pago', 'Marcar cobrança como paga', financeModulo, '/finance/charges', 'marcar-pago'],
+    ['finance.charges.negociar', 'Negociar cobrança', financeModulo, '/finance/charges', 'negociar'],
+    ['finance.charges.cancelar', 'Cancelar cobrança', financeModulo, '/finance/charges', 'cancelar'],
+    ['finance.charges.exportar', 'Exportar cobranças', financeModulo, '/finance/charges', 'exportar'],
+    ['finance.tuitions.acessar', 'Acessar Mensalidades', financeModulo, '/finance/tuitions', 'acessar'],
+    ['finance.tuitions.gerar-lote', 'Gerar mensalidades em lote', financeModulo, '/finance/tuitions', 'gerar-lote'],
+    ['finance.tuitions.editar', 'Editar mensalidade', financeModulo, '/finance/tuitions', 'editar'],
+    ['finance.boletos.acessar', 'Acessar Boletos', financeModulo, '/finance/boletos', 'acessar'],
+    ['finance.boletos.emitir', 'Emitir boleto', financeModulo, '/finance/boletos', 'emitir'],
+    ['finance.boletos.baixar', 'Baixar boleto', financeModulo, '/finance/boletos', 'baixar'],
+    ['finance.products.acessar', 'Acessar Produtos', financeModulo, '/finance/products', 'acessar'],
+    ['finance.products.criar', 'Criar produto', financeModulo, '/finance/products', 'criar'],
+    ['finance.products.editar', 'Editar produto', financeModulo, '/finance/products', 'editar'],
+    ['finance.products.excluir', 'Excluir produto', financeModulo, '/finance/products', 'excluir'],
+    ['finance.services.acessar', 'Acessar Serviços', financeModulo, '/finance/services', 'acessar'],
+    ['finance.services.criar', 'Criar serviço', financeModulo, '/finance/services', 'criar'],
+    ['finance.services.editar', 'Editar serviço', financeModulo, '/finance/services', 'editar'],
+    ['finance.services.excluir', 'Excluir serviço', financeModulo, '/finance/services', 'excluir'],
+    ['finance.nfe.acessar', 'Acessar Notas Fiscais', financeModulo, '/finance/nfe', 'acessar'],
+    ['finance.nfe.emitir', 'Emitir nota fiscal', financeModulo, '/finance/nfe', 'emitir'],
+    ['finance.nfe.exportar-xml', 'Exportar XML da nota fiscal', financeModulo, '/finance/nfe', 'exportar-xml'],
+    ['finance.reports.acessar', 'Acessar Relatórios', financeModulo, '/finance/reports', 'acessar'],
+    ['finance.reports.exportar', 'Exportar relatório', financeModulo, '/finance/reports', 'exportar'],
+    ['finance.discounts.acessar', 'Acessar Descontos', financeModulo, '/finance/discounts', 'acessar'],
+    ['finance.discounts.criar', 'Criar desconto', financeModulo, '/finance/discounts', 'criar'],
+    ['finance.discounts.editar', 'Editar desconto', financeModulo, '/finance/discounts', 'editar'],
+    ['finance.discounts.excluir', 'Excluir desconto', financeModulo, '/finance/discounts', 'excluir'],
   ] as const;
 }
 
 const deskTicketOperationKeys = [
+  'desk.dashboard.acessar',
   'desk.tickets.acessar', 'desk.tickets.criar', 'desk.tickets.editar', 'desk.tickets.encerrar',
   'desk.tickets.reabrir', 'desk.tickets.transferir', 'desk.tickets.anexar', 'desk.tickets.nota-interna',
 ];
@@ -174,8 +329,89 @@ const assetsViewKeys = ['assets.dashboard.acessar'];
 const assetsOperationalKeys = ['assets.inventory.criar', 'assets.inventory.editar', 'assets.inventory.movimentar'];
 const assetsManagementKeys = ['assets.inventory.excluir', 'assets.inventory.gerenciar-categorias'];
 
+/** Coordenação acadêmica: gestão ampla do Academy + Learn (bypass de dono em turma alheia). */
+const academyCoordenadorKeys = [
+  'academy.dashboard.acessar', 'academy.manage.acessar', 'academy.manage.gerenciar-cursos',
+  'academy.manage.gerenciar-disciplinas', 'academy.manage.gerenciar-turmas', 'academy.manage.gerenciar-professores',
+  'academy.manage.gerenciar-alunos', 'academy.manage.gerenciar-calendario', 'academy.manage.matricular',
+  'academy.attendance.acessar', 'academy.attendance.registrar-chamada', 'academy.attendance.editar-chamada',
+  'academy.grades.acessar', 'academy.grades.lancar-notas', 'academy.grades.configurar-pesos',
+  'learn.dashboard.acessar', 'learn.classes.acessar', 'learn.classes.gerenciar-turmas', 'learn.classes.criar-atividade',
+  'learn.classes.editar-questoes', 'learn.classes.corrigir', 'learn.classes.duplicar', 'learn.classes.excluir',
+  // Cadastro de alunos/professores vincula a um Usuario do Hub já existente — a tela de
+  // Gestão acadêmica precisa poder LER o diretório de usuários para buscar/selecionar
+  // (nunca criar/editar/excluir usuário a partir do Academy).
+  'hub.usuarios.acessar',
+];
+/** Professor: só o que precisa para lecionar as próprias turmas — a checagem de "é dono da turma" acontece no backend. */
+const academyProfessorKeys = [
+  'academy.dashboard.acessar',
+  'academy.attendance.acessar', 'academy.attendance.registrar-chamada', 'academy.attendance.editar-chamada',
+  'academy.grades.acessar', 'academy.grades.lancar-notas', 'academy.grades.configurar-pesos',
+  'learn.dashboard.acessar', 'learn.classes.acessar', 'learn.classes.criar-atividade', 'learn.classes.corrigir', 'learn.classes.excluir',
+  'student.documents.acessar',
+  // Instrutor do Boost = Professor do Academy que também dá curso lá (sem cadastro à parte).
+  // Sem `boost.manage.acessar` de propósito — essa é a permissão AMPLA (bypass de dono),
+  // exclusiva de coordenação/admin; o professor só gerencia o próprio curso (ownership
+  // check em `exigirDonoOuGestor`, igual ao Academy).
+  'boost.dashboard.acessar', 'boost.manage.gerenciar-cursos',
+  'boost.manage.gerenciar-conteudo', 'boost.manage.ver-progresso', 'boost.manage.mensagem',
+];
+/** Aluno: portal do Rooster Student + as ações do Rooster Learn como respondente. */
+const alunoKeys = [
+  'student.dashboard.acessar', 'student.profile.acessar', 'student.disciplines.acessar',
+  'student.activities.acessar', 'student.activities.entregar', 'student.grades.acessar', 'student.attendance.acessar',
+  'student.history.acessar', 'student.history.baixar', 'student.calendar.acessar',
+  'student.documents.acessar', 'student.documents.enviar', 'student.documents.baixar',
+  'student.notifications.acessar', 'student.notifications.marcar-lida',
+  'student.finance.acessar', 'student.finance.baixar-boleto',
+  'learn.dashboard.acessar', 'learn.student.acessar', 'learn.student.responder', 'learn.student.anexar', 'learn.student.ver-correcao',
+];
+/** Financeiro: gestão completa do Rooster Finance (cobranças, produtos, serviços, descontos, NF, relatórios). */
+const financeStaffKeys = [
+  'finance.dashboard.acessar',
+  'finance.charges.acessar', 'finance.charges.criar', 'finance.charges.marcar-pago', 'finance.charges.negociar', 'finance.charges.cancelar', 'finance.charges.exportar',
+  'finance.tuitions.acessar', 'finance.tuitions.gerar-lote', 'finance.tuitions.editar',
+  'finance.boletos.acessar', 'finance.boletos.emitir', 'finance.boletos.baixar',
+  'finance.products.acessar', 'finance.products.criar', 'finance.products.editar', 'finance.products.excluir',
+  'finance.services.acessar', 'finance.services.criar', 'finance.services.editar', 'finance.services.excluir',
+  'finance.nfe.acessar', 'finance.nfe.emitir', 'finance.nfe.exportar-xml',
+  'finance.reports.acessar', 'finance.reports.exportar',
+  'finance.discounts.acessar', 'finance.discounts.criar', 'finance.discounts.editar', 'finance.discounts.excluir',
+];
+
 async function clearDatabase() {
   await prisma.$transaction([
+    prisma.notaFiscal.deleteMany(),
+    prisma.cobranca.deleteMany(),
+    prisma.descontoAluno.deleteMany(),
+    prisma.desconto.deleteMany(),
+    prisma.servico.deleteMany(),
+    prisma.produto.deleteMany(),
+    prisma.certificadoBoost.deleteMany(),
+    prisma.progressoAula.deleteMany(),
+    prisma.mensagemBoost.deleteMany(),
+    prisma.matriculaBoost.deleteMany(),
+    prisma.materialApoio.deleteMany(),
+    prisma.aulaBoost.deleteMany(),
+    prisma.moduloBoost.deleteMany(),
+    prisma.cursoBoost.deleteMany(),
+    prisma.boostUsuario.deleteMany(),
+    prisma.anexoEntrega.deleteMany(),
+    prisma.entrega.deleteMany(),
+    prisma.atividade.deleteMany(),
+    prisma.nota.deleteMany(),
+    prisma.itemAvaliativo.deleteMany(),
+    prisma.registroFrequencia.deleteMany(),
+    prisma.matricula.deleteMany(),
+    prisma.documentoAcademico.deleteMany(),
+    prisma.eventoCalendarioAcademico.deleteMany(),
+    prisma.turma.deleteMany(),
+    prisma.disciplina.deleteMany(),
+    prisma.professor.deleteMany(),
+    prisma.aluno.deleteMany(),
+    prisma.periodoLetivo.deleteMany(),
+    prisma.curso.deleteMany(),
     prisma.patrimonioMovimento.deleteMany(),
     prisma.patrimonio.deleteMany(),
     prisma.patrimonioCategoria.deleteMany(),
@@ -214,9 +450,14 @@ async function main() {
   const roomsModulo = await prisma.modulo.create({ data: { id: ids.roomsModule, nome: 'Rooster Rooms', rota: '/rooms', icone: 'CalendarRange', ativo: true } });
   const assetsModulo = await prisma.modulo.create({ data: { id: ids.assetsModule, nome: 'Rooster Assets', rota: '/assets', icone: 'Package', ativo: true } });
   const hubModulo = await prisma.modulo.create({ data: { id: ids.hubModule, nome: 'Rooster Hub', rota: '/hub', icone: 'ShieldCheck', ativo: true } });
+  const academyModulo = await prisma.modulo.create({ data: { id: ids.academyModule, nome: 'Rooster Academy', rota: '/academy', icone: 'GraduationCap', ativo: true } });
+  const learnModulo = await prisma.modulo.create({ data: { id: ids.learnModule, nome: 'Rooster Learn', rota: '/learn', icone: 'BookOpen', ativo: true } });
+  const studentModulo = await prisma.modulo.create({ data: { id: ids.studentModule, nome: 'Rooster Student', rota: '/student', icone: 'GraduationCap', ativo: true } });
+  const boostModulo = await prisma.modulo.create({ data: { id: ids.boostModule, nome: 'Rooster Boost', rota: '/boost', icone: 'Rocket', ativo: true } });
+  const financeModulo = await prisma.modulo.create({ data: { id: ids.financeModule, nome: 'Rooster Finance', rota: '/finance', icone: 'Wallet', ativo: true } });
 
   const permissions = new Map<string, { id: string }>();
-  for (const [key, nome, moduloAlvo, recurso, acao] of permissionDefinitions(hubModulo, modulo, roomsModulo, assetsModulo)) {
+  for (const [key, nome, moduloAlvo, recurso, acao] of permissionDefinitions(hubModulo, modulo, roomsModulo, assetsModulo, academyModulo, learnModulo, studentModulo, boostModulo, financeModulo)) {
     const permission = await prisma.permissao.create({
       data: { moduloId: moduloAlvo.id, nome: key, descricao: nome, recurso, acao },
       select: { id: true },
@@ -251,7 +492,7 @@ async function main() {
 
   const solicitantePermissions = [...deskTicketOperationKeys.filter((k) => k !== 'desk.tickets.encerrar' && k !== 'desk.tickets.reabrir' && k !== 'desk.tickets.transferir'), ...roomsViewKeys, ...roomsSelfServiceKeys];
   const atendentePermissions = [...deskTicketOperationKeys, ...roomsViewKeys, ...assetsViewKeys, ...assetsOperationalKeys];
-  const visualizadorPermissions = ['desk.tickets.acessar', ...roomsViewKeys, ...assetsViewKeys];
+  const visualizadorPermissions = ['desk.dashboard.acessar', 'desk.tickets.acessar', ...roomsViewKeys, ...assetsViewKeys];
   const coordenadorPermissions = [
     ...deskTicketOperationKeys, ...deskManagementKeys,
     ...roomsViewKeys, ...roomsSelfServiceKeys, ...roomsManagementKeys,
@@ -288,6 +529,9 @@ async function main() {
   await grant(users[0].id, solicitantePermissions);
   await grant(users[1].id, atendentePermissions);
   await grant(users[2].id, visualizadorPermissions);
+
+  await prisma.usuario.create({ data: { id: ids.users.financeiro, nome: 'Marcos Financeiro', email: 'financeiro@rooster.local', senhaHash: await senha('Financeiro123!'), ativo: true } });
+  await grant(ids.users.financeiro, financeStaffKeys);
 
   await prisma.usuarioSetor.createMany({
     data: [
@@ -462,6 +706,231 @@ async function main() {
     ],
   });
 
+  // =====================================================
+  // Rooster Academy / Learn / Student — usuários e dados de exemplo
+  // =====================================================
+  await prisma.usuario.create({ data: { id: ids.academyUsers.coordenador, nome: 'Coordenadora Julia Prado', email: 'coordenacao.academica@rooster.local', senhaHash: await senha('Coordenador123!'), ativo: true } });
+  await grant(ids.academyUsers.coordenador, academyCoordenadorKeys);
+
+  await prisma.usuario.create({ data: { id: ids.academyUsers.professorLima, nome: 'Prof. Ricardo Lima', email: 'ricardo.lima@rooster.local', senhaHash: await senha('Professor123!'), ativo: true } });
+  await grant(ids.academyUsers.professorLima, academyProfessorKeys);
+  await prisma.usuario.create({ data: { id: ids.academyUsers.professorCosta, nome: 'Profa. Fernanda Costa', email: 'fernanda.costa@rooster.local', senhaHash: await senha('Professor123!'), ativo: true } });
+  await grant(ids.academyUsers.professorCosta, academyProfessorKeys);
+
+  await prisma.usuario.create({ data: { id: ids.academyUsers.alunoJoao, nome: 'João Pereira', email: 'joao.pereira@rooster.local', senhaHash: await senha('Aluno123!'), ativo: true } });
+  await grant(ids.academyUsers.alunoJoao, alunoKeys);
+  await prisma.usuario.create({ data: { id: ids.academyUsers.alunoMaria, nome: 'Maria Santos', email: 'maria.santos@rooster.local', senhaHash: await senha('Aluno123!'), ativo: true } });
+  await grant(ids.academyUsers.alunoMaria, alunoKeys);
+
+  await prisma.curso.createMany({
+    data: [
+      { id: ids.cursos.engenhariaSoftware, nome: 'Engenharia de Software', codigo: 'ENGSOFT', grau: 'Graduação', ativo: true, criadoEm: new Date(), atualizadoEm: new Date() },
+      { id: ids.cursos.administracao, nome: 'Administração', codigo: 'ADM', grau: 'Graduação', ativo: true, criadoEm: new Date(), atualizadoEm: new Date() },
+    ],
+  });
+
+  await prisma.periodoLetivo.create({
+    data: { id: ids.periodosLetivos.atual, nome: '2026.2', dataInicio: new Date('2026-08-03'), dataFim: new Date('2026-12-18'), ativo: true, criadoEm: new Date() },
+  });
+
+  await prisma.disciplina.createMany({
+    data: [
+      { id: ids.disciplinas.algoritmos, codigo: 'ALG101', nome: 'Algoritmos e Estruturas de Dados', cursoId: ids.cursos.engenhariaSoftware, cargaHoraria: 80, status: 'ativa', criadoEm: new Date(), atualizadoEm: new Date() },
+      { id: ids.disciplinas.bancoDados, codigo: 'BD101', nome: 'Banco de Dados', cursoId: ids.cursos.engenhariaSoftware, cargaHoraria: 60, status: 'ativa', criadoEm: new Date(), atualizadoEm: new Date() },
+    ],
+  });
+
+  await prisma.professor.createMany({
+    data: [
+      { id: ids.professores.lima, usuarioId: ids.academyUsers.professorLima, titulacao: 'Prof. Dr.', departamento: 'Ciência da Computação', cargaHorariaSemanal: 20, status: 'ativo', criadoEm: new Date(), atualizadoEm: new Date() },
+      { id: ids.professores.costa, usuarioId: ids.academyUsers.professorCosta, titulacao: 'Profa. Ma.', departamento: 'Ciência da Computação', cargaHorariaSemanal: 16, status: 'ativo', criadoEm: new Date(), atualizadoEm: new Date() },
+    ],
+  });
+
+  await prisma.aluno.createMany({
+    data: [
+      { id: ids.alunos.joao, usuarioId: ids.academyUsers.alunoJoao, ra: '2026001', cursoId: ids.cursos.engenhariaSoftware, semestre: 3, situacao: 'ativo', criadoEm: new Date(), atualizadoEm: new Date() },
+      { id: ids.alunos.maria, usuarioId: ids.academyUsers.alunoMaria, ra: '2026002', cursoId: ids.cursos.engenhariaSoftware, semestre: 3, situacao: 'ativo', criadoEm: new Date(), atualizadoEm: new Date() },
+    ],
+  });
+
+  await prisma.turma.createMany({
+    data: [
+      { id: ids.turmas.algoritmosA, codigo: 'ALG101-A', disciplinaId: ids.disciplinas.algoritmos, periodoLetivoId: ids.periodosLetivos.atual, professorId: ids.professores.lima, turno: 'Noturno', capacidade: 40, sala: 'Sala 101', horario: 'Seg/Qua 19:00-20:40', status: 'em-andamento', criadoEm: new Date(), atualizadoEm: new Date() },
+      { id: ids.turmas.bancoDadosA, codigo: 'BD101-A', disciplinaId: ids.disciplinas.bancoDados, periodoLetivoId: ids.periodosLetivos.atual, professorId: ids.professores.costa, turno: 'Noturno', capacidade: 35, sala: 'Sala 102', horario: 'Ter/Qui 19:00-20:40', status: 'em-andamento', criadoEm: new Date(), atualizadoEm: new Date() },
+    ],
+  });
+
+  // João só está matriculado em Algoritmos (turma do Prof. Lima); Maria só em Banco de Dados
+  // (turma da Profa. Costa) — de propósito, para exercitar os casos negativos de escopo
+  // (aluno/professor de uma turma não pode ver dado da outra).
+  await prisma.matricula.createMany({
+    data: [
+      { alunoId: ids.alunos.joao, turmaId: ids.turmas.algoritmosA, status: 'ativa', criadoEm: new Date(), atualizadoEm: new Date() },
+      { alunoId: ids.alunos.maria, turmaId: ids.turmas.bancoDadosA, status: 'ativa', criadoEm: new Date(), atualizadoEm: new Date() },
+    ],
+  });
+
+  await prisma.registroFrequencia.createMany({
+    data: [
+      { turmaId: ids.turmas.algoritmosA, alunoId: ids.alunos.joao, data: new Date(Date.now() - 7 * 86400000), presenca: 'presente', registradoPorId: ids.academyUsers.professorLima, criadoEm: new Date() },
+      { turmaId: ids.turmas.algoritmosA, alunoId: ids.alunos.joao, data: new Date(Date.now() - 2 * 86400000), presenca: 'falta', registradoPorId: ids.academyUsers.professorLima, criadoEm: new Date() },
+    ],
+  });
+
+  await prisma.itemAvaliativo.create({
+    data: { id: ids.itensAvaliativos.provaAlgoritmos, turmaId: ids.turmas.algoritmosA, nome: 'Prova 1', peso: 0.6, notaMaxima: 10, origem: 'manual', criadoEm: new Date() },
+  });
+  await prisma.nota.create({
+    data: { itemAvaliativoId: ids.itensAvaliativos.provaAlgoritmos, alunoId: ids.alunos.joao, valor: 8.5, lancadoPorId: ids.academyUsers.professorLima, atualizadoEm: new Date() },
+  });
+
+  // Atividade do Learn já publicada, com item avaliativo gerado (origem "learn") — mostra a
+  // integração Learn -> Academy sem duplicar dado (mesma turma, mesmo aluno matriculado).
+  await prisma.atividade.create({
+    data: {
+      id: ids.atividades.listaAlgoritmos, codigo: 'ALG101-L1', titulo: 'Lista 1 — Complexidade de algoritmos',
+      tipo: 'lista', turmaId: ids.turmas.algoritmosA, professorId: ids.professores.lima,
+      status: 'publicada', peso: 0.4, notaMaxima: 10,
+      prazoEm: new Date(Date.now() + 5 * 86400000), permiteAtraso: true,
+      criadoEm: new Date(), publicadoEm: new Date(),
+    },
+  });
+  await prisma.itemAvaliativo.create({
+    data: { turmaId: ids.turmas.algoritmosA, nome: 'Lista 1 — Complexidade de algoritmos', peso: 0.4, notaMaxima: 10, origem: 'learn', atividadeId: ids.atividades.listaAlgoritmos, criadoEm: new Date() },
+  });
+
+  await prisma.eventoCalendarioAcademico.create({
+    data: { titulo: 'Início do semestre 2026.2', data: new Date('2026-08-03'), tipo: 'semestre', publico: 'Todos', criadoEm: new Date() },
+  });
+
+  // =====================================================
+  // Rooster Finance — cobranças ligadas a alunos reais do Academy
+  // (sem financeStudents fictício: alunoId sempre aponta para `Aluno`)
+  // =====================================================
+  await prisma.produto.createMany({
+    data: [
+      { id: ids.produtos.apostila, codigo: 'LIV-001', nome: 'Apostila de Algoritmos', categoria: 'Livros', descricao: 'Material didático oficial da disciplina.', preco: 89.9, estoque: 4, estoqueMinimo: 10, unidade: 'un', ativo: true, criadoEm: new Date(), atualizadoEm: new Date() },
+      { id: ids.produtos.uniforme, codigo: 'UNI-014', nome: 'Uniforme oficial — Camiseta', categoria: 'Uniformes', descricao: 'Malha piquê com bordado institucional.', preco: 79.0, estoque: 128, estoqueMinimo: 40, unidade: 'un', ativo: true, criadoEm: new Date(), atualizadoEm: new Date() },
+    ],
+  });
+  await prisma.servico.createMany({
+    data: [
+      { id: ids.servicos.mensalidadeGraduacao, nome: 'Mensalidade — Graduação', descricao: 'Mensalidade padrão dos cursos de graduação.', preco: 1250.0, categoria: 'Mensalidade', frequencia: 'mensal', ativo: true, criadoEm: new Date(), atualizadoEm: new Date() },
+      { id: ids.servicos.segundaVia, nome: '2ª via de documento', descricao: 'Emissão de segunda via de documentos.', preco: 45.0, categoria: 'Taxa', frequencia: 'unico', ativo: true, criadoEm: new Date(), atualizadoEm: new Date() },
+    ],
+  });
+  await prisma.desconto.create({
+    data: {
+      id: ids.descontos.bolsaMerito, nome: 'Bolsa Mérito 50%', tipo: 'bolsa-parcial', valor: 50, unidade: 'percent',
+      motivo: 'Alto desempenho acadêmico', responsavel: 'Coordenação Acadêmica',
+      vigenciaInicio: new Date('2026-01-01'), vigenciaFim: new Date('2026-12-31'), ativo: true,
+      criadoEm: new Date(), atualizadoEm: new Date(),
+    },
+  });
+  await prisma.descontoAluno.create({
+    data: { alunoId: ids.alunos.maria, descontoId: ids.descontos.bolsaMerito, atribuidoEm: new Date() },
+  });
+
+  // João: mensalidade paga (jul), vencida/em aberto (ago) com boleto já emitido, e futura (out).
+  await prisma.cobranca.create({
+    data: {
+      alunoId: ids.alunos.joao, tipo: 'mensalidade', descricao: 'Mensalidade — Graduação — 2026-07', competencia: '2026-07',
+      servicoId: ids.servicos.mensalidadeGraduacao, valorOriginal: 1250, valorDesconto: 0,
+      vencimento: new Date('2026-07-10'), status: 'pago', valorPago: 1250, formaPagamento: 'pix',
+      pagoEm: new Date('2026-07-09'), criadoEm: new Date('2026-07-01'), atualizadoEm: new Date('2026-07-09'),
+    },
+  });
+  await prisma.cobranca.create({
+    data: {
+      alunoId: ids.alunos.joao, tipo: 'mensalidade', descricao: 'Mensalidade — Graduação — 2026-08', competencia: '2026-08',
+      servicoId: ids.servicos.mensalidadeGraduacao, valorOriginal: 1250, valorDesconto: 0,
+      vencimento: new Date('2026-08-10'), status: 'aberto',
+      nossoNumero: '17293004651', linhaDigitavel: '341917293004651000012500000000000000000000000'.slice(0, 47),
+      pixCopiaECola: '00020126360014BR.GOV.BCB.PIX0114ROOSTERONEfinance152040000530398654061250.005802BR6009ROOSTERONE',
+      emitidoEm: new Date('2026-08-01'),
+      criadoEm: new Date('2026-08-01'), atualizadoEm: new Date('2026-08-01'),
+    },
+  });
+  await prisma.cobranca.create({
+    data: {
+      alunoId: ids.alunos.joao, tipo: 'mensalidade', descricao: 'Mensalidade — Graduação — 2026-10', competencia: '2026-10',
+      servicoId: ids.servicos.mensalidadeGraduacao, valorOriginal: 1250, valorDesconto: 0,
+      vencimento: new Date('2026-10-10'), status: 'aberto', criadoEm: new Date('2026-09-01'), atualizadoEm: new Date('2026-09-01'),
+    },
+  });
+
+  // Maria: bolsista (50% de desconto aplicado automaticamente).
+  await prisma.cobranca.create({
+    data: {
+      alunoId: ids.alunos.maria, tipo: 'mensalidade', descricao: 'Mensalidade — Graduação — 2026-08', competencia: '2026-08',
+      servicoId: ids.servicos.mensalidadeGraduacao, descontoId: ids.descontos.bolsaMerito, valorOriginal: 1250, valorDesconto: 625,
+      vencimento: new Date('2026-08-10'), status: 'pago', valorPago: 625, formaPagamento: 'boleto',
+      pagoEm: new Date('2026-08-08'), criadoEm: new Date('2026-08-01'), atualizadoEm: new Date('2026-08-08'),
+    },
+  });
+  await prisma.cobranca.create({
+    data: {
+      alunoId: ids.alunos.maria, tipo: 'mensalidade', descricao: 'Mensalidade — Graduação — 2026-10', competencia: '2026-10',
+      servicoId: ids.servicos.mensalidadeGraduacao, descontoId: ids.descontos.bolsaMerito, valorOriginal: 1250, valorDesconto: 625,
+      vencimento: new Date('2026-10-10'), status: 'aberto', criadoEm: new Date('2026-09-01'), atualizadoEm: new Date('2026-09-01'),
+    },
+  });
+
+  // Compra de produto por João, já paga e com nota fiscal interna emitida.
+  const cobrancaProduto = await prisma.cobranca.create({
+    data: {
+      alunoId: ids.alunos.joao, tipo: 'produto', descricao: 'Apostila de Algoritmos', produtoId: ids.produtos.apostila,
+      valorOriginal: 89.9, valorDesconto: 0, vencimento: new Date('2026-07-12'), status: 'pago', valorPago: 89.9,
+      formaPagamento: 'pix', pagoEm: new Date('2026-07-12'), criadoEm: new Date('2026-07-12'), atualizadoEm: new Date('2026-07-12'),
+    },
+  });
+  await prisma.notaFiscal.create({
+    data: {
+      numero: 'NFP-2026-0001', tipo: 'produto', cobrancaId: cobrancaProduto.id,
+      caminhoPdf: 'seed-placeholder.pdf', status: 'emitida', emitidoEm: new Date('2026-07-12'),
+    },
+  });
+
+  // =====================================================
+  // Rooster Boost — curso público de exemplo (login próprio, fora do Hub)
+  // =====================================================
+  const boostAluno = await prisma.boostUsuario.create({
+    data: { nome: 'Camila Nogueira', email: 'camila.externa@example.com', senhaHash: await senha('Boost123!'), criadoEm: new Date() },
+  });
+
+  const cursoBoost = await prisma.cursoBoost.create({
+    data: {
+      titulo: 'Fundamentos de Lógica de Programação', slug: 'fundamentos-logica-programacao',
+      descricao: 'Introdução a variáveis, estruturas de decisão, laços e lógica algorítmica, com exercícios práticos.',
+      categoria: 'Tecnologia', nivel: 'iniciante', cargaHoraria: 20, status: 'publicado', emiteCertificado: true,
+      professorId: ids.professores.lima, criadoEm: new Date(), atualizadoEm: new Date(),
+    },
+  });
+  const moduloBoost1 = await prisma.moduloBoost.create({ data: { cursoId: cursoBoost.id, titulo: 'Primeiros passos', ordem: 1 } });
+  const moduloBoost2 = await prisma.moduloBoost.create({ data: { cursoId: cursoBoost.id, titulo: 'Estruturas de controle', ordem: 2 } });
+  const aulaBoost1 = await prisma.aulaBoost.create({ data: { moduloId: moduloBoost1.id, titulo: 'O que é lógica de programação', ordem: 1, tipo: 'texto', conteudoTexto: 'Lógica de programação é a técnica de encadear pensamentos para atingir um objetivo definido.', duracaoMin: 15 } });
+  const aulaBoost2 = await prisma.aulaBoost.create({ data: { moduloId: moduloBoost1.id, titulo: 'Variáveis e tipos de dados', ordem: 2, tipo: 'video', conteudoUrl: 'https://www.youtube.com/watch?v=exemplo1', duracaoMin: 20 } });
+  await prisma.aulaBoost.create({ data: { moduloId: moduloBoost2.id, titulo: 'Estruturas condicionais', ordem: 1, tipo: 'video', conteudoUrl: 'https://www.youtube.com/watch?v=exemplo2', duracaoMin: 25 } });
+  await prisma.aulaBoost.create({ data: { moduloId: moduloBoost2.id, titulo: 'Laços de repetição', ordem: 2, tipo: 'texto', conteudoTexto: 'Laços permitem repetir um bloco de instruções enquanto uma condição for verdadeira.', duracaoMin: 20 } });
+  await prisma.materialApoio.create({ data: { aulaId: aulaBoost1.id, nome: 'slides-introducao.pdf', caminho: 'seed-placeholder.pdf', tipo: 'application/pdf', tamanho: BigInt(102400), criadoEm: new Date() } });
+
+  const matriculaBoost = await prisma.matriculaBoost.create({
+    data: { boostUsuarioId: boostAluno.id, cursoId: cursoBoost.id, status: 'ativa', progressoPct: 50, matriculadoEm: new Date() },
+  });
+  await prisma.progressoAula.createMany({
+    data: [
+      { matriculaId: matriculaBoost.id, aulaId: aulaBoost1.id, concluidoEm: new Date() },
+      { matriculaId: matriculaBoost.id, aulaId: aulaBoost2.id, concluidoEm: new Date() },
+    ],
+  });
+  await prisma.mensagemBoost.create({
+    data: { cursoId: cursoBoost.id, boostUsuarioId: boostAluno.id, mensagem: 'Professor, qual a diferença entre laço "para" e "enquanto"?', criadoEm: new Date() },
+  });
+  await prisma.mensagemBoost.create({
+    data: { cursoId: cursoBoost.id, professorId: ids.professores.lima, mensagem: 'Boa pergunta! Veremos isso em detalhes na próxima aula.', criadoEm: new Date() },
+  });
+
   console.log('Banco de desenvolvimento limpo e populado.');
   console.log('Usuários: ana.solicitante@rooster.local, bruno.atendente@rooster.local, carla.visualizadora@rooster.local');
   console.log('Senha de todos: Senha123');
@@ -469,6 +938,13 @@ async function main() {
   console.log('Coordenadores: coordenador.secretaria@rooster.local, coordenador.suporte@rooster.local, coordenador.coordenacao@rooster.local / Coordenador123!');
   console.log('Rooms: 1 campus, 2 blocos, 5 ambientes e 5 reservas (2 em análise para aprovar/recusar).');
   console.log('Assets: 3 categorias, 3 setores, 6 patrimônios e 4 movimentações.');
+  console.log('Academy/Learn/Student: coordenacao.academica@rooster.local / Coordenador123!');
+  console.log('  Professores: ricardo.lima@rooster.local, fernanda.costa@rooster.local / Professor123!');
+  console.log('  Alunos: joao.pereira@rooster.local (turma ALG101-A), maria.santos@rooster.local (turma BD101-A) / Aluno123!');
+  console.log('Rooster Boost: instrutor ricardo.lima@rooster.local / Professor123! (curso "Fundamentos de Lógica de Programação")');
+  console.log('  Aluno externo (login próprio, fora do Hub): camila.externa@example.com / Boost123!');
+  console.log('Rooster Finance: financeiro@rooster.local / Financeiro123!');
+  console.log('  João (sem desconto): paga, vencida com boleto emitido e futura. Maria (bolsa 50%): paga e futura.');
 }
 
 main()

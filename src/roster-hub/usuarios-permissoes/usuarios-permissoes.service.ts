@@ -1,11 +1,15 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
+import { AuditoriaService } from '../shared/auditoria.service';
 import { CreateUsuarioPermissaoDto } from './dto/create-usuario-permissao.dto';
 
 @Injectable()
 export class UsuariosPermissoesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditoria: AuditoriaService,
+  ) {}
 
   // =====================================================
   // CRUD
@@ -19,7 +23,15 @@ export class UsuariosPermissoesService {
     };
 
     try {
-      return await this.prisma.usuarioPermissao.create({ data });
+      const vinculo = await this.prisma.usuarioPermissao.create({ data });
+      await this.auditoria.registrar({
+        usuarioId: createUsuarioPermissaoDto.usuarioId,
+        modulo: 'Rooster Hub',
+        acao: 'permissao_concedida',
+        entidade: 'usuario_permissao',
+        entidadeId: vinculo.id,
+      });
+      return vinculo;
     } catch (error) {
       this.handleError(error, 'conceder permissão ao usuário');
     }
@@ -42,7 +54,15 @@ export class UsuariosPermissoesService {
     }
 
     try {
-      return await this.prisma.usuarioPermissao.delete({ where: { id } });
+      const vinculo = await this.prisma.usuarioPermissao.delete({ where: { id } });
+      await this.auditoria.registrar({
+        usuarioId: existing.usuarioId,
+        modulo: 'Rooster Hub',
+        acao: 'permissao_revogada',
+        entidade: 'usuario_permissao',
+        entidadeId: id,
+      });
+      return vinculo;
     } catch (error) {
       this.handleError(error, 'revogar permissão do usuário');
     }

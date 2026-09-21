@@ -15,6 +15,9 @@ type DeskModel =
   | 'categoriaTicket' | 'subcategoriaTicket' | 'prioridadeTicket' | 'statusTicket'
   | 'ticket' | 'anexoTicket' | 'historicoTicket' | 'avaliacaoTicket';
 
+/** Nunca incluir `senhaHash` em uma resposta HTTP — mesma seleção segura usada em usuarios.service.ts. */
+const USUARIO_SAFE_SELECT = { id: true, nome: true, email: true, ativo: true } satisfies Prisma.UsuarioSelect;
+
 @Injectable()
 export class RoosterDeskService implements OnModuleInit {
   constructor(
@@ -71,11 +74,13 @@ export class RoosterDeskService implements OnModuleInit {
   }
 
   async findAll(model: DeskModel) {
-    return (this.prisma as any)[model].findMany({
+    const rows = await (this.prisma as any)[model].findMany({
       orderBy: { criadoEm: 'desc' },
-      ...(model === 'ticket' ? { include: { usuario: true, tecnico: true, categoria: true, subcategoria: true, prioridade: true, status: true } } : {}),
+      ...(model === 'ticket' ? { include: { usuario: { select: USUARIO_SAFE_SELECT }, tecnico: { select: USUARIO_SAFE_SELECT }, categoria: true, subcategoria: true, prioridade: true, status: true } } : {}),
       ...(model === 'categoriaTicket' ? { include: { subcategorias: true } } : {}),
     });
+    if (model === 'anexoTicket') return rows.map((anexo: { tamanho: bigint | null }) => this.serializeAnexo(anexo));
+    return rows;
   }
 
   async findCategoriesForUser(usuarioId: string) {
@@ -83,7 +88,7 @@ export class RoosterDeskService implements OnModuleInit {
     const isAdmin = await this.isAdmin(usuarioId);
     return this.prisma.categoriaTicket.findMany({
       where: isAdmin ? undefined : { setorId: { in: sectorIds } },
-      include: { subcategorias: { include: { atendentes: { include: { usuario: true } } } }, setor: true },
+      include: { subcategorias: { include: { atendentes: { include: { usuario: { select: USUARIO_SAFE_SELECT } } } } }, setor: true },
       orderBy: { criadoEm: 'desc' },
     });
   }
@@ -93,7 +98,7 @@ export class RoosterDeskService implements OnModuleInit {
     const isAdmin = await this.isAdmin(usuarioId);
     return this.prisma.usuario.findMany({
       where: { ativo: true, ...(isAdmin ? {} : { setores: { some: { setorId: { in: sectorIds } } } }) },
-      include: { setores: { include: { setor: true } } },
+      select: { ...USUARIO_SAFE_SELECT, setores: { include: { setor: true } } },
       orderBy: { nome: 'asc' },
     });
   }
@@ -144,7 +149,7 @@ export class RoosterDeskService implements OnModuleInit {
     }
     await this.prisma.atendimentoSubcategoria.deleteMany({ where: { subcategoriaId } });
     await this.prisma.atendimentoSubcategoria.createMany({ data: validIds.map((usuarioId) => ({ subcategoriaId, usuarioId })) });
-    return this.prisma.atendimentoSubcategoria.findMany({ where: { subcategoriaId }, include: { usuario: true } });
+    return this.prisma.atendimentoSubcategoria.findMany({ where: { subcategoriaId }, include: { usuario: { select: USUARIO_SAFE_SELECT } } });
   }
 
   private async usuariosAreSameSector(firstId: string, secondId: string) {
@@ -166,7 +171,7 @@ export class RoosterDeskService implements OnModuleInit {
     return this.prisma.ticket.findMany({
       where,
       orderBy: { criadoEm: 'desc' },
-      include: { usuario: true, tecnico: true, categoria: { include: { setor: true } }, subcategoria: true, prioridade: true, status: true },
+      include: { usuario: { select: USUARIO_SAFE_SELECT }, tecnico: { select: USUARIO_SAFE_SELECT }, categoria: { include: { setor: true } }, subcategoria: true, prioridade: true, status: true },
     });
   }
 
@@ -328,12 +333,77 @@ export class RoosterDeskService implements OnModuleInit {
     return mensagemCriada;
   }
 
+  /** `tamanho` é BigInt no schema (coluna que não cabe em INTEGER) — JSON.stringify não serializa BigInt. */
+  private serializeAnexo<T extends { tamanho: bigint | null }>(anexo: T) {
+    return { ...anexo, tamanho: anexo.tamanho === null ? null : Number(anexo.tamanho) };
+  }
+
+  /** Anexos reais do chamado — mesma regra de visibilidade da conversa. */
+  async getAnexosChamado(ticketId: string, usuarioId: string, isAdmin: boolean) {
+    const ticket = await this.carregarTicketParaConversa(ticketId);
+    if (!(await this.podeAcessarConversa(ticket, usuarioId, isAdmin))) {
+      throw new NotFoundException('Chamado não encontrado.');
+    }
+    const anexos = await this.prisma.anexoTicket.findMany({
+      where: { ticketId },
+      orderBy: { criadoEm: 'asc' },
+      include: { usuario: { select: { id: true, nome: true } } },
+    });
+    return anexos.map((anexo) => this.serializeAnexo(anexo));
+  }
+
+  async createAnexoChamado(
+    ticketId: string,
+    usuarioId: string,
+    isAdmin: boolean,
+    arquivo: { originalname: string; filename: string; mimetype: string; size: number },
+  ) {
+    const ticket = await this.carregarTicketParaConversa(ticketId);
+    if (!(await this.podeAcessarConversa(ticket, usuarioId, isAdmin))) {
+      throw new NotFoundException('Chamado não encontrado.');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const anexo = await tx.anexoTicket.create({
+        data: {
+          ticketId,
+          usuarioId,
+          nomeArquivo: arquivo.originalname,
+          caminho: arquivo.filename,
+          tipo: arquivo.mimetype,
+          tamanho: arquivo.size,
+          criadoEm: new Date(),
+        },
+        include: { usuario: { select: { id: true, nome: true } } },
+      });
+      await tx.historicoTicket.create({
+        data: { ticketId, usuarioId, campo: 'anexo', valorNovo: arquivo.originalname, criadoEm: new Date() },
+      });
+      return this.serializeAnexo(anexo);
+    });
+  }
+
+  /** Anexo + confere que pertence ao chamado informado, respeitando a mesma regra de visibilidade da conversa. */
+  async getAnexoParaDownload(ticketId: string, anexoId: string, usuarioId: string, isAdmin: boolean) {
+    const ticket = await this.carregarTicketParaConversa(ticketId);
+    if (!(await this.podeAcessarConversa(ticket, usuarioId, isAdmin))) {
+      throw new NotFoundException('Chamado não encontrado.');
+    }
+    const anexo = await this.prisma.anexoTicket.findUnique({ where: { id: anexoId } });
+    if (!anexo || anexo.ticketId !== ticketId) throw new NotFoundException('Anexo não encontrado.');
+    return anexo;
+  }
+
   async findOne(model: DeskModel, id: string) {
     const result = await (this.prisma as any)[model].findUnique({
       where: { id },
-      ...(model === 'ticket' ? { include: { usuario: true, tecnico: true, categoria: true, subcategoria: true, prioridade: true, status: true, anexos: true, historico: { orderBy: { criadoEm: 'asc' }, include: { usuario: { select: { id: true, nome: true } } } }, avaliacoes: true } } : {}),
+      ...(model === 'ticket' ? { include: { usuario: { select: USUARIO_SAFE_SELECT }, tecnico: { select: USUARIO_SAFE_SELECT }, categoria: true, subcategoria: true, prioridade: true, status: true, anexos: true, historico: { orderBy: { criadoEm: 'asc' }, include: { usuario: { select: { id: true, nome: true } } } }, avaliacoes: true } } : {}),
     });
     if (!result) throw new NotFoundException('Registro não encontrado.');
+    if (model === 'ticket' && Array.isArray(result.anexos)) {
+      result.anexos = result.anexos.map((anexo: { tamanho: bigint | null }) => this.serializeAnexo(anexo));
+    }
+    if (model === 'anexoTicket') return this.serializeAnexo(result);
     return result;
   }
 

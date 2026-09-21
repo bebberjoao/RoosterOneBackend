@@ -1,0 +1,95 @@
+import { Injectable } from '@nestjs/common';
+import { existsSync, mkdirSync, createWriteStream } from 'fs';
+import { join } from 'path';
+import { randomUUID } from 'crypto';
+import PDFDocument from 'pdfkit';
+import { PrismaService } from '../roster-hub/shared/prisma.service';
+
+export const CERTIFICADOS_DIR = join(process.cwd(), 'uploads', 'certificados-boost');
+if (!existsSync(CERTIFICADOS_DIR)) mkdirSync(CERTIFICADOS_DIR, { recursive: true });
+
+/**
+ * Gera o PDF do certificado de conclusão e grava o registro `CertificadoBoost`.
+ * Chamado uma única vez, quando uma matrícula bate 100% de progresso
+ * (ver `boost-portal.service.ts` -> `concluirAula`) — nunca manualmente,
+ * conforme decisão de produto (emissão automática, sem aprovação).
+ */
+@Injectable()
+export class CertificadoBoostService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async emitir(matriculaId: string) {
+    const existente = await this.prisma.certificadoBoost.findUnique({ where: { matriculaId } });
+    if (existente) return existente;
+
+    const matricula = await this.prisma.matriculaBoost.findUnique({
+      where: { id: matriculaId },
+      include: { boostUsuario: true, curso: true },
+    });
+    if (!matricula) throw new Error(`Matrícula ${matriculaId} não encontrada ao emitir certificado.`);
+
+    const codigo = `RB-${new Date().getFullYear()}-${randomUUID().slice(0, 8).toUpperCase()}`;
+    const nomeArquivo = `${randomUUID()}.pdf`;
+    const caminhoCompleto = join(CERTIFICADOS_DIR, nomeArquivo);
+
+    await this.gerarPdf(caminhoCompleto, {
+      alunoNome: matricula.boostUsuario.nome,
+      cursoTitulo: matricula.curso.titulo,
+      cargaHoraria: matricula.curso.cargaHoraria,
+      codigo,
+      data: new Date(),
+    });
+
+    return this.prisma.certificadoBoost.create({
+      data: { matriculaId, codigo, caminhoPdf: nomeArquivo, emitidoEm: new Date() },
+    });
+  }
+
+  private gerarPdf(
+    caminho: string,
+    info: { alunoNome: string; cursoTitulo: string; cargaHoraria: number; codigo: string; data: Date },
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ layout: 'landscape', size: 'A4', margin: 50 });
+      const stream = createWriteStream(caminho);
+      doc.pipe(stream);
+
+      const largura = doc.page.width;
+      const altura = doc.page.height;
+
+      doc.rect(20, 20, largura - 40, altura - 40).lineWidth(2).strokeColor('#2b3a67').stroke();
+      doc.rect(30, 30, largura - 60, altura - 60).lineWidth(0.75).strokeColor('#9aa5c9').stroke();
+
+      doc.font('Helvetica-Bold').fontSize(14).fillColor('#2b3a67')
+        .text('ROOSTER ONE · ROOSTER BOOST', 0, 70, { align: 'center' });
+
+      doc.font('Helvetica-Bold').fontSize(30).fillColor('#111827')
+        .text('Certificado de Conclusão', 0, 110, { align: 'center' });
+
+      doc.font('Helvetica').fontSize(14).fillColor('#374151')
+        .text('Certificamos que', 0, 175, { align: 'center' });
+
+      doc.font('Helvetica-Bold').fontSize(24).fillColor('#111827')
+        .text(info.alunoNome, 0, 200, { align: 'center' });
+
+      doc.font('Helvetica').fontSize(14).fillColor('#374151')
+        .text('concluiu com êxito o curso', 0, 240, { align: 'center' });
+
+      doc.font('Helvetica-Bold').fontSize(18).fillColor('#2b3a67')
+        .text(info.cursoTitulo, 0, 262, { align: 'center' });
+
+      doc.font('Helvetica').fontSize(13).fillColor('#374151')
+        .text(`carga horária de ${info.cargaHoraria} horas`, 0, 296, { align: 'center' });
+
+      const dataFormatada = info.data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+      doc.font('Helvetica').fontSize(11).fillColor('#6b7280')
+        .text(`Emitido em ${dataFormatada}`, 0, altura - 100, { align: 'center' });
+      doc.font('Helvetica').fontSize(10).fillColor('#6b7280')
+        .text(`Código de verificação: ${info.codigo}`, 0, altura - 82, { align: 'center' });
+
+      doc.end();
+      stream.on('finish', () => resolve());
+      stream.on('error', reject);
+    });
+  }
+}

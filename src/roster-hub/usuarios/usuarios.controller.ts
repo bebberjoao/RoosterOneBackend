@@ -8,13 +8,18 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBody } from '@nestjs/swagger';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import type { Request } from 'express';
+import { LOGIN_THROTTLE_LIMIT } from '../../auth/throttle.util';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { LoginDto } from './dto/login.dto';
+import { EsqueciSenhaDto } from './dto/esqueci-senha.dto';
+import { RedefinirSenhaDto } from './dto/redefinir-senha.dto';
 import { UsuariosService } from './usuarios.service';
 import { Public } from '../../auth/public.decorator';
 import { PermissionGuard } from '../../auth/permission.guard';
@@ -27,8 +32,33 @@ export class AuthController {
 
   @Post('login')
   @Public()
-  login(@Body() dto: LoginDto) {
-    return this.usuariosService.login(dto.email, dto.senha);
+  @Throttle({ default: { limit: LOGIN_THROTTLE_LIMIT, ttl: 60_000 } })
+  login(@Body() dto: LoginDto, @Req() request: Request) {
+    return this.usuariosService.login(dto.email, dto.senha, {
+      ip: request.ip,
+      userAgent: request.headers['user-agent'],
+    });
+  }
+
+  @Post('esqueci-senha')
+  @Public()
+  @Throttle({ default: { limit: LOGIN_THROTTLE_LIMIT, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Envia por e-mail um link para redefinir a senha, se o e-mail existir' })
+  async esqueciSenha(@Body() dto: EsqueciSenhaDto, @Req() request: Request) {
+    await this.usuariosService.requestPasswordReset(dto.email, {
+      ip: request.ip,
+      userAgent: request.headers['user-agent'],
+    });
+    return { message: 'Se o e-mail existir, você receberá as instruções de redefinição.' };
+  }
+
+  @Post('redefinir-senha')
+  @Public()
+  @Throttle({ default: { limit: LOGIN_THROTTLE_LIMIT, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Define uma nova senha a partir do token recebido por e-mail' })
+  async redefinirSenha(@Body() dto: RedefinirSenhaDto) {
+    await this.usuariosService.resetPasswordWithToken(dto.token, dto.novaSenha);
+    return { message: 'Senha redefinida com sucesso.' };
   }
 }
 

@@ -280,6 +280,7 @@ export class AssetsService {
             destino: dto.destino,
             usuario: dto.usuario,
             observacoes: dto.observacoes,
+            dataDevolucaoPrevista: dto.tipo === 'emprestimo' && dto.dataDevolucaoPrevista ? new Date(dto.dataDevolucaoPrevista) : undefined,
             criadoEm: new Date(),
           },
         }),
@@ -293,6 +294,53 @@ export class AssetsService {
     } catch (error) {
       this.handleError(error, 'registrar movimentação de patrimônio');
     }
+  }
+
+  /** Marca um empréstimo como devolvido: libera o item e registra a devolução no histórico. */
+  async devolverEmprestimo(movimentoId: string, usuario: string) {
+    const emprestimo = await this.prisma.patrimonioMovimento.findUnique({ where: { id: movimentoId } });
+    if (!emprestimo || emprestimo.tipo !== 'emprestimo') {
+      throw new NotFoundException('Empréstimo não encontrado.');
+    }
+    if (emprestimo.devolvidoEm) {
+      throw new BadRequestException('Este empréstimo já foi devolvido.');
+    }
+    const asset = await this.prisma.patrimonio.findUnique({ where: { id: emprestimo.patrimonioId } });
+    if (!asset) throw new NotFoundException('Patrimônio não encontrado.');
+
+    try {
+      const [, , patrimonio] = await this.prisma.$transaction([
+        this.prisma.patrimonioMovimento.update({ where: { id: movimentoId }, data: { devolvidoEm: new Date() } }),
+        this.prisma.patrimonioMovimento.create({
+          data: {
+            patrimonio: { connect: { id: emprestimo.patrimonioId } },
+            tipo: 'devolucao',
+            origem: asset.responsavel ?? undefined,
+            destino: asset.localizacao ?? undefined,
+            usuario,
+            observacoes: 'Devolução registrada a partir do empréstimo.',
+            criadoEm: new Date(),
+          },
+        }),
+        this.prisma.patrimonio.update({
+          where: { id: emprestimo.patrimonioId },
+          data: { status: 'disponivel', responsavel: null, atualizadoEm: new Date() },
+          include: { categoria: true, setorRef: true },
+        }),
+      ]);
+      return patrimonio;
+    } catch (error) {
+      this.handleError(error, 'registrar devolução de empréstimo');
+    }
+  }
+
+  /** Empréstimos com prazo vencido e ainda não devolvidos. */
+  async findEmprestimosAtrasados() {
+    return this.prisma.patrimonioMovimento.findMany({
+      where: { tipo: 'emprestimo', devolvidoEm: null, dataDevolucaoPrevista: { lt: new Date() } },
+      include: { patrimonio: true },
+      orderBy: { dataDevolucaoPrevista: 'asc' },
+    });
   }
 
   /** Dá baixa no patrimônio (status "baixado") e registra a baixa no histórico. */

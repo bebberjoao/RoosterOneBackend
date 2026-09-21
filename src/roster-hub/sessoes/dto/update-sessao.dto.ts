@@ -1,4 +1,4 @@
-import { PartialType } from '@nestjs/mapped-types';
+import { PartialType } from '@nestjs/swagger';
 import { CreateSessaoDto } from './create-sessao.dto';
 
 export class UpdateSessaoDto extends PartialType(CreateSessaoDto) {}

@@ -20,6 +20,7 @@ import { CreateAmbienteDto } from './dto/create-ambiente.dto';
 import { CreateBlocoDto } from './dto/create-bloco.dto';
 import { CreateCampusDto } from './dto/create-campus.dto';
 import { CreateReservaDto } from './dto/create-reserva.dto';
+import { CreateReservaSerieDto } from './dto/create-reserva-serie.dto';
 import { CreateMensagemReservaDto } from './dto/create-mensagem-reserva.dto';
 import { UpdateAmbienteDto } from './dto/update-ambiente.dto';
 import { UpdateBlocoDto } from './dto/update-bloco.dto';
@@ -174,6 +175,36 @@ export class RoomsController {
   @RequirePermission(MODULO, '/rooms', 'acessar')
   findAllReservas(@Query('ambienteId') ambienteId?: string, @Query('data') data?: string, @Query('status') status?: string) {
     return this.roomsService.findAllReservas(ambienteId, data, status);
+  }
+
+  @Post('reservas/serie')
+  @RequirePermission(MODULO, '/rooms/book', 'solicitar')
+  @ApiOperation({ summary: 'Cria uma série de reservas recorrentes (mesma sala/horário, uma linha por ocorrência, até 26 ocorrências)' })
+  @ApiBody({ type: CreateReservaSerieDto })
+  createReservaSerie(@Body() dto: CreateReservaSerieDto) {
+    return this.roomsService.createReservaSerie(dto);
+  }
+
+  @Get('reservas/serie/:serieId')
+  @RequirePermission(MODULO, '/rooms', 'acessar')
+  @ApiOperation({ summary: 'Lista todas as ocorrências de uma série de reservas' })
+  findReservasDaSerie(@Param('serieId') serieId: string) {
+    return this.roomsService.findReservasDaSerie(serieId);
+  }
+
+  @Patch('reservas/serie/:serieId/cancelar')
+  @ApiOperation({ summary: 'Cancela todas as ocorrências pendentes/futuras da série' })
+  async cancelarSerie(@Req() request: Request, @Param('serieId') serieId: string, @Body('motivo') motivo?: string) {
+    const usuarioId = (request.user as { id?: string } | undefined)?.id;
+    if (!usuarioId) throw new ForbiddenException('Usuário não autenticado.');
+    if (!(await this.usuariosService.hasPermission(usuarioId, MODULO, '/rooms/manage', 'cancelar'))) {
+      const [primeira] = await this.roomsService.findReservasDaSerie(serieId);
+      const isOwner = primeira?.responsavelId === usuarioId;
+      if (!isOwner || !(await this.usuariosService.hasPermission(usuarioId, MODULO, '/rooms/reservations', 'cancelar'))) {
+        throw new ForbiddenException('Sem permissão para cancelar esta série.');
+      }
+    }
+    return this.roomsService.cancelarSerie(serieId, motivo, usuarioId);
   }
 
   @Get('reservas/:id')

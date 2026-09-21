@@ -1,6 +1,14 @@
-import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Query, Req, UseGuards, NotFoundException } from '@nestjs/common';
-import type { Request } from 'express';
-import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post,
+  Query, Req, Res, UseGuards, UseInterceptors, UploadedFile, NotFoundException,
+} from '@nestjs/common';
+import type { Request, Response } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { randomUUID } from 'crypto';
+import { existsSync, mkdirSync } from 'fs';
+import { extname, join } from 'path';
+import { ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   CreateAnexoTicketDto, CreateAvaliacaoTicketDto, CreateCategoriaTicketDto,
   CreateHistoricoTicketDto, CreateMensagemChamadoDto,
@@ -20,6 +28,10 @@ const MODULO = 'Rooster Desk';
 const TELA_TICKETS = '/desk/tickets';
 const TELA_CATEGORIES = '/desk/categories';
 const TELA_TEAM = '/desk/team';
+
+const UPLOADS_DIR = join(process.cwd(), 'uploads', 'anexos-tickets');
+if (!existsSync(UPLOADS_DIR)) mkdirSync(UPLOADS_DIR, { recursive: true });
+const MAX_ANEXO_BYTES = 10 * 1024 * 1024; // 10MB
 
 @ApiTags('Rooster Desk')
 @Controller()
@@ -219,9 +231,23 @@ export class RoosterDeskController {
       await this.service.validateTicketClassification(dto.categoriaId ?? current.categoriaId, dto.subcategoriaId ?? current.subcategoriaId);
     }
     await this.requireTicketAction(usuarioId, await this.statusTransitionAction(current.status?.encerrado, status));
-    const atualizado = await this.service.update('ticket', id, dto);
+    const encerradoEm = this.derivarEncerradoEm(current.status?.encerrado, status);
+    const atualizado = await this.service.update('ticket', id, { ...dto, ...(encerradoEm !== undefined ? { encerradoEm } : {}) });
     await this.registrarHistoricoTicket(id, usuarioId, current, dto, status);
     return atualizado;
+  }
+
+  /**
+   * `encerradoEm` nunca deveria depender do cliente mandar a data certa —
+   * deriva automaticamente da transição de status (fechou agora -> now();
+   * reabriu -> null). `undefined` quando o status não mudou o estado
+   * aberto/fechado, para não sobrescrever o valor à toa.
+   */
+  private derivarEncerradoEm(estavaEncerrado: boolean | undefined, novoStatus: { encerrado: boolean } | null): Date | null | undefined {
+    if (!novoStatus) return undefined;
+    if (novoStatus.encerrado && !estavaEncerrado) return new Date();
+    if (!novoStatus.encerrado && estavaEncerrado) return null;
+    return undefined;
   }
 
   @Patch('tickets/:id')
@@ -247,7 +273,8 @@ export class RoosterDeskController {
     const current = await this.service.findOne('ticket', id);
     const status = dto.statusId ? await this.service.findStatus(dto.statusId) : null;
     await this.requireTicketAction(usuarioId, await this.statusTransitionAction(current.status?.encerrado, status));
-    const atualizado = await this.service.update('ticket', id, { statusId: dto.statusId, encerradoEm: dto.encerradoEm });
+    const encerradoEm = this.derivarEncerradoEm(current.status?.encerrado, status);
+    const atualizado = await this.service.update('ticket', id, { statusId: dto.statusId, ...(encerradoEm !== undefined ? { encerradoEm } : {}) });
     await this.registrarHistoricoTicket(id, usuarioId, current, { statusId: dto.statusId }, status);
     return atualizado;
   }
@@ -370,6 +397,55 @@ export class RoosterDeskController {
     // emite depois que a transação já commitou — o REST continua sendo a fonte da verdade
     this.mensagensGateway.emitirNovaMensagem(id, mensagem);
     return mensagem;
+  }
+
+  @Get('chamados/:id/anexos')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
+  @ApiOperation({ summary: 'Lista os anexos reais do chamado' })
+  async findAnexosChamado(@Req() request: Request, @Param('id') id: string) {
+    const usuarioId = (request.user as { id: string }).id;
+    const isAdmin = await this.usuariosService.isAdmin(usuarioId);
+    return this.service.getAnexosChamado(id, usuarioId, isAdmin);
+  }
+
+  @Post('chamados/:id/anexos')
+  @RequirePermission(MODULO, TELA_TICKETS, 'anexar')
+  @ApiOperation({ summary: 'Envia um arquivo (até 10MB) como anexo do chamado' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('arquivo', {
+      storage: diskStorage({
+        destination: UPLOADS_DIR,
+        filename: (_req, file, cb) => cb(null, `${randomUUID()}${extname(file.originalname)}`),
+      }),
+      limits: { fileSize: MAX_ANEXO_BYTES },
+    }),
+  )
+  async uploadAnexoChamado(
+    @Req() request: Request,
+    @Param('id') id: string,
+    @UploadedFile() arquivo?: Express.Multer.File,
+  ) {
+    if (!arquivo) throw new BadRequestException('Nenhum arquivo enviado (campo "arquivo").');
+    const usuarioId = (request.user as { id: string }).id;
+    const isAdmin = await this.usuariosService.isAdmin(usuarioId);
+    return this.service.createAnexoChamado(id, usuarioId, isAdmin, arquivo);
+  }
+
+  @Get('chamados/:id/anexos/:anexoId/arquivo')
+  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
+  @ApiOperation({ summary: 'Baixa o arquivo de um anexo do chamado' })
+  async downloadAnexoChamado(
+    @Req() request: Request,
+    @Res() response: Response,
+    @Param('id') id: string,
+    @Param('anexoId') anexoId: string,
+  ) {
+    const usuarioId = (request.user as { id: string }).id;
+    const isAdmin = await this.usuariosService.isAdmin(usuarioId);
+    const anexo = await this.service.getAnexoParaDownload(id, anexoId, usuarioId, isAdmin);
+    if (!anexo.caminho) throw new NotFoundException('Arquivo não encontrado.');
+    return response.download(join(UPLOADS_DIR, anexo.caminho), anexo.nomeArquivo ?? anexo.caminho);
   }
 
   @Post('anexos-tickets')
