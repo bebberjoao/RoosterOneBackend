@@ -1,0 +1,72 @@
+# CI do backend — roda as mesmas verificações exigidas pelo CONTRIBUTING.md,
+# para que "passou na minha máquina" e "passou no CI" signifiquem a mesma coisa.
+#
+# A suíte e2e usa SQLite (prisma/schema.test.prisma) e não precisa de serviço
+# de banco no runner: o próprio `npm run test:e2e` cria e migra o arquivo.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verificar:
+    name: Tipos, testes e build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar Prisma Client
+        # `generate` só lê o schema, não conecta — a URL é um placeholder
+        # válido só para satisfazer o parser.
+        run: npx prisma generate --schema=prisma/schema.prisma
+        env:
+          DATABASE_URL: postgresql://user:pass@localhost:5432/placeholder?schema=public
+
+      - name: Checagem de tipos
+        run: npx tsc --noEmit
+
+      - name: Testes unitários
+        run: npm test
+
+      - name: Testes e2e
+        run: npm run test:e2e
+
+      - name: Build
+        run: npm run build
+
+  auditoria:
+    name: Varredura de dependência
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # `continue-on-error`: há avisos conhecidos e sem correção não-quebrante
+      # (multer, via @nestjs/platform-express — ver docs/security/05-analise-de-seguranca.md).
+      # O job existe para tornar o estado visível a cada PR, não para travar o
+      # trabalho por algo que já está registrado e decidido.
+      - run: npm run audit
+        continue-on-error: true
+
+  imagem:
+    name: Build da imagem Docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Só constrói: publicar exige registro e credencial, que dependem de um
+      # ambiente de produção que ainda não existe.
+      - run: docker build -t rooster-one-api:ci .

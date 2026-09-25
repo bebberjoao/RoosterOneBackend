@@ -1,0 +1,19 @@
+stateDiagram-v2
+  [*] --> Disponivel : cadastro do item
+  Disponivel --> EmUso : movimentacao para setor/sala
+  Disponivel --> Emprestado : emprestimo com prazo
+  Emprestado --> Disponivel : devolucao registrada
+  Emprestado --> EmAtraso : passou a data prevista
+  EmAtraso --> Disponivel : devolucao registrada
+  EmUso --> Manutencao : envio para manutencao
+  Manutencao --> Disponivel : retorno da manutencao
+  EmUso --> Disponivel : retorno ao estoque
+  Disponivel --> Baixado : baixa do item
+  EmUso --> Baixado : baixa do item
+  Baixado --> [*]
+
+  note right of Baixado
+    Item baixado rejeita
+    qualquer nova
+    movimentacao (RN013)
+  end note

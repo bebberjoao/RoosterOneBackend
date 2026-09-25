@@ -1,0 +1,29 @@
+sequenceDiagram
+  participant FE as Frontend
+  participant JWT as JwtAuthGuard
+  participant PG as PermissionGuard
+  participant SVC as UsuariosService
+  participant DB as PostgreSQL
+  participant CTRL as Controller
+
+  FE->>JWT: requisicao + Bearer token
+  JWT->>JWT: verifica assinatura e expiracao
+  alt token invalido
+    JWT-->>FE: 401
+  else token valido
+    JWT->>PG: request.user = { id }
+    PG->>PG: le metadata @RequirePermission
+    PG->>SVC: isAdmin(usuarioId)
+    SVC->>DB: getAccess(usuarioId)
+    alt e administrador
+      PG->>CTRL: libera (bypass total)
+    else nao e admin
+      PG->>SVC: hasPermission(modulo, recurso, acao)
+      alt tem a permissao
+        PG->>CTRL: libera
+      else nao tem
+        PG-->>FE: 403 Forbidden
+      end
+    end
+    CTRL-->>FE: resposta
+  end

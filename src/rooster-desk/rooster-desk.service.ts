@@ -9,6 +9,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
 import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
+import { PaginacaoQueryDto, montarPagina, pediuPaginacao, prismaSkipTake } from '../common/pagination';
 import { CreateMensagemChamadoDto } from './dto/rooster-desk.dto';
 
 type DeskModel =
@@ -93,6 +94,14 @@ export class RoosterDeskService implements OnModuleInit {
     });
   }
 
+  /** Só o que o formulário de abertura precisa — sem atendentes nem outros dados internos da equipe. */
+  async findCategoriesForTicketOpening() {
+    return this.prisma.categoriaTicket.findMany({
+      include: { subcategorias: true, setor: true },
+      orderBy: { nome: 'asc' },
+    });
+  }
+
   async findAgentsForUser(usuarioId: string) {
     const sectorIds = await this.userSectorIds(usuarioId);
     const isAdmin = await this.isAdmin(usuarioId);
@@ -164,15 +173,28 @@ export class RoosterDeskService implements OnModuleInit {
     return this.usuariosService.isAdmin(usuarioId);
   }
 
-  async findTicketsForUser(usuarioId: string, isAdmin: boolean) {
+  /**
+   * Sem `pagina`/`limite`, devolve a lista completa (contrato histórico).
+   * Com qualquer um dos dois, devolve o envelope paginado — ver
+   * `src/common/pagination.ts`. O escopo por setor (RN007) é aplicado antes
+   * da paginação, para que o total reflita só o que o usuário pode ver.
+   */
+  async findTicketsForUser(usuarioId: string, isAdmin: boolean, paginacao: PaginacaoQueryDto = {}) {
     const where = isAdmin ? undefined : {
       categoria: { setorId: { in: await this.userSectorIds(usuarioId) } },
     };
-    return this.prisma.ticket.findMany({
-      where,
-      orderBy: { criadoEm: 'desc' },
-      include: { usuario: { select: USUARIO_SAFE_SELECT }, tecnico: { select: USUARIO_SAFE_SELECT }, categoria: { include: { setor: true } }, subcategoria: true, prioridade: true, status: true },
-    });
+    const orderBy = { criadoEm: 'desc' } as const;
+    const include = { usuario: { select: USUARIO_SAFE_SELECT }, tecnico: { select: USUARIO_SAFE_SELECT }, categoria: { include: { setor: true } }, subcategoria: true, prioridade: true, status: true };
+
+    if (!pediuPaginacao(paginacao)) {
+      return this.prisma.ticket.findMany({ where, orderBy, include });
+    }
+    const { skip, take } = prismaSkipTake(paginacao);
+    const [dados, total] = await this.prisma.$transaction([
+      this.prisma.ticket.findMany({ where, orderBy, include, skip, take }),
+      this.prisma.ticket.count({ where }),
+    ]);
+    return montarPagina(dados, total, paginacao);
   }
 
   async canViewTicket(ticketId: string, usuarioId: string, isAdmin: boolean) {

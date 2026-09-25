@@ -1,0 +1,22 @@
+flowchart LR
+  ADM((Administrador))
+  TEC((Tecnico))
+  COORD((Coordenacao))
+  ALU((Aluno))
+
+  U1([Autenticar-se])
+  U2([Gerenciar usuarios e permissoes])
+  U3([Abrir e acompanhar chamado])
+  U4([Atender chamado])
+  U5([Solicitar reserva de sala])
+  U6([Aprovar reserva])
+  U7([Gerenciar patrimonio])
+
+  ADM --> U1
+  ADM --> U2
+  TEC --> U1
+  TEC --> U4
+  TEC --> U7
+  COORD --> U6
+  ALU --> U3
+  ALU --> U5

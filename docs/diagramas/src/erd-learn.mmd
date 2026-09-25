@@ -1,0 +1,20 @@
+erDiagram
+  Turma ||--o{ Atividade : recebe
+  Professor ||--o{ Atividade : cria
+  Atividade ||--o{ Entrega : respondida_por
+  Aluno ||--o{ Entrega : envia
+  Entrega ||--o{ AnexoEntrega : anexa
+  Atividade ||--o| ItemAvaliativo : gera_ao_publicar
+
+  Atividade {
+    uuid id PK
+    string status
+    decimal peso
+    datetime prazo
+  }
+  Entrega {
+    uuid id PK
+    bool atrasada
+    decimal nota
+    string feedback
+  }

@@ -1,0 +1,8 @@
+graph LR
+  LEARN[Rooster Learn] -->|"publicar atividade com peso<br/>cria ItemAvaliativo origem=learn"| ACAD[Rooster Academy]
+  LEARN -->|"corrigir entrega<br/>propaga nota na mesma transacao"| ACAD
+  FIN[Rooster Finance] -->|"resolve Aluno pelo usuarioId do JWT<br/>rotas /financeiro/me/*"| ACAD
+  BOOST[Rooster Boost] -->|"instrutor e sempre um Professor<br/>ja cadastrado"| ACAD
+  ACAD -->|"Professor/Aluno sao vinculos<br/>a um Usuario existente"| HUB[Rooster Hub]
+  DESK[Rooster Desk] -->|"escopo de visibilidade por Setor"| HUB
+  HUB -->|"registrar evento sensivel"| AUD[LogAuditoria]

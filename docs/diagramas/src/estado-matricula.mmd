@@ -1,0 +1,10 @@
+stateDiagram-v2
+  [*] --> Ativa : aluno matriculado na turma
+  Ativa --> Trancada : trancamento
+  Trancada --> Ativa : retorno
+  Ativa --> Aprovado : media + frequencia suficientes
+  Ativa --> Reprovado : media insuficiente
+  Ativa --> ReprovadoPorFalta : frequencia insuficiente
+  Aprovado --> [*]
+  Reprovado --> [*]
+  ReprovadoPorFalta --> [*]

@@ -60,7 +60,7 @@ Registrados em cada documento específico com a frase "Não identificado no cód
 ## Inconsistências encontradas
 
 - **`GET /usuarios/:id` (e outras respostas de usuário) expõem `senhaHash`** (o hash bcrypt) porque o service não usa `select` para omitir o campo — achado de segurança real, documentado em `security/05-analise-de-seguranca.md` com recomendação de correção.
-- **Senha mínima inconsistente**: criação de usuário exige 8 caracteres; redefinição de senha aceita a partir de 6 — não há um valor mínimo único no sistema (`backend/08-validacoes.md`).
+- ~~**Senha mínima inconsistente**~~ — **corrigido (setembro/2026)**. Criação de usuário e cadastro do Boost exigiam 8 caracteres, mas a redefinição de senha aceitava 6. Não era só inconsistência de documentação: dava para contornar o mínimo de 8 usando o fluxo de "esqueci minha senha" para definir uma senha de 6. Unificado em 8, com teste que trava a regressão (`src/common/validacao-dtos.spec.ts`).
 - **`@tanstack/react-query` e `react-hook-form`/`zod` instalados mas não usados** para data fetching/validação real em nenhuma tela — infraestrutura montada no root, sem uso efetivo (`frontend/05-estado-e-hooks.md`, `frontend/09-validacoes.md`).
 - **Tabela `Sessao` (com `refreshToken`) sem uso pelo fluxo real de login** — CRUD existe, nada escreve nela no caminho principal (`engineering/08-divida-tecnica.md`).
 - **`x-user-id` ainda liberado no CORS do backend**, resquício de um esquema de autenticação anterior sem uso real hoje.

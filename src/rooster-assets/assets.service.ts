@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
+import { PaginacaoQueryDto, montarPagina, pediuPaginacao, prismaSkipTake } from '../common/pagination';
 import { CreateAssetCategoryDto } from './dto/create-asset-category.dto';
 import { CreateAssetMovementDto } from './dto/create-asset-movement.dto';
 import { CreateAssetSectorDto } from './dto/create-asset-sector.dto';
@@ -166,16 +167,27 @@ export class AssetsService {
     }
   }
 
-  async findAllAssets(categoriaId?: string, setorId?: string, status?: string) {
-    return this.prisma.patrimonio.findMany({
-      where: {
-        ...(categoriaId ? { categoriaId } : {}),
-        ...(setorId ? { setorId } : {}),
-        ...(status ? { status } : {}),
-      },
+  async findAllAssets(categoriaId?: string, setorId?: string, status?: string, paginacao: PaginacaoQueryDto = {}) {
+    const where = {
+      ...(categoriaId ? { categoriaId } : {}),
+      ...(setorId ? { setorId } : {}),
+      ...(status ? { status } : {}),
+    };
+    const consulta = {
+      where,
       orderBy: { criadoEm: 'desc' },
       include: { categoria: true, setorRef: true },
-    });
+    } satisfies Prisma.PatrimonioFindManyArgs;
+
+    if (!pediuPaginacao(paginacao)) {
+      return this.prisma.patrimonio.findMany(consulta);
+    }
+
+    const [total, dados] = await this.prisma.$transaction([
+      this.prisma.patrimonio.count({ where }),
+      this.prisma.patrimonio.findMany({ ...consulta, ...prismaSkipTake(paginacao) }),
+    ]);
+    return montarPagina(dados, total, paginacao);
   }
 
   async findOneAsset(id: string) {
@@ -378,12 +390,23 @@ export class AssetsService {
     }
   }
 
-  async findAllMovements(patrimonioId?: string) {
-    return this.prisma.patrimonioMovimento.findMany({
-      where: patrimonioId ? { patrimonioId } : undefined,
+  async findAllMovements(patrimonioId?: string, paginacao: PaginacaoQueryDto = {}) {
+    const where = patrimonioId ? { patrimonioId } : {};
+    const consulta = {
+      where,
       orderBy: { criadoEm: 'desc' },
       include: { patrimonio: true },
-    });
+    } satisfies Prisma.PatrimonioMovimentoFindManyArgs;
+
+    if (!pediuPaginacao(paginacao)) {
+      return this.prisma.patrimonioMovimento.findMany(consulta);
+    }
+
+    const [total, dados] = await this.prisma.$transaction([
+      this.prisma.patrimonioMovimento.count({ where }),
+      this.prisma.patrimonioMovimento.findMany({ ...consulta, ...prismaSkipTake(paginacao) }),
+    ]);
+    return montarPagina(dados, total, paginacao);
   }
 
   async findOneMovement(id: string) {

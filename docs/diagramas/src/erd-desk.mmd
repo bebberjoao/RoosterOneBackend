@@ -1,0 +1,40 @@
+erDiagram
+  CategoriaTicket ||--o{ SubcategoriaTicket : contem
+  Setor ||--o{ CategoriaTicket : responde_por
+  SubcategoriaTicket ||--o{ AtendimentoSubcategoria : atendida_por
+  Usuario ||--o{ AtendimentoSubcategoria : atende
+  CategoriaTicket ||--o{ Ticket : classifica
+  SubcategoriaTicket ||--o{ Ticket : detalha
+  PrioridadeTicket ||--o{ Ticket : prioriza
+  StatusTicket ||--o{ Ticket : estado
+  Usuario ||--o{ Ticket : solicita
+  Ticket ||--o{ MensagemTicket : conversa
+  Ticket ||--o{ AnexoTicket : anexa
+  Ticket ||--o{ HistoricoTicket : registra
+  Ticket ||--o| AvaliacaoTicket : avaliado_por
+
+  Ticket {
+    uuid id PK
+    string titulo
+    uuid usuarioId FK
+    uuid categoriaId FK
+    uuid tecnicoId FK
+    uuid statusId FK
+    datetime encerradoEm
+  }
+  MensagemTicket {
+    uuid id PK
+    bool interno
+    datetime criadoEm
+  }
+  AnexoTicket {
+    uuid id PK
+    string caminho
+    bigint tamanho
+  }
+  HistoricoTicket {
+    uuid id PK
+    string campo
+    string de
+    string para
+  }

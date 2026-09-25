@@ -1,0 +1,21 @@
+erDiagram
+  PatrimonioCategoria ||--o{ Patrimonio : classifica
+  PatrimonioSetor ||--o{ Patrimonio : aloca
+  Patrimonio ||--o{ PatrimonioMovimento : movimentado_por
+  Usuario ||--o{ PatrimonioMovimento : registra
+
+  Patrimonio {
+    uuid id PK
+    string codigo UK
+    string nome
+    decimal valor
+    string status
+    date adquiridoEm
+  }
+  PatrimonioMovimento {
+    uuid id PK
+    string tipo
+    string destino
+    date dataDevolucaoPrevista
+    datetime devolvidoEm
+  }

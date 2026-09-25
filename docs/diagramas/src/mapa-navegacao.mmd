@@ -1,0 +1,63 @@
+graph LR
+  LOGIN[/login/] --> SHELL
+
+  subgraph SHELL["AppShell - RequireAccess por rota"]
+    HOME[/ - home/]
+    subgraph HubR[Hub]
+      H1[/hub/]
+      H2[/hub/usuarios/]
+      H3[/hub/acessos/]
+      H4[/hub/setores/]
+    end
+    subgraph DeskR[Desk]
+      D1[/desk/]
+      D2[/desk/tickets/]
+      D3[/desk/tickets/:id/]
+      D4[/desk/categories/]
+    end
+    subgraph RoomsR[Rooms]
+      R1[/rooms/]
+      R2[/rooms/book/]
+      R3[/rooms/manage/]
+      R4[/rooms/structure/]
+    end
+    subgraph AssetsR[Assets]
+      AS1[/assets/]
+      AS2[/assets/inventory/]
+    end
+    subgraph AcadR[Academy]
+      AC1[/academy/]
+      AC2[/academy/manage/]
+      AC3[/academy/attendance/]
+      AC4[/academy/grades/]
+    end
+    subgraph LearnR[Learn]
+      L1[/learn/]
+      L2[/learn/classes/]
+      L3[/learn/student/]
+    end
+    subgraph StudR[Student]
+      S1[/student/]
+      S2[/student/grades/]
+      S3[/student/finance/]
+    end
+    subgraph FinR[Finance]
+      F1[/finance/]
+      F2[/finance/charges/]
+      F3[/finance/nfe/]
+    end
+    subgraph BoostR[Boost - instrutor]
+      B1[/boost/]
+      B2[/boost/manage/:id/]
+    end
+  end
+
+  subgraph PUBLICO["Fora do AppShell - sessao propria"]
+    P1[/boost-portal/]
+    P2[/boost-portal/cursos/:slug/]
+    P3[/boost-portal/entrar/]
+    P4[/boost-portal/painel/]
+  end
+
+  classDef pub fill:#E8F4EE,stroke:#2E7D57,color:#14532D
+  class P1,P2,P3,P4 pub

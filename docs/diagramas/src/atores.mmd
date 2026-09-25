@@ -1,0 +1,30 @@
+graph TB
+  subgraph Hub["Autenticam pelo Hub - Usuario + RBAC"]
+    ADM[Administrador<br/>permissao gerenciar-permissoes<br/>bypass total]
+    COORDA[Coordenacao academica<br/>gestao ampla Academy/Learn]
+    COORDS[Coordenacao setorial<br/>gestao Desk/Rooms/Assets]
+    PROF[Professor<br/>so as proprias turmas]
+    TEC[Tecnico / Atendente<br/>so o proprio setor]
+    SEC[Secretaria]
+    FIN[Equipe financeira]
+    ALU[Aluno matriculado<br/>so os proprios dados]
+  end
+
+  subgraph Externo["Login proprio - BoostUsuario"]
+    EXT[Aluno externo<br/>sem vinculo institucional<br/>sem permissao no catalogo]
+  end
+
+  SIS[(Rooster One)]
+
+  ADM --> SIS
+  COORDA --> SIS
+  COORDS --> SIS
+  PROF --> SIS
+  TEC --> SIS
+  SEC --> SIS
+  FIN --> SIS
+  ALU --> SIS
+  EXT --> SIS
+
+  classDef externo fill:#E8F4EE,stroke:#2E7D57,color:#14532D
+  class EXT externo

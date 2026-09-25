@@ -1,0 +1,34 @@
+# <tipo>(<escopo>): <assunto no imperativo, minusculo, sem acento, ate 72 caracteres>
+#
+# <corpo: explique o PORQUE da mudanca. O diff ja mostra o que mudou.
+#  Se for correcao, diga qual era o sintoma. Acento pode, aqui no corpo.>
+#
+# <rodape: BREAKING CHANGE: ... / Refs: ...>
+#
+# ----------------------------------------------------------------------
+# TIPOS
+#   feat     funcionalidade nova visivel para algum usuario
+#   fix      correcao de defeito em comportamento existente
+#   docs     so documentacao (docs/, README, comentario explicativo)
+#   refactor mudanca de estrutura sem alterar comportamento observavel
+#   test     acrescimo ou correcao de teste
+#   perf     mudanca cujo objetivo e desempenho
+#   chore    manutencao (dependencia, script, configuracao)
+#   build    processo de build ou dependencia de build
+#   ci       pipeline
+#
+# ESCOPOS (modulo de negocio ou tema transversal)
+#   hub  desk  rooms  assets  academy  learn  student  finance  boost
+#   rbac  auth  db  api  deps  docs
+#
+# LEMBRETES ANTES DE COMMITAR
+#   [ ] documentacao impactada foi atualizada NESTE commit
+#   [ ] rota nova declara @RequirePermission
+#   [ ] resposta com relacao de Usuario usa select explicito (nunca include cru)
+#   [ ] escrita em mais de uma tabela esta em transacao
+#   [ ] mudou schema.prisma? replicou em schema.test.prisma?
+#   [ ] tsc --noEmit limpo (apague dist/tsconfig.tsbuildinfo antes)
+#   [ ] suite e2e passando
+#
+# Processo completo: docs/engineering/12-processo-de-desenvolvimento.md
+# ----------------------------------------------------------------------

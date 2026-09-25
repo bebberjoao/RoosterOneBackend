@@ -1,0 +1,22 @@
+graph TB
+  subgraph Maquina["Maquina de desenvolvimento"]
+    subgraph NodeFE["Processo Node - Vite"]
+      FE[Frontend TanStack Start<br/>porta 8080+]
+    end
+    subgraph NodeBE["Processo Node - NestJS"]
+      BE[API REST + WebSocket<br/>porta 3000]
+    end
+    subgraph PGS["Servico PostgreSQL"]
+      DB[(rooster_one)]
+    end
+    DISK[["uploads/"]]
+  end
+
+  NAV[Navegador] --> FE
+  FE -->|VITE_API_URL| BE
+  BE -->|DATABASE_URL| DB
+  BE --> DISK
+
+  NOTA["NAO EXISTE HOJE: staging, producao,<br/>container, balanceador, CI/CD"]
+  classDef aviso fill:#FDE8E8,stroke:#9B2C2C,color:#6B1F1F
+  class NOTA aviso

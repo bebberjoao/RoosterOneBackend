@@ -1,10 +1,10 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { rm } from 'node:fs/promises';
-import path from 'node:path';
 import * as bcrypt from 'bcryptjs';
+import { createHash } from 'crypto';
 const request = require('supertest');
 import { AppModule } from '../src/app.module';
+import { configurarApp } from '../src/app-config';
 import { PrismaService } from '../src/roster-hub/shared/prisma.service';
 import { PrismaTestService } from '../src/roster-hub/shared/prisma-test.service';
 import { MailService } from '../src/mail/mail.service';
@@ -49,6 +49,8 @@ const PERMISSION_CATALOG: Array<[modulo: string, recurso: string, acao: string]>
   ['Rooster Rooms', '/rooms/structure', 'editar'],
   ['Rooster Rooms', '/rooms/structure', 'excluir'],
   ['Rooster Rooms', '/rooms/book', 'solicitar'],
+  ['Rooster Rooms', '/rooms/book', 'solicitar-recorrente'],
+  ['Rooster Rooms', '/rooms/book', 'prazo-estendido'],
   ['Rooster Rooms', '/rooms/manage', 'aprovar'],
   ['Rooster Rooms', '/rooms/manage', 'responder'],
   ['Rooster Rooms', '/rooms/manage', 'alterar-horario'],
@@ -128,7 +130,12 @@ const PERMISSION_CATALOG: Array<[modulo: string, recurso: string, acao: string]>
   ['Rooster Boost', '/boost/manage', 'gerenciar-cursos'],
   ['Rooster Boost', '/boost/manage', 'gerenciar-conteudo'],
   ['Rooster Boost', '/boost/manage', 'ver-progresso'],
-  ['Rooster Boost', '/boost/manage', 'mensagem'],
+  ['Rooster Boost', '/boost/manage', 'certificado'],
+  ['Rooster Boost', '/boost/manage', 'vincular-orientadores'],
+  ['Rooster Boost', '/boost/conversas', 'acessar'],
+  ['Rooster Boost', '/boost/conversas', 'responder'],
+  ['Rooster Boost', '/boost/students', 'acessar'],
+  ['Rooster Boost', '/boost/students', 'gerenciar'],
 ];
 
 describe('Full API e2e tests', () => {
@@ -162,7 +169,7 @@ describe('Full API e2e tests', () => {
     }
 
     const loginRes = await request(app.getHttpServer())
-      .post('/auth/login')
+      .post('/v1/auth/login')
       .send({ email: 'admin.teste@example.com', senha: 'Senha123!' })
       .expect(201);
     authHeader = `Bearer ${loginRes.body.accessToken}`;
@@ -180,7 +187,7 @@ describe('Full API e2e tests', () => {
       });
       await prisma.usuarioPermissao.create({ data: { usuarioId: usuario.id, permissaoId: permissao.id } });
     }
-    const loginRes = await request(app.getHttpServer()).post('/auth/login').send({ email, senha: 'Senha123!' }).expect(201);
+    const loginRes = await request(app.getHttpServer()).post('/v1/auth/login').send({ email, senha: 'Senha123!' }).expect(201);
     return { usuario, header: `Bearer ${loginRes.body.accessToken}` };
   }
 
@@ -191,6 +198,7 @@ describe('Full API e2e tests', () => {
       .compile();
 
     app = moduleRef.createNestApplication();
+    configurarApp(app);
     await app.init();
 
     prisma = moduleRef.get(PrismaService) as PrismaTestService;
@@ -208,10 +216,12 @@ describe('Full API e2e tests', () => {
       prisma.certificadoBoost.deleteMany(),
       prisma.progressoAula.deleteMany(),
       prisma.mensagemBoost.deleteMany(),
+      prisma.conversaBoost.deleteMany(),
       prisma.matriculaBoost.deleteMany(),
       prisma.materialApoio.deleteMany(),
       prisma.aulaBoost.deleteMany(),
       prisma.moduloBoost.deleteMany(),
+      prisma.cursoOrientadorBoost.deleteMany(),
       prisma.cursoBoost.deleteMany(),
       prisma.boostUsuario.deleteMany(),
       prisma.anexoEntrega.deleteMany(),
@@ -263,15 +273,33 @@ describe('Full API e2e tests', () => {
   afterAll(async () => {
     await app.close();
     await prisma.$disconnect();
-    await rm(path.join(process.cwd(), 'prisma', 'dev-test.db'), { force: true });
+    // Não apaga dev-test.db aqui: o arquivo é compartilhado com outras suítes
+    // e2e (ex. rooms-reservas.e2e-spec.ts) — apagar cedo demais derruba a
+    // suíte seguinte. Limpeza única em test/global-teardown.ts, depois que
+    // TODAS as suítes terminam (ver jest-e2e.json -> globalTeardown).
   });
 
-  it('Root route should respond with 200', () => {
+  // O health check é VERSION_NEUTRAL de propósito: quem monitora precisa de um
+  // endereço estável, que não mude quando a API ganhar uma v2.
+  it('Health check responde em / (fora do versionamento)', () => {
     return request(app.getHttpServer()).get('/').expect(200);
   });
 
+  it('Rota de negócio sem o prefixo /v1 não existe (o versionamento não é opcional)', async () => {
+    // `defaultVersion: '1'` registra as rotas SOB /v1 — não significa que a
+    // URL sem versão continua valendo. Qualquer cliente precisa mandar /v1.
+    await request(app.getHttpServer()).get('/usuarios').set('Authorization', authHeader).expect(404);
+  });
+
+  it('GET /health verifica o banco de verdade, não só se o processo responde', async () => {
+    const res = await request(app.getHttpServer()).get('/health').expect(200);
+    expect(res.body.status).toBe('ok');
+    expect(res.body.banco).toBe('ok');
+    expect(typeof res.body.uptimeSegundos).toBe('number');
+  });
+
   it('Rejects a protected route without a token', () => {
-    return request(app.getHttpServer()).get('/usuarios').expect(401);
+    return request(app.getHttpServer()).get('/v1/usuarios').expect(401);
   });
 
   it('Rejects a protected route with a valid token but without the required permission', async () => {
@@ -279,12 +307,12 @@ describe('Full API e2e tests', () => {
       data: { nome: 'Sem Permissao', email: 'sem.permissao@example.com', senhaHash: await bcrypt.hash('Senha123!', 10), ativo: true },
     });
     const loginRes = await request(app.getHttpServer())
-      .post('/auth/login')
+      .post('/v1/auth/login')
       .send({ email: semPermissao.email, senha: 'Senha123!' })
       .expect(201);
 
     await request(app.getHttpServer())
-      .get('/usuarios')
+      .get('/v1/usuarios')
       .set('Authorization', `Bearer ${loginRes.body.accessToken}`)
       .expect(403);
   });
@@ -300,7 +328,7 @@ describe('Full API e2e tests', () => {
     };
 
     const createRes = await request(app.getHttpServer())
-      .post('/usuarios')
+      .post('/v1/usuarios')
       .set('Authorization', authHeader)
       .send(createUser)
       .expect(201);
@@ -311,15 +339,15 @@ describe('Full API e2e tests', () => {
 
     const userId = createRes.body.id;
 
-    const listRes = await request(app.getHttpServer()).get('/usuarios').set('Authorization', authHeader).expect(200);
+    const listRes = await request(app.getHttpServer()).get('/v1/usuarios').set('Authorization', authHeader).expect(200);
     expect(Array.isArray(listRes.body)).toBe(true);
     expect(listRes.body.some((item: any) => item.id === userId)).toBe(true);
 
-    const getRes = await request(app.getHttpServer()).get(`/usuarios/${userId}`).set('Authorization', authHeader).expect(200);
+    const getRes = await request(app.getHttpServer()).get(`/v1/usuarios/${userId}`).set('Authorization', authHeader).expect(200);
     expect(getRes.body.email).toBe(createUser.email);
 
     const patchRes = await request(app.getHttpServer())
-      .patch(`/usuarios/${userId}`)
+      .patch(`/v1/usuarios/${userId}`)
       .set('Authorization', authHeader)
       .send({ nome: 'Usuário Atualizado' })
       .expect(200);
@@ -327,43 +355,43 @@ describe('Full API e2e tests', () => {
 
     // login com a senha original continua funcionando após o hash
     await request(app.getHttpServer())
-      .post('/auth/login')
+      .post('/v1/auth/login')
       .send({ email: createUser.email, senha: createUser.senhaHash })
       .expect(201);
 
-    const deleteRes = await request(app.getHttpServer()).delete(`/usuarios/${userId}`).set('Authorization', authHeader).expect(200);
+    const deleteRes = await request(app.getHttpServer()).delete(`/v1/usuarios/${userId}`).set('Authorization', authHeader).expect(200);
     expect(deleteRes.body.id).toBe(userId);
   });
 
   it('Setores endpoints should create, read, update and delete a setor', async () => {
     const createSetor = { nome: 'Setor Teste', descricao: 'Setor de teste', ativo: true };
-    const createRes = await request(app.getHttpServer()).post('/setores').set('Authorization', authHeader).send(createSetor).expect(201);
+    const createRes = await request(app.getHttpServer()).post('/v1/setores').set('Authorization', authHeader).send(createSetor).expect(201);
     expect(createRes.body.id).toBeDefined();
     const setorId = createRes.body.id;
 
-    await request(app.getHttpServer()).get('/setores').set('Authorization', authHeader).expect(200);
-    await request(app.getHttpServer()).get(`/setores/${setorId}`).set('Authorization', authHeader).expect(200);
-    const patchRes = await request(app.getHttpServer()).patch(`/setores/${setorId}`).set('Authorization', authHeader).send({ nome: 'Setor Alterado' }).expect(200);
+    await request(app.getHttpServer()).get('/v1/setores').set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).get(`/v1/setores/${setorId}`).set('Authorization', authHeader).expect(200);
+    const patchRes = await request(app.getHttpServer()).patch(`/v1/setores/${setorId}`).set('Authorization', authHeader).send({ nome: 'Setor Alterado' }).expect(200);
     expect(patchRes.body.nome).toBe('Setor Alterado');
-    await request(app.getHttpServer()).delete(`/setores/${setorId}`).set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).delete(`/v1/setores/${setorId}`).set('Authorization', authHeader).expect(200);
   });
 
   it('Modulos endpoints should create, read, update and delete a modulo', async () => {
     const createModulo = { nome: 'Modulo Teste', rota: '/teste', icone: 'icon-test', ativo: true };
-    const createRes = await request(app.getHttpServer()).post('/modulos').set('Authorization', authHeader).send(createModulo).expect(201);
+    const createRes = await request(app.getHttpServer()).post('/v1/modulos').set('Authorization', authHeader).send(createModulo).expect(201);
     expect(createRes.body.id).toBeDefined();
     const moduloId = createRes.body.id;
 
-    await request(app.getHttpServer()).get('/modulos').set('Authorization', authHeader).expect(200);
-    await request(app.getHttpServer()).get(`/modulos/${moduloId}`).set('Authorization', authHeader).expect(200);
-    const patchRes = await request(app.getHttpServer()).patch(`/modulos/${moduloId}`).set('Authorization', authHeader).send({ nome: 'Modulo Alterado' }).expect(200);
+    await request(app.getHttpServer()).get('/v1/modulos').set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).get(`/v1/modulos/${moduloId}`).set('Authorization', authHeader).expect(200);
+    const patchRes = await request(app.getHttpServer()).patch(`/v1/modulos/${moduloId}`).set('Authorization', authHeader).send({ nome: 'Modulo Alterado' }).expect(200);
     expect(patchRes.body.nome).toBe('Modulo Alterado');
-    await request(app.getHttpServer()).delete(`/modulos/${moduloId}`).set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).delete(`/v1/modulos/${moduloId}`).set('Authorization', authHeader).expect(200);
   });
 
   it('Permissoes endpoints should create, read, update and delete a permissao', async () => {
     const createResModulo = await request(app.getHttpServer())
-      .post('/modulos')
+      .post('/v1/modulos')
       .set('Authorization', authHeader)
       .send({ nome: 'Modulo Permissao', ativo: true })
       .expect(201);
@@ -376,40 +404,66 @@ describe('Full API e2e tests', () => {
       recurso: '/recurso',
       acao: 'acao',
     };
-    const createRes = await request(app.getHttpServer()).post('/permissoes').set('Authorization', authHeader).send(createPermissao).expect(201);
+    const createRes = await request(app.getHttpServer()).post('/v1/permissoes').set('Authorization', authHeader).send(createPermissao).expect(201);
     expect(createRes.body.id).toBeDefined();
     const permissaoId = createRes.body.id;
 
-    await request(app.getHttpServer()).get('/permissoes').set('Authorization', authHeader).expect(200);
-    await request(app.getHttpServer()).get(`/permissoes/${permissaoId}`).set('Authorization', authHeader).expect(200);
-    const patchRes = await request(app.getHttpServer()).patch(`/permissoes/${permissaoId}`).set('Authorization', authHeader).send({ nome: 'Permissao Alterada' }).expect(200);
+    await request(app.getHttpServer()).get('/v1/permissoes').set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).get(`/v1/permissoes/${permissaoId}`).set('Authorization', authHeader).expect(200);
+    const patchRes = await request(app.getHttpServer()).patch(`/v1/permissoes/${permissaoId}`).set('Authorization', authHeader).send({ nome: 'Permissao Alterada' }).expect(200);
     expect(patchRes.body.nome).toBe('Permissao Alterada');
-    await request(app.getHttpServer()).delete(`/permissoes/${permissaoId}`).set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).delete(`/v1/permissoes/${permissaoId}`).set('Authorization', authHeader).expect(200);
   });
 
   it('Notificacoes endpoints should create, read, update and delete a notificacao', async () => {
     const createResUser = await request(app.getHttpServer())
-      .post('/usuarios')
+      .post('/v1/usuarios')
       .set('Authorization', authHeader)
       .send({ nome: 'Notificacao User', email: 'notificacao@example.com', senhaHash: 'SenhaSegura123' })
       .expect(201);
     const usuarioId = createResUser.body.id;
 
     const createNotificacao = { usuarioId, titulo: 'Nova Notificacao', mensagem: 'Mensagem de teste', lida: false };
-    const createRes = await request(app.getHttpServer()).post('/notificacoes').set('Authorization', authHeader).send(createNotificacao).expect(201);
+    const createRes = await request(app.getHttpServer()).post('/v1/notificacoes').set('Authorization', authHeader).send(createNotificacao).expect(201);
     expect(createRes.body.id).toBeDefined();
     const notificacaoId = createRes.body.id;
 
-    await request(app.getHttpServer()).get('/notificacoes').set('Authorization', authHeader).expect(200);
-    await request(app.getHttpServer()).get(`/notificacoes/${notificacaoId}`).set('Authorization', authHeader).expect(200);
-    const patchRes = await request(app.getHttpServer()).patch(`/notificacoes/${notificacaoId}`).set('Authorization', authHeader).send({ lida: true }).expect(200);
+    await request(app.getHttpServer()).get('/v1/notificacoes').set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).get(`/v1/notificacoes/${notificacaoId}`).set('Authorization', authHeader).expect(200);
+    const patchRes = await request(app.getHttpServer()).patch(`/v1/notificacoes/${notificacaoId}`).set('Authorization', authHeader).send({ lida: true }).expect(200);
     expect(patchRes.body.lida).toBe(true);
-    await request(app.getHttpServer()).delete(`/notificacoes/${notificacaoId}`).set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).delete(`/v1/notificacoes/${notificacaoId}`).set('Authorization', authHeader).expect(200);
+  });
+
+  it('Caixa de entrada: cada usuário lê e marca só as próprias notificações (sem exigir permissão)', async () => {
+    const dono = await criarUsuarioComPermissoes('Dono Notif', 'dono.notif@example.com', []);
+    const outro = await criarUsuarioComPermissoes('Outro Notif', 'outro.notif@example.com', []);
+    const nova = async (usuarioId: string, titulo: string) =>
+      (await request(app.getHttpServer()).post('/v1/notificacoes').set('Authorization', authHeader).send({ usuarioId, titulo, mensagem: 'x' }).expect(201)).body.id as string;
+    const n1 = await nova(dono.usuario.id, 'Primeira');
+    await nova(dono.usuario.id, 'Segunda');
+    const alheia = await nova(outro.usuario.id, 'Do outro');
+
+    await request(app.getHttpServer()).get('/v1/notificacoes/minhas').expect(401);
+
+    const caixa = await request(app.getHttpServer()).get('/v1/notificacoes/minhas').set('Authorization', dono.header).expect(200);
+    expect(caixa.body.itens).toHaveLength(2);
+    expect(caixa.body.naoLidas).toBe(2);
+
+    await request(app.getHttpServer()).patch(`/v1/notificacoes/minhas/${alheia}/lida`).set('Authorization', dono.header).expect(404);
+    await request(app.getHttpServer()).patch(`/v1/notificacoes/minhas/${n1}/lida`).set('Authorization', dono.header).expect(200);
+    const depois = await request(app.getHttpServer()).get('/v1/notificacoes/minhas').set('Authorization', dono.header).expect(200);
+    expect(depois.body.naoLidas).toBe(1);
+
+    const todas = await request(app.getHttpServer()).post('/v1/notificacoes/minhas/marcar-todas-lidas').set('Authorization', dono.header).expect(201);
+    expect(todas.body.atualizadas).toBe(1);
+    const doOutro = await request(app.getHttpServer()).get('/v1/notificacoes/minhas').set('Authorization', outro.header).expect(200);
+    expect(doOutro.body.naoLidas).toBe(1);
   });
 
   it('Sessoes endpoints should create, read, update and delete a sessao', async () => {
     const createResUser = await request(app.getHttpServer())
-      .post('/usuarios')
+      .post('/v1/usuarios')
       .set('Authorization', authHeader)
       .send({ nome: 'Sessao User', email: 'sessao@example.com', senhaHash: 'SenhaSegura123' })
       .expect(201);
@@ -423,94 +477,165 @@ describe('Full API e2e tests', () => {
       expiraEm: new Date(Date.now() + 3600000).toISOString(),
       revogada: false,
     };
-    const createRes = await request(app.getHttpServer()).post('/sessoes').set('Authorization', authHeader).send(createSessao).expect(201);
+    const createRes = await request(app.getHttpServer()).post('/v1/sessoes').set('Authorization', authHeader).send(createSessao).expect(201);
     expect(createRes.body.id).toBeDefined();
     const sessaoId = createRes.body.id;
 
-    await request(app.getHttpServer()).get('/sessoes').set('Authorization', authHeader).expect(200);
-    await request(app.getHttpServer()).get(`/sessoes/${sessaoId}`).set('Authorization', authHeader).expect(200);
-    const patchRes = await request(app.getHttpServer()).patch(`/sessoes/${sessaoId}`).set('Authorization', authHeader).send({ revogada: true }).expect(200);
+    await request(app.getHttpServer()).get('/v1/sessoes').set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).get(`/v1/sessoes/${sessaoId}`).set('Authorization', authHeader).expect(200);
+    const patchRes = await request(app.getHttpServer()).patch(`/v1/sessoes/${sessaoId}`).set('Authorization', authHeader).send({ revogada: true }).expect(200);
     expect(patchRes.body.revogada).toBe(true);
-    await request(app.getHttpServer()).delete(`/sessoes/${sessaoId}`).set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).delete(`/v1/sessoes/${sessaoId}`).set('Authorization', authHeader).expect(200);
   });
 
   it('Logs auditoria endpoints should create, read, update and delete a log', async () => {
     const createLog = { modulo: 'Auth', acao: 'login', entidade: 'Usuario', entidadeId: '123', ip: '127.0.0.1', navegador: 'Chrome' };
-    const createRes = await request(app.getHttpServer()).post('/logs-auditoria').set('Authorization', authHeader).send(createLog).expect(201);
+    const createRes = await request(app.getHttpServer()).post('/v1/logs-auditoria').set('Authorization', authHeader).send(createLog).expect(201);
     expect(createRes.body.id).toBeDefined();
     const logId = createRes.body.id;
 
-    await request(app.getHttpServer()).get('/logs-auditoria').set('Authorization', authHeader).expect(200);
-    await request(app.getHttpServer()).get(`/logs-auditoria/${logId}`).set('Authorization', authHeader).expect(200);
-    const patchRes = await request(app.getHttpServer()).patch(`/logs-auditoria/${logId}`).set('Authorization', authHeader).send({ acao: 'logout' }).expect(200);
+    await request(app.getHttpServer()).get('/v1/logs-auditoria').set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).get(`/v1/logs-auditoria/${logId}`).set('Authorization', authHeader).expect(200);
+    const patchRes = await request(app.getHttpServer()).patch(`/v1/logs-auditoria/${logId}`).set('Authorization', authHeader).send({ acao: 'logout' }).expect(200);
     expect(patchRes.body.acao).toBe('logout');
-    await request(app.getHttpServer()).delete(`/logs-auditoria/${logId}`).set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).delete(`/v1/logs-auditoria/${logId}`).set('Authorization', authHeader).expect(200);
+  });
+
+  it('Paginação opcional: sem `pagina`/`limite` devolve array; com eles devolve envelope com metadados', async () => {
+    // Contrato deliberadamente retrocompatível (`src/common/pagination.ts`): as telas do
+    // frontend consomem array direto, então omitir os parâmetros tem que continuar devolvendo
+    // exatamente o que sempre devolveu. O envelope só aparece quando é pedido.
+    const semPaginacao = await request(app.getHttpServer()).get('/v1/usuarios').set('Authorization', authHeader).expect(200);
+    expect(Array.isArray(semPaginacao.body)).toBe(true);
+
+    const comPaginacao = await request(app.getHttpServer())
+      .get('/v1/usuarios?pagina=1&limite=2')
+      .set('Authorization', authHeader)
+      .expect(200);
+    expect(Array.isArray(comPaginacao.body.dados)).toBe(true);
+    expect(comPaginacao.body.dados.length).toBeLessThanOrEqual(2);
+    expect(comPaginacao.body.paginacao).toEqual({
+      pagina: 1,
+      limite: 2,
+      total: semPaginacao.body.length,
+      totalPaginas: Math.ceil(semPaginacao.body.length / 2),
+    });
+
+    // `limite` acima do teto (200) é recusado, para uma query não conseguir arrastar a tabela inteira.
+    await request(app.getHttpServer()).get('/v1/usuarios?limite=500').set('Authorization', authHeader).expect(400);
+    await request(app.getHttpServer()).get('/v1/usuarios?pagina=0').set('Authorization', authHeader).expect(400);
   });
 
   it('Usuarios-setores and usuarios-permissoes flows should create, read and delete association entities', async () => {
     const userRes = await request(app.getHttpServer())
-      .post('/usuarios')
+      .post('/v1/usuarios')
       .set('Authorization', authHeader)
       .send({ nome: 'Assoc User', email: 'assoc.user@example.com', senhaHash: 'SenhaSegura123' })
       .expect(201);
-    const setorRes = await request(app.getHttpServer()).post('/setores').set('Authorization', authHeader).send({ nome: 'Assoc Setor' }).expect(201);
-    const moduloRes = await request(app.getHttpServer()).post('/modulos').set('Authorization', authHeader).send({ nome: 'Assoc Modulo', ativo: true }).expect(201);
+    const setorRes = await request(app.getHttpServer()).post('/v1/setores').set('Authorization', authHeader).send({ nome: 'Assoc Setor' }).expect(201);
+    const moduloRes = await request(app.getHttpServer()).post('/v1/modulos').set('Authorization', authHeader).send({ nome: 'Assoc Modulo', ativo: true }).expect(201);
     const permissaoRes = await request(app.getHttpServer())
-      .post('/permissoes')
+      .post('/v1/permissoes')
       .set('Authorization', authHeader)
       .send({ nome: 'assoc.permissao', moduloId: moduloRes.body.id, recurso: '/assoc', acao: 'acessar' })
       .expect(201);
 
     const usuarioSetorRes = await request(app.getHttpServer())
-      .post('/usuarios-setores')
+      .post('/v1/usuarios-setores')
       .set('Authorization', authHeader)
       .send({ usuarioId: userRes.body.id, setorId: setorRes.body.id })
       .expect(201);
     expect(usuarioSetorRes.body.id).toBeDefined();
-    await request(app.getHttpServer()).get('/usuarios-setores').set('Authorization', authHeader).expect(200);
-    await request(app.getHttpServer()).get(`/usuarios-setores/${usuarioSetorRes.body.id}`).set('Authorization', authHeader).expect(200);
-    await request(app.getHttpServer()).delete(`/usuarios-setores/${usuarioSetorRes.body.id}`).set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).get('/v1/usuarios-setores').set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).get(`/v1/usuarios-setores/${usuarioSetorRes.body.id}`).set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).delete(`/v1/usuarios-setores/${usuarioSetorRes.body.id}`).set('Authorization', authHeader).expect(200);
 
     const usuarioPermissaoRes = await request(app.getHttpServer())
-      .post('/usuarios-permissoes')
+      .post('/v1/usuarios-permissoes')
       .set('Authorization', authHeader)
       .send({ usuarioId: userRes.body.id, permissaoId: permissaoRes.body.id })
       .expect(201);
     expect(usuarioPermissaoRes.body.id).toBeDefined();
-    await request(app.getHttpServer()).get('/usuarios-permissoes').set('Authorization', authHeader).expect(200);
-    await request(app.getHttpServer()).get(`/usuarios-permissoes/${usuarioPermissaoRes.body.id}`).set('Authorization', authHeader).expect(200);
-    await request(app.getHttpServer()).delete(`/usuarios-permissoes/${usuarioPermissaoRes.body.id}`).set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).get('/v1/usuarios-permissoes').set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).get(`/v1/usuarios-permissoes/${usuarioPermissaoRes.body.id}`).set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).delete(`/v1/usuarios-permissoes/${usuarioPermissaoRes.body.id}`).set('Authorization', authHeader).expect(200);
+  });
+
+  it('Proteção do último administrador: não dá para revogar, excluir nem desativar o único admin ativo', async () => {
+    // Perder o último administrador é irreversível PELA INTERFACE: ninguém sobra
+    // para conceder a permissão de volta. Os três caminhos que levam a isso
+    // (revogar / excluir / desativar) precisam estar fechados.
+    const admin = await prisma.usuario.findFirst({ where: { email: 'admin.teste@example.com' } });
+    expect(admin).toBeTruthy();
+    const vinculoAdmin = await prisma.usuarioPermissao.findFirst({
+      where: {
+        usuarioId: admin!.id,
+        permissao: { recurso: '/hub/acessos', acao: 'gerenciar-permissoes', modulo: { nome: 'Rooster Hub' } },
+      },
+    });
+    expect(vinculoAdmin).toBeTruthy();
+
+    // Sendo o único admin, os três caminhos são bloqueados com 409.
+    await request(app.getHttpServer()).delete(`/v1/usuarios-permissoes/${vinculoAdmin!.id}`).set('Authorization', authHeader).expect(409);
+    await request(app.getHttpServer()).delete(`/v1/usuarios/${admin!.id}`).set('Authorization', authHeader).expect(409);
+    await request(app.getHttpServer()).patch(`/v1/usuarios/${admin!.id}`).set('Authorization', authHeader).send({ ativo: false }).expect(409);
+
+    // Com um segundo administrador ativo, a trava sai do caminho.
+    const segundoAdmin = await criarUsuarioComPermissoes('Segundo Admin', 'segundo.admin@example.com', [
+      ['Rooster Hub', '/hub/acessos', 'gerenciar-permissoes'],
+    ]);
+    await request(app.getHttpServer()).delete(`/v1/usuarios-permissoes/${vinculoAdmin!.id}`).set('Authorization', authHeader).expect(200);
+
+    // E agora o segundo admin passou a ser o último: a trava acompanha quem é o último, não um id fixo.
+    const vinculoSegundo = await prisma.usuarioPermissao.findFirst({ where: { usuarioId: segundoAdmin.usuario.id } });
+    await request(app.getHttpServer())
+      .delete(`/v1/usuarios-permissoes/${vinculoSegundo!.id}`)
+      .set('Authorization', segundoAdmin.header)
+      .expect(409);
   });
 
   it('Rooster Desk should create, read, update and delete a ticket flow', async () => {
     const userRes = await request(app.getHttpServer())
-      .post('/usuarios')
+      .post('/v1/usuarios')
       .set('Authorization', authHeader)
       .send({ nome: 'Desk User', email: 'desk.user@example.com', senhaHash: 'SenhaSegura123' })
       .expect(201);
     const setorRes = await request(app.getHttpServer())
-      .post('/setores')
+      .post('/v1/setores')
       .set('Authorization', authHeader)
       .send({ nome: 'Setor Desk E2E' })
       .expect(201);
     const categoriaRes = await request(app.getHttpServer())
-      .post('/categorias-tickets')
+      .post('/v1/chamados-categorias')
       .set('Authorization', authHeader)
       .send({ nome: 'Suporte', descricao: 'Solicitações de suporte', setorId: setorRes.body.id })
       .expect(201);
     const prioridadeRes = await request(app.getHttpServer())
-      .post('/prioridades-tickets')
+      .post('/v1/chamados-prioridades')
       .set('Authorization', authHeader)
-      .send({ nome: 'Alta', cor: '#ef4444' })
+      // CreatePrioridadeTicketDto restringe `nome` a um enum fechado e minúsculo
+      // (@IsIn(['baixa','media','alta','urgente'])), igual ao seed real — ver
+      // prisma/seed-dev.ts. Esse @IsIn só passou a ser exercitado de verdade
+      // quando a suíte e2e ganhou o mesmo ValidationPipe da aplicação real
+      // (src/app-config.ts); antes disso o teste "passava" sem validar nada.
+      .send({ nome: 'alta', cor: '#ef4444' })
       .expect(201);
+    // Regressão dupla: PrioridadeTicket.id não tinha @default(uuid()) em
+    // schema.prisma (só em schema.test.prisma) — criar prioridade quebraria em
+    // produção; e CreateTicketDto.prioridadeId era @IsIn(['1','2','3','4']),
+    // que rejeitaria qualquer id gerado (não-literal) como este. A asserção
+    // abaixo garante que o teste está de fato exercitando um id gerado, não um
+    // dos quatro literais do seed — sem ela, a regressão passaria por acaso se
+    // alguém reintroduzisse ids fixos.
+    expect(['1', '2', '3', '4']).not.toContain(prioridadeRes.body.id);
     const statusRes = await request(app.getHttpServer())
-      .post('/status-tickets')
+      .post('/v1/chamados-status')
       .set('Authorization', authHeader)
       .send({ nome: 'Aberto', ordem: 1 })
       .expect(201);
 
     const ticketRes = await request(app.getHttpServer())
-      .post('/tickets')
+      .post('/v1/chamados')
       .set('Authorization', authHeader)
       .send({
         protocolo: 'TCK-000001',
@@ -525,24 +650,24 @@ describe('Full API e2e tests', () => {
     const ticketId = ticketRes.body.id;
     expect(ticketRes.body.protocolo).toBe('TCK-000001');
 
-    await request(app.getHttpServer()).get('/tickets').set('Authorization', authHeader).expect(200);
-    await request(app.getHttpServer()).get(`/tickets/${ticketId}`).set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).get('/v1/chamados').set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).get(`/v1/chamados/${ticketId}`).set('Authorization', authHeader).expect(200);
     const patchRes = await request(app.getHttpServer())
-      .patch(`/tickets/${ticketId}`)
+      .patch(`/v1/chamados/${ticketId}`)
       .set('Authorization', authHeader)
       .send({ titulo: 'Acesso atualizado' })
       .expect(200);
     expect(patchRes.body.titulo).toBe('Acesso atualizado');
 
     const mensagemRes = await request(app.getHttpServer())
-      .post(`/chamados/${ticketId}/mensagens`)
+      .post(`/v1/chamados/${ticketId}/mensagens`)
       .set('Authorization', authHeader)
       .send({ mensagem: 'Estou acompanhando o caso.' })
       .expect(201);
     expect(mensagemRes.body.id).toBeDefined();
 
     const anexoRes = await request(app.getHttpServer())
-      .post(`/chamados/${ticketId}/anexos`)
+      .post(`/v1/chamados/${ticketId}/anexos`)
       .set('Authorization', authHeader)
       .attach('arquivo', Buffer.from('conteúdo de teste'), 'evidencia.txt')
       .expect(201);
@@ -550,36 +675,36 @@ describe('Full API e2e tests', () => {
     expect(typeof anexoRes.body.tamanho).toBe('number'); // BigInt no schema — precisa vir serializado como number
 
     const anexosListRes = await request(app.getHttpServer())
-      .get(`/chamados/${ticketId}/anexos`)
+      .get(`/v1/chamados/${ticketId}/anexos`)
       .set('Authorization', authHeader)
       .expect(200);
     expect(anexosListRes.body.some((a: any) => a.id === anexoRes.body.id)).toBe(true);
 
     const downloadRes = await request(app.getHttpServer())
-      .get(`/chamados/${ticketId}/anexos/${anexoRes.body.id}/arquivo`)
+      .get(`/v1/chamados/${ticketId}/anexos/${anexoRes.body.id}/arquivo`)
       .set('Authorization', authHeader)
       .expect(200);
     expect(downloadRes.text).toBe('conteúdo de teste');
 
     const ticketComAnexoRes = await request(app.getHttpServer())
-      .get(`/chamados/${ticketId}`)
+      .get(`/v1/chamados/${ticketId}`)
       .set('Authorization', authHeader)
       .expect(200);
     expect(ticketComAnexoRes.body.anexos.some((a: any) => a.id === anexoRes.body.id)).toBe(true);
 
     const statusEncerradoRes = await request(app.getHttpServer())
-      .post('/status-tickets')
+      .post('/v1/chamados-status')
       .set('Authorization', authHeader)
       .send({ nome: 'Encerrado', ordem: 2, encerrado: true })
       .expect(201);
     await request(app.getHttpServer())
-      .patch(`/chamados/${ticketId}/status`)
+      .patch(`/v1/chamados/${ticketId}/status`)
       .set('Authorization', authHeader)
       .send({ statusId: statusEncerradoRes.body.id })
       .expect(200);
 
     const ticketDetalheRes = await request(app.getHttpServer())
-      .get(`/chamados/${ticketId}`)
+      .get(`/v1/chamados/${ticketId}`)
       .set('Authorization', authHeader)
       .expect(200);
     expect(ticketDetalheRes.body.historico.some((h: any) => h.campo === 'status' && h.valorNovo === 'Encerrado')).toBe(true);
@@ -587,50 +712,96 @@ describe('Full API e2e tests', () => {
     expect(ticketDetalheRes.body.encerradoEm).not.toBeNull();
 
     const statusReabertoRes = await request(app.getHttpServer())
-      .post('/status-tickets')
+      .post('/v1/chamados-status')
       .set('Authorization', authHeader)
       .send({ nome: 'Em atendimento (reaberto)', ordem: 3, encerrado: false })
       .expect(201);
     await request(app.getHttpServer())
-      .patch(`/chamados/${ticketId}/status`)
+      .patch(`/v1/chamados/${ticketId}/status`)
       .set('Authorization', authHeader)
       .send({ statusId: statusReabertoRes.body.id })
       .expect(200);
     const ticketReabertoRes = await request(app.getHttpServer())
-      .get(`/chamados/${ticketId}`)
+      .get(`/v1/chamados/${ticketId}`)
       .set('Authorization', authHeader)
       .expect(200);
     expect(ticketReabertoRes.body.encerradoEm).toBeNull();
 
     const avaliacaoRes = await request(app.getHttpServer())
-      .post('/avaliacoes-tickets')
+      .post('/v1/avaliacoes-tickets')
       .set('Authorization', authHeader)
       .send({ ticketId, usuarioId: userRes.body.id, nota: 5, comentario: 'Atendimento resolvido.' })
       .expect(201);
     expect(avaliacaoRes.body.nota).toBe(5);
 
-    await request(app.getHttpServer()).delete(`/tickets/${ticketId}`).set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).delete(`/v1/chamados/${ticketId}`).set('Authorization', authHeader).expect(200);
+  });
+
+  // Regressão: um usuário com só `desk.tickets.criar` (ex.: um solicitante que
+  // só abre chamado, nunca navega para a fila) ficava com o formulário de novo
+  // chamado sem opção nenhuma — GET categorias/subcategorias/prioridades/status
+  // exigiam `acessar`, que esse perfil não tem. Achado real em teste manual.
+  it('Rooster Desk: quem só tem `criar` (sem `acessar`) ainda consegue ler a taxonomia do formulário de novo chamado', async () => {
+    const soCriar = await criarUsuarioComPermissoes('So Cria Chamado', 'so.criar.chamado@example.com', [
+      ['Rooster Desk', '/desk/tickets', 'criar'],
+    ]);
+    await request(app.getHttpServer()).get('/v1/chamados-categorias').set('Authorization', soCriar.header).expect(200);
+    await request(app.getHttpServer()).get('/v1/chamados-subcategorias').set('Authorization', soCriar.header).expect(200);
+    await request(app.getHttpServer()).get('/v1/chamados-prioridades').set('Authorization', soCriar.header).expect(200);
+    await request(app.getHttpServer()).get('/v1/chamados-status').set('Authorization', soCriar.header).expect(200);
+
+    const semPermissaoDesk = await criarUsuarioComPermissoes('Sem Permissao Desk', 'sem.permissao.desk@example.com', []);
+    await request(app.getHttpServer()).get('/v1/chamados-categorias').set('Authorization', semPermissaoDesk.header).expect(403);
+  });
+
+  // Regressão: o teste acima só checava o status 200 — e um solicitante SEM setor (o caso comum)
+  // recebia 200 com a lista VAZIA, porque a listagem de gestão filtra pelo setor do usuário.
+  // O formulário de novo chamado ficava sem categoria, subcategoria e prioridade.
+  it('Rooster Desk: o formulário de novo chamado recebe as categorias de todos os setores, mesmo de quem não tem setor', async () => {
+    const setor = await request(app.getHttpServer()).post('/v1/setores').set('Authorization', authHeader).send({ nome: 'Setor Abertura E2E' }).expect(201);
+    const categoria = await request(app.getHttpServer())
+      .post('/v1/chamados-categorias').set('Authorization', authHeader)
+      .send({ nome: 'Categoria Abertura E2E', descricao: 'x', setorId: setor.body.id }).expect(201);
+    await request(app.getHttpServer())
+      .post('/v1/chamados-subcategorias').set('Authorization', authHeader)
+      .send({ nome: 'Sub Abertura E2E', categoriaId: categoria.body.id }).expect(201);
+
+    const semSetor = await criarUsuarioComPermissoes('Solicitante Sem Setor', 'solicitante.sem.setor@example.com', [
+      ['Rooster Desk', '/desk/tickets', 'criar'],
+    ]);
+
+    const gestao = await request(app.getHttpServer()).get('/v1/chamados-categorias').set('Authorization', semSetor.header).expect(200);
+    expect(gestao.body.some((c: any) => c.id === categoria.body.id)).toBe(false);
+
+    const abertura = await request(app.getHttpServer()).get('/v1/chamados-categorias?escopo=abertura').set('Authorization', semSetor.header).expect(200);
+    const achada = abertura.body.find((c: any) => c.id === categoria.body.id);
+    expect(achada).toBeDefined();
+    expect(achada.subcategorias.map((sub: any) => sub.nome)).toContain('Sub Abertura E2E');
+    expect(achada.subcategorias.every((sub: any) => sub.atendentes === undefined)).toBe(true);
+
+    const semPermissaoDesk = await criarUsuarioComPermissoes('Sem Desk Abertura', 'sem.desk.abertura@example.com', []);
+    await request(app.getHttpServer()).get('/v1/chamados-categorias?escopo=abertura').set('Authorization', semPermissaoDesk.header).expect(403);
   });
 
   it('Rooster Rooms should create structure, request and approve a reservation', async () => {
     const campusRes = await request(app.getHttpServer())
-      .post('/campus')
+      .post('/v1/campus')
       .set('Authorization', authHeader)
       .send({ nome: 'Campus E2E', codigo: 'E2E' })
       .expect(201);
     const blocoRes = await request(app.getHttpServer())
-      .post('/blocos')
+      .post('/v1/blocos')
       .set('Authorization', authHeader)
       .send({ campusId: campusRes.body.id, nome: 'Bloco E2E', codigo: 'B1' })
       .expect(201);
     const ambienteRes = await request(app.getHttpServer())
-      .post('/ambientes')
+      .post('/v1/ambientes')
       .set('Authorization', authHeader)
       .send({ campusId: campusRes.body.id, blocoId: blocoRes.body.id, nome: 'Sala E2E', codigo: 'S-E2E', andar: 1, tipo: 'sala', capacidade: 10 })
       .expect(201);
 
     const reservaRes = await request(app.getHttpServer())
-      .post('/reservas')
+      .post('/v1/reservas')
       .set('Authorization', authHeader)
       .send({
         codigo: 'RES-E2E-0001',
@@ -640,39 +811,43 @@ describe('Full API e2e tests', () => {
         data: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
         horarioInicio: '10:00',
         horarioFim: '11:00',
+        // participantes é obrigatório no CreateReservaDto (@IsInt @Min(1), sem
+        // @IsOptional) — só passou a ser exercitado quando a suíte ganhou o
+        // mesmo ValidationPipe da aplicação real (src/app-config.ts).
+        participantes: 8,
       })
       .expect(201);
     expect(reservaRes.body.status).toBe('analise');
 
     const statusRes = await request(app.getHttpServer())
-      .patch(`/reservas/${reservaRes.body.id}/status`)
+      .patch(`/v1/reservas/${reservaRes.body.id}/status`)
       .set('Authorization', authHeader)
       .send({ status: 'confirmada' })
       .expect(200);
     expect(statusRes.body.status).toBe('confirmada');
 
     const mensagemRes = await request(app.getHttpServer())
-      .post(`/reservas/${reservaRes.body.id}/mensagens`)
+      .post(`/v1/reservas/${reservaRes.body.id}/mensagens`)
       .set('Authorization', authHeader)
       .send({ mensagem: 'Sala liberada para o evento.' })
       .expect(201);
     expect(mensagemRes.body.mensagem).toBe('Sala liberada para o evento.');
 
     const mensagensListRes = await request(app.getHttpServer())
-      .get(`/reservas/${reservaRes.body.id}/mensagens`)
+      .get(`/v1/reservas/${reservaRes.body.id}/mensagens`)
       .set('Authorization', authHeader)
       .expect(200);
     expect(mensagensListRes.body.length).toBe(1);
 
     const canceladaRes = await request(app.getHttpServer())
-      .patch(`/reservas/${reservaRes.body.id}/status`)
+      .patch(`/v1/reservas/${reservaRes.body.id}/status`)
       .set('Authorization', authHeader)
       .send({ status: 'cancelada', motivo: 'Evento adiado' })
       .expect(200);
     expect(canceladaRes.body.motivoCancelamento).toBe('Evento adiado');
 
     const reservaDetalheRes = await request(app.getHttpServer())
-      .get(`/reservas/${reservaRes.body.id}`)
+      .get(`/v1/reservas/${reservaRes.body.id}`)
       .set('Authorization', authHeader)
       .expect(200);
     expect(reservaDetalheRes.body.historico.some((h: any) => h.campo === 'status' && h.valorNovo === 'cancelada')).toBe(true);
@@ -680,17 +855,17 @@ describe('Full API e2e tests', () => {
 
   it('Rooster Rooms recurring series: generates occurrences, rejects on conflict atomically, cancels in bulk', async () => {
     const campusRes = await request(app.getHttpServer())
-      .post('/campus')
+      .post('/v1/campus')
       .set('Authorization', authHeader)
       .send({ nome: 'Campus Série E2E', codigo: 'SER' })
       .expect(201);
     const blocoRes = await request(app.getHttpServer())
-      .post('/blocos')
+      .post('/v1/blocos')
       .set('Authorization', authHeader)
       .send({ campusId: campusRes.body.id, nome: 'Bloco Série E2E', codigo: 'B1' })
       .expect(201);
     const ambienteRes = await request(app.getHttpServer())
-      .post('/ambientes')
+      .post('/v1/ambientes')
       .set('Authorization', authHeader)
       .send({ campusId: campusRes.body.id, blocoId: blocoRes.body.id, nome: 'Sala Série E2E', codigo: 'S-SER', andar: 1, tipo: 'sala', capacidade: 10 })
       .expect(201);
@@ -699,7 +874,7 @@ describe('Full API e2e tests', () => {
     const repetirAte = new Date(primeiraData.getTime() + 21 * 86400000); // +3 semanas = 4 ocorrências
 
     const serieRes = await request(app.getHttpServer())
-      .post('/reservas/serie')
+      .post('/v1/reservas/serie')
       .set('Authorization', authHeader)
       .send({
         codigo: 'RES-SERIE-E2E',
@@ -709,6 +884,7 @@ describe('Full API e2e tests', () => {
         data: primeiraData.toISOString().slice(0, 10),
         horarioInicio: '10:00',
         horarioFim: '11:00',
+        participantes: 8,
         recorrencia: 'semanal',
         repetirAte: repetirAte.toISOString().slice(0, 10),
       })
@@ -719,7 +895,7 @@ describe('Full API e2e tests', () => {
 
     // colide com a 2ª ocorrência (mesmo horário, mesma sala) -> a série inteira deve ser rejeitada, nada criado
     await request(app.getHttpServer())
-      .post('/reservas/serie')
+      .post('/v1/reservas/serie')
       .set('Authorization', authHeader)
       .send({
         codigo: 'RES-SERIE-CONFLITO-E2E',
@@ -729,27 +905,28 @@ describe('Full API e2e tests', () => {
         data: primeiraData.toISOString().slice(0, 10),
         horarioInicio: '10:30',
         horarioFim: '11:30',
+        participantes: 8,
         recorrencia: 'semanal',
         repetirAte: repetirAte.toISOString().slice(0, 10),
       })
       .expect(409);
 
     const listaRes = await request(app.getHttpServer())
-      .get(`/reservas/serie/${serieId}`)
+      .get(`/v1/reservas/serie/${serieId}`)
       .set('Authorization', authHeader)
       .expect(200);
     expect(listaRes.body.length).toBe(4);
     expect(listaRes.body.some((r: any) => r.codigo === 'RES-SERIE-CONFLITO-E2E')).toBe(false);
 
     const cancelRes = await request(app.getHttpServer())
-      .patch(`/reservas/serie/${serieId}/cancelar`)
+      .patch(`/v1/reservas/serie/${serieId}/cancelar`)
       .set('Authorization', authHeader)
       .send({ motivo: 'Cancelamento em massa E2E' })
       .expect(200);
     expect(cancelRes.body.canceladas).toBe(4);
 
     const listaCanceladaRes = await request(app.getHttpServer())
-      .get(`/reservas/serie/${serieId}`)
+      .get(`/v1/reservas/serie/${serieId}`)
       .set('Authorization', authHeader)
       .expect(200);
     expect(listaCanceladaRes.body.every((r: any) => r.status === 'cancelada')).toBe(true);
@@ -757,46 +934,50 @@ describe('Full API e2e tests', () => {
 
   it('Rooster Assets should register an asset and a movement', async () => {
     const categoriaRes = await request(app.getHttpServer())
-      .post('/patrimonio-categorias')
+      .post('/v1/patrimonio-categorias')
       .set('Authorization', authHeader)
       .send({ nome: 'Categoria E2E' })
       .expect(201);
     const setorRes = await request(app.getHttpServer())
-      .post('/patrimonio-setores')
+      .post('/v1/patrimonio-setores')
       .set('Authorization', authHeader)
       .send({ nome: 'Setor Patrimonio E2E' })
       .expect(201);
     const assetRes = await request(app.getHttpServer())
-      .post('/patrimonio')
+      .post('/v1/patrimonio')
       .set('Authorization', authHeader)
-      .send({ nome: 'Notebook E2E', tag: 'PAT-E2E-0001', categoriaId: categoriaRes.body.id, setorId: setorRes.body.id })
+      // adquiridoEm/valor são obrigatórios no CreateAssetDto (@IsDateString/@IsNumber,
+      // sem @IsOptional) — o formulário real sempre os envia (padrão: hoje / 0).
+      // Só passou a ser exercitado quando a suíte ganhou o mesmo ValidationPipe
+      // da aplicação real (src/app-config.ts).
+      .send({ nome: 'Notebook E2E', tag: 'PAT-E2E-0001', categoriaId: categoriaRes.body.id, setorId: setorRes.body.id, adquiridoEm: '2026-01-15', valor: 4500 })
       .expect(201);
 
     const movimentoRes = await request(app.getHttpServer())
-      .post('/patrimonio-movimentacoes')
+      .post('/v1/patrimonio-movimentacoes')
       .set('Authorization', authHeader)
       .send({ patrimonioId: assetRes.body.id, tipo: 'setor', destino: 'Outro setor', usuario: 'Admin Teste' })
       .expect(201);
     expect(movimentoRes.body.movimentacao.id).toBeDefined();
 
-    await request(app.getHttpServer()).get('/patrimonio').set('Authorization', authHeader).expect(200);
+    await request(app.getHttpServer()).get('/v1/patrimonio').set('Authorization', authHeader).expect(200);
   });
 
   it('Asset loans: overdue tracking and return flow', async () => {
     const categoriaRes = await request(app.getHttpServer())
-      .post('/patrimonio-categorias')
+      .post('/v1/patrimonio-categorias')
       .set('Authorization', authHeader)
       .send({ nome: 'Categoria Empréstimo E2E' })
       .expect(201);
     const assetRes = await request(app.getHttpServer())
-      .post('/patrimonio')
+      .post('/v1/patrimonio')
       .set('Authorization', authHeader)
-      .send({ nome: 'Projetor E2E', tag: 'PAT-E2E-EMP', categoriaId: categoriaRes.body.id })
+      .send({ nome: 'Projetor E2E', tag: 'PAT-E2E-EMP', categoriaId: categoriaRes.body.id, adquiridoEm: '2026-01-15', valor: 3200 })
       .expect(201);
 
     const ontem = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
     const emprestimoRes = await request(app.getHttpServer())
-      .post('/patrimonio-movimentacoes')
+      .post('/v1/patrimonio-movimentacoes')
       .set('Authorization', authHeader)
       .send({ patrimonioId: assetRes.body.id, tipo: 'emprestimo', destino: 'Prof. E2E', usuario: 'Admin Teste', dataDevolucaoPrevista: ontem })
       .expect(201);
@@ -804,41 +985,129 @@ describe('Full API e2e tests', () => {
     const movimentoId = emprestimoRes.body.movimentacao.id;
 
     const atrasadosRes = await request(app.getHttpServer())
-      .get('/patrimonio-emprestimos-atrasados')
+      .get('/v1/patrimonio-emprestimos-atrasados')
       .set('Authorization', authHeader)
       .expect(200);
     expect(atrasadosRes.body.some((m: any) => m.id === movimentoId)).toBe(true);
 
     const devolverRes = await request(app.getHttpServer())
-      .patch(`/patrimonio-movimentacoes/${movimentoId}/devolver`)
+      .patch(`/v1/patrimonio-movimentacoes/${movimentoId}/devolver`)
       .set('Authorization', authHeader)
       .send({ usuario: 'Admin Teste' })
       .expect(200);
     expect(devolverRes.body.status).toBe('disponivel');
 
     const atrasadosDepoisRes = await request(app.getHttpServer())
-      .get('/patrimonio-emprestimos-atrasados')
+      .get('/v1/patrimonio-emprestimos-atrasados')
       .set('Authorization', authHeader)
       .expect(200);
     expect(atrasadosDepoisRes.body.some((m: any) => m.id === movimentoId)).toBe(false);
 
     await request(app.getHttpServer())
-      .patch(`/patrimonio-movimentacoes/${movimentoId}/devolver`)
+      .patch(`/v1/patrimonio-movimentacoes/${movimentoId}/devolver`)
       .set('Authorization', authHeader)
       .send({ usuario: 'Admin Teste' })
       .expect(400);
   });
 
+  it('Refresh token: login devolve o par, renova com rotação, e o token antigo deixa de valer', async () => {
+    const usuario = await criarUsuarioComPermissoes('Refresh User', 'refresh.user@example.com', []);
+
+    const login = await request(app.getHttpServer())
+      .post('/v1/auth/login')
+      .send({ email: 'refresh.user@example.com', senha: 'Senha123!' })
+      .expect(201);
+    expect(typeof login.body.refreshToken).toBe('string');
+    expect(login.body.refreshToken).toHaveLength(64);
+
+    // O banco nunca guarda o refresh token em texto puro — só o hash SHA-256.
+    // (Localizar a sessão pelo hash, e não pelo usuário: `criarUsuarioComPermissoes`
+    // já faz um login, então este usuário tem mais de uma sessão aberta.)
+    const hashDoToken = createHash('sha256').update(login.body.refreshToken as string).digest('hex');
+    const sessaoCrua = await prisma.sessao.findFirst({ where: { refreshToken: hashDoToken } });
+    expect(sessaoCrua).toBeTruthy();
+    expect(sessaoCrua!.refreshToken).not.toBe(login.body.refreshToken);
+
+    // Renovar devolve um par novo e um access token utilizável.
+    const renovado = await request(app.getHttpServer())
+      .post('/v1/auth/refresh')
+      .send({ refreshToken: login.body.refreshToken })
+      .expect(201);
+    expect(renovado.body.refreshToken).not.toBe(login.body.refreshToken);
+    await request(app.getHttpServer())
+      .get('/v1/me/perfil')
+      .set('Authorization', `Bearer ${renovado.body.accessToken}`)
+      .expect((res) => {
+        // 200 ou 403/404 conforme o vínculo do usuário — o que importa é não ser 401.
+        expect(res.status).not.toBe(401);
+      });
+
+    // Rotação: o refresh token usado não serve mais.
+    await request(app.getHttpServer())
+      .post('/v1/auth/refresh')
+      .send({ refreshToken: login.body.refreshToken })
+      .expect(401);
+
+    // Logout revoga o token atual...
+    await request(app.getHttpServer()).post('/v1/auth/logout').send({ refreshToken: renovado.body.refreshToken }).expect(201);
+    await request(app.getHttpServer())
+      .post('/v1/auth/refresh')
+      .send({ refreshToken: renovado.body.refreshToken })
+      .expect(401);
+
+    // ...e repetir o logout continua respondendo igual (idempotente, e não revela se o token existia).
+    await request(app.getHttpServer()).post('/v1/auth/logout').send({ refreshToken: renovado.body.refreshToken }).expect(201);
+  });
+
+  it('Refresh token: desativar o usuário derruba a renovação na hora', async () => {
+    // O access token só expira em 8h; sem esta checagem, desativar alguém não
+    // teria efeito prático até lá, e a sessão ainda poderia se renovar sozinha.
+    const usuario = await criarUsuarioComPermissoes('Refresh Inativo', 'refresh.inativo@example.com', []);
+    const login = await request(app.getHttpServer())
+      .post('/v1/auth/login')
+      .send({ email: 'refresh.inativo@example.com', senha: 'Senha123!' })
+      .expect(201);
+
+    await prisma.usuario.update({ where: { id: usuario.usuario.id }, data: { ativo: false } });
+
+    await request(app.getHttpServer())
+      .post('/v1/auth/refresh')
+      .send({ refreshToken: login.body.refreshToken })
+      .expect(401);
+  });
+
+  it('Refresh token: sessão expirada não renova e fica revogada', async () => {
+    await criarUsuarioComPermissoes('Refresh Expirado', 'refresh.expirado@example.com', []);
+    const login = await request(app.getHttpServer())
+      .post('/v1/auth/login')
+      .send({ email: 'refresh.expirado@example.com', senha: 'Senha123!' })
+      .expect(201);
+
+    // Localiza pelo hash do token, e não pelo usuário: `criarUsuarioComPermissoes`
+    // já abriu uma sessão antes desta, e expirar a errada não testaria nada.
+    const hashDoToken = createHash('sha256').update(login.body.refreshToken as string).digest('hex');
+    const sessao = await prisma.sessao.findFirst({ where: { refreshToken: hashDoToken } });
+    await prisma.sessao.update({ where: { id: sessao!.id }, data: { expiraEm: new Date(Date.now() - 1000) } });
+
+    await request(app.getHttpServer())
+      .post('/v1/auth/refresh')
+      .send({ refreshToken: login.body.refreshToken })
+      .expect(401);
+
+    const depois = await prisma.sessao.findUnique({ where: { id: sessao!.id } });
+    expect(depois!.revogada).toBe(true);
+  });
+
   it('Password reset via email: request, consume token, old password stops working, token cannot be reused', async () => {
     // e-mail inexistente: mesma resposta genérica, sem 404 e sem enviar e-mail
     await request(app.getHttpServer())
-      .post('/auth/esqueci-senha')
+      .post('/v1/auth/esqueci-senha')
       .send({ email: 'nao.existe@example.com' })
       .expect(201);
     expect(mail.outbox.length).toBe(0);
 
     await request(app.getHttpServer())
-      .post('/auth/esqueci-senha')
+      .post('/v1/auth/esqueci-senha')
       .send({ email: 'admin.teste@example.com' })
       .expect(201);
     expect(mail.outbox.length).toBe(1);
@@ -849,38 +1118,38 @@ describe('Full API e2e tests', () => {
     expect(token).toBeTruthy();
 
     await request(app.getHttpServer())
-      .post('/auth/redefinir-senha')
+      .post('/v1/auth/redefinir-senha')
       .send({ token: 'token-invalido', novaSenha: 'NovaSenha789' })
       .expect(400);
 
     await request(app.getHttpServer())
-      .post('/auth/redefinir-senha')
+      .post('/v1/auth/redefinir-senha')
       .send({ token, novaSenha: 'NovaSenha789' })
       .expect(201);
 
     await request(app.getHttpServer())
-      .post('/auth/login')
+      .post('/v1/auth/login')
       .send({ email: 'admin.teste@example.com', senha: 'Senha123!' })
       .expect(401);
     await request(app.getHttpServer())
-      .post('/auth/login')
+      .post('/v1/auth/login')
       .send({ email: 'admin.teste@example.com', senha: 'NovaSenha789' })
       .expect(201);
 
     // token já usado não pode ser reaproveitado
     await request(app.getHttpServer())
-      .post('/auth/redefinir-senha')
+      .post('/v1/auth/redefinir-senha')
       .send({ token, novaSenha: 'OutraSenha999' })
       .expect(400);
   });
 
   it('Security-relevant events are written automatically to LogAuditoria', async () => {
     await request(app.getHttpServer())
-      .post('/auth/login')
+      .post('/v1/auth/login')
       .send({ email: 'admin.teste@example.com', senha: 'senha-errada' })
       .expect(401);
 
-    const logsRes = await request(app.getHttpServer()).get('/logs-auditoria').set('Authorization', authHeader).expect(200);
+    const logsRes = await request(app.getHttpServer()).get('/v1/logs-auditoria').set('Authorization', authHeader).expect(200);
     const acoes = logsRes.body.map((log: any) => log.acao);
     expect(acoes).toContain('login_sucesso'); // do beforeEach (seedAdminAndLogin)
     expect(acoes).toContain('login_falhou');
@@ -949,14 +1218,14 @@ describe('Full API e2e tests', () => {
       const cenario = await montarCenarioAcademico();
 
       const turmaDetalhe = await request(app.getHttpServer())
-        .get(`/turmas/${cenario.turmaAlg.id}`)
+        .get(`/v1/turmas/${cenario.turmaAlg.id}`)
         .set('Authorization', cenario.coordenador.header)
         .expect(200);
       expect(turmaDetalhe.body.disciplina.nome).toBe('Algoritmos');
       expect(turmaDetalhe.body.matriculas).toHaveLength(1);
 
       const matriculasRes = await request(app.getHttpServer())
-        .get(`/turmas/${cenario.turmaAlg.id}/matriculas`)
+        .get(`/v1/turmas/${cenario.turmaAlg.id}/matriculas`)
         .set('Authorization', cenario.coordenador.header)
         .expect(200);
       expect(matriculasRes.body[0].aluno.usuario.nome).toBe('João Teste');
@@ -966,7 +1235,7 @@ describe('Full API e2e tests', () => {
       const cenario = await montarCenarioAcademico();
 
       const uploadRes = await request(app.getHttpServer())
-        .post('/documentos-academicos')
+        .post('/v1/documentos-academicos')
         .set('Authorization', cenario.coordenador.header)
         .field('tipo', 'plano-de-ensino')
         .field('disciplinaId', cenario.disciplinaAlg.id)
@@ -976,19 +1245,19 @@ describe('Full API e2e tests', () => {
       expect(typeof uploadRes.body.tamanho).toBe('number');
 
       const listRes = await request(app.getHttpServer())
-        .get(`/documentos-academicos?disciplinaId=${cenario.disciplinaAlg.id}`)
+        .get(`/v1/documentos-academicos?disciplinaId=${cenario.disciplinaAlg.id}`)
         .set('Authorization', cenario.coordenador.header)
         .expect(200);
       expect(listRes.body.some((d: any) => d.id === uploadRes.body.id)).toBe(true);
 
       const downloadRes = await request(app.getHttpServer())
-        .get(`/documentos-academicos/${uploadRes.body.id}/arquivo`)
+        .get(`/v1/documentos-academicos/${uploadRes.body.id}/arquivo`)
         .set('Authorization', cenario.coordenador.header)
         .expect(200);
       expect(downloadRes.text).toBe('conteúdo de teste');
 
       await request(app.getHttpServer())
-        .delete(`/documentos-academicos/${uploadRes.body.id}`)
+        .delete(`/v1/documentos-academicos/${uploadRes.body.id}`)
         .set('Authorization', cenario.coordenador.header)
         .expect(200);
     });
@@ -997,22 +1266,22 @@ describe('Full API e2e tests', () => {
       const cenario = await montarCenarioAcademico();
 
       // dono: acessa e registra chamada normalmente
-      await request(app.getHttpServer()).get(`/turmas/${cenario.turmaAlg.id}`).set('Authorization', cenario.profLima.header).expect(200);
+      await request(app.getHttpServer()).get(`/v1/turmas/${cenario.turmaAlg.id}`).set('Authorization', cenario.profLima.header).expect(200);
       await request(app.getHttpServer())
-        .post(`/turmas/${cenario.turmaAlg.id}/frequencia`)
+        .post(`/v1/turmas/${cenario.turmaAlg.id}/frequencia`)
         .set('Authorization', cenario.profLima.header)
         .send({ data: '2026-09-17', registros: [{ alunoId: cenario.alunoJoaoAcademico.id, data: '2026-09-17', presenca: 'presente' }] })
         .expect(201);
 
       // turma alheia: 403 tanto para leitura quanto para escrita
-      await request(app.getHttpServer()).get(`/turmas/${cenario.turmaBd.id}`).set('Authorization', cenario.profLima.header).expect(403);
+      await request(app.getHttpServer()).get(`/v1/turmas/${cenario.turmaBd.id}`).set('Authorization', cenario.profLima.header).expect(403);
       await request(app.getHttpServer())
-        .post(`/turmas/${cenario.turmaBd.id}/frequencia`)
+        .post(`/v1/turmas/${cenario.turmaBd.id}/frequencia`)
         .set('Authorization', cenario.profLima.header)
         .send({ data: '2026-09-17', registros: [] })
         .expect(403);
       await request(app.getHttpServer())
-        .post('/atividades')
+        .post('/v1/atividades')
         .set('Authorization', cenario.profLima.header)
         .send({ titulo: 'Atividade indevida', tipo: 'lista', turmaId: cenario.turmaBd.id })
         .expect(403);
@@ -1020,44 +1289,44 @@ describe('Full API e2e tests', () => {
       // GET /turmas/:id/notas (boletim da turma inteira, usado pela tela de notas do professor):
       // dono acessa, outro professor não, e o próprio aluno matriculado também não (ele só vê /me/notas).
       const item = await request(app.getHttpServer())
-        .post(`/turmas/${cenario.turmaAlg.id}/itens-avaliativos`)
+        .post(`/v1/turmas/${cenario.turmaAlg.id}/itens-avaliativos`)
         .set('Authorization', cenario.profLima.header)
         .send({ nome: 'Prova 1', peso: 1, notaMaxima: 10 })
         .expect(201);
       await request(app.getHttpServer())
-        .patch(`/itens-avaliativos/${item.body.id}/notas`)
+        .patch(`/v1/itens-avaliativos/${item.body.id}/notas`)
         .set('Authorization', cenario.profLima.header)
         .send({ alunoId: cenario.alunoJoaoAcademico.id, valor: 7.5 })
         .expect(200);
 
       const boletimRes = await request(app.getHttpServer())
-        .get(`/turmas/${cenario.turmaAlg.id}/notas`)
+        .get(`/v1/turmas/${cenario.turmaAlg.id}/notas`)
         .set('Authorization', cenario.profLima.header)
         .expect(200);
       expect(boletimRes.body[0].notas[0].valor).toBe('7.5');
 
-      await request(app.getHttpServer()).get(`/turmas/${cenario.turmaBd.id}/notas`).set('Authorization', cenario.profLima.header).expect(403);
-      await request(app.getHttpServer()).get(`/turmas/${cenario.turmaAlg.id}/notas`).set('Authorization', cenario.alunoJoao.header).expect(403);
+      await request(app.getHttpServer()).get(`/v1/turmas/${cenario.turmaBd.id}/notas`).set('Authorization', cenario.profLima.header).expect(403);
+      await request(app.getHttpServer()).get(`/v1/turmas/${cenario.turmaAlg.id}/notas`).set('Authorization', cenario.alunoJoao.header).expect(403);
     });
 
     it('Aluno só vê os próprios dados via /me — 401 sem token, 403 fora do escopo', async () => {
       const cenario = await montarCenarioAcademico();
 
-      await request(app.getHttpServer()).get('/me/turmas').expect(401);
+      await request(app.getHttpServer()).get('/v1/me/turmas').expect(401);
 
       const minhasTurmasRes = await request(app.getHttpServer())
-        .get('/me/turmas')
+        .get('/v1/me/turmas')
         .set('Authorization', cenario.alunoJoao.header)
         .expect(200);
       expect(minhasTurmasRes.body).toHaveLength(1);
       expect(minhasTurmasRes.body[0].turma.codigo).toBe('ALG-T-A');
 
       // João não está matriculado na turma de Banco de Dados
-      await request(app.getHttpServer()).get(`/turmas/${cenario.turmaBd.id}`).set('Authorization', cenario.alunoJoao.header).expect(403);
+      await request(app.getHttpServer()).get(`/v1/turmas/${cenario.turmaBd.id}`).set('Authorization', cenario.alunoJoao.header).expect(403);
 
       // aluno autenticado mas sem a ação de gestão -> 403 (não 500/401)
       await request(app.getHttpServer())
-        .post(`/turmas/${cenario.turmaAlg.id}/frequencia`)
+        .post(`/v1/turmas/${cenario.turmaAlg.id}/frequencia`)
         .set('Authorization', cenario.alunoJoao.header)
         .send({ data: '2026-09-17', registros: [] })
         .expect(403);
@@ -1067,33 +1336,33 @@ describe('Full API e2e tests', () => {
       const cenario = await montarCenarioAcademico();
 
       const atividadeRes = await request(app.getHttpServer())
-        .post('/atividades')
+        .post('/v1/atividades')
         .set('Authorization', cenario.profLima.header)
         .send({ titulo: 'Lista 1', tipo: 'lista', turmaId: cenario.turmaAlg.id, peso: 0.5, notaMaxima: 10 })
         .expect(201);
       const atividadeId = atividadeRes.body.id;
 
       const publicarRes = await request(app.getHttpServer())
-        .patch(`/atividades/${atividadeId}/publicar`)
+        .patch(`/v1/atividades/${atividadeId}/publicar`)
         .set('Authorization', cenario.profLima.header)
         .expect(200);
       expect(publicarRes.body.status).toBe('publicada');
 
       const itensRes = await request(app.getHttpServer())
-        .get(`/turmas/${cenario.turmaAlg.id}/itens-avaliativos`)
+        .get(`/v1/turmas/${cenario.turmaAlg.id}/itens-avaliativos`)
         .set('Authorization', cenario.profLima.header)
         .expect(200);
       expect(itensRes.body.some((item: any) => item.origem === 'learn' && item.atividadeId === atividadeId)).toBe(true);
 
       // Maria não está matriculada na turma de Algoritmos -> não pode entregar
       await request(app.getHttpServer())
-        .post(`/atividades/${atividadeId}/entregas`)
+        .post(`/v1/atividades/${atividadeId}/entregas`)
         .set('Authorization', cenario.alunoMaria.header)
         .send({ texto: 'tentativa indevida' })
         .expect(400);
 
       const entregaRes = await request(app.getHttpServer())
-        .post(`/atividades/${atividadeId}/entregas`)
+        .post(`/v1/atividades/${atividadeId}/entregas`)
         .set('Authorization', cenario.alunoJoao.header)
         .send({ texto: 'Minha resposta' })
         .expect(201);
@@ -1102,40 +1371,40 @@ describe('Full API e2e tests', () => {
       // Anexo na entrega — tamanho (BigInt no schema) precisa vir serializado como number
       // em toda rota que devolve entregas com anexos incluídos (não só no upload em si).
       const anexoRes = await request(app.getHttpServer())
-        .post(`/entregas/${entregaRes.body.id}/anexos`)
+        .post(`/v1/entregas/${entregaRes.body.id}/anexos`)
         .set('Authorization', cenario.alunoJoao.header)
         .attach('arquivo', Buffer.from('conteúdo da lista'), 'lista1.txt')
         .expect(201);
       expect(typeof anexoRes.body.tamanho).toBe('number');
 
       const entregasDaAtividadeRes = await request(app.getHttpServer())
-        .get(`/atividades/${atividadeId}/entregas`)
+        .get(`/v1/atividades/${atividadeId}/entregas`)
         .set('Authorization', cenario.profLima.header)
         .expect(200);
       const entregaComAnexo = entregasDaAtividadeRes.body.find((e: any) => e.id === entregaRes.body.id);
       expect(typeof entregaComAnexo.anexos[0].tamanho).toBe('number');
 
       const minhasEntregasRes = await request(app.getHttpServer())
-        .get('/me/entregas')
+        .get('/v1/me/entregas')
         .set('Authorization', cenario.alunoJoao.header)
         .expect(200);
       expect(typeof minhasEntregasRes.body[0].anexos[0].tamanho).toBe('number');
 
       // Profa. Costa (outra turma) não pode corrigir a entrega de Lima
       await request(app.getHttpServer())
-        .patch(`/entregas/${entregaRes.body.id}/corrigir`)
+        .patch(`/v1/entregas/${entregaRes.body.id}/corrigir`)
         .set('Authorization', cenario.profCosta.header)
         .send({ nota: 10 })
         .expect(403);
 
       await request(app.getHttpServer())
-        .patch(`/entregas/${entregaRes.body.id}/corrigir`)
+        .patch(`/v1/entregas/${entregaRes.body.id}/corrigir`)
         .set('Authorization', cenario.profLima.header)
         .send({ nota: 9, feedback: 'Muito bom!' })
         .expect(200);
 
       const minhasNotasRes = await request(app.getHttpServer())
-        .get('/me/notas')
+        .get('/v1/me/notas')
         .set('Authorization', cenario.alunoJoao.header)
         .expect(200);
       const itemLearn = minhasNotasRes.body[0].itens.find((item: any) => item.origem === 'learn');
@@ -1144,39 +1413,49 @@ describe('Full API e2e tests', () => {
   });
 
   describe('Rooster Boost', () => {
-    const BOOST_PROFESSOR_KEYS: Array<[string, string, string]> = [
+    // Gestão por permissão: vale para TODOS os cursos, sem "dono".
+    const BOOST_GESTOR_KEYS: Array<[string, string, string]> = [
       ['Rooster Boost', '/boost', 'acessar'],
+      ['Rooster Boost', '/boost/manage', 'acessar'],
       ['Rooster Boost', '/boost/manage', 'gerenciar-cursos'],
       ['Rooster Boost', '/boost/manage', 'gerenciar-conteudo'],
       ['Rooster Boost', '/boost/manage', 'ver-progresso'],
-      ['Rooster Boost', '/boost/manage', 'mensagem'],
+      ['Rooster Boost', '/boost/manage', 'certificado'],
+      ['Rooster Boost', '/boost/manage', 'vincular-orientadores'],
+    ];
+    // Orientador: professor que só conversa com os alunos dos cursos a que foi vinculado.
+    const BOOST_ORIENTADOR_KEYS: Array<[string, string, string]> = [
+      ['Rooster Boost', '/boost/conversas', 'acessar'],
+      ['Rooster Boost', '/boost/conversas', 'responder'],
     ];
 
-    /** Professor (login do Hub) apto a lecionar no Boost + um curso publicado dele, com 1 módulo/1 aula/1 material. */
+    /** Gestor + um orientador VINCULADO ao curso + outro professor NÃO vinculado; curso publicado com 1 módulo/1 aula. */
     async function montarCenarioBoost() {
-      const profUsuario = await criarUsuarioComPermissoes('Prof. Boost Teste', 'prof.boost.teste@example.com', BOOST_PROFESSOR_KEYS);
-      const profOutroUsuario = await criarUsuarioComPermissoes('Prof. Boost Outro', 'prof.boost.outro@example.com', BOOST_PROFESSOR_KEYS);
-      const professor = await prisma.professor.create({ data: { usuarioId: profUsuario.usuario.id } });
-      const professorOutro = await prisma.professor.create({ data: { usuarioId: profOutroUsuario.usuario.id } });
+      const gestor = await criarUsuarioComPermissoes('Gestor Boost Teste', 'gestor.boost.teste@example.com', BOOST_GESTOR_KEYS);
+      const orientador = await criarUsuarioComPermissoes('Prof. Orientador Teste', 'prof.orientador.teste@example.com', BOOST_ORIENTADOR_KEYS);
+      const orientadorOutro = await criarUsuarioComPermissoes('Prof. Orientador Outro', 'prof.orientador.outro@example.com', BOOST_ORIENTADOR_KEYS);
+      const professor = await prisma.professor.create({ data: { usuarioId: orientador.usuario.id } });
+      const professorOutro = await prisma.professor.create({ data: { usuarioId: orientadorOutro.usuario.id } });
 
       const curso = await prisma.cursoBoost.create({
-        data: { titulo: 'Curso Teste Boost', slug: `curso-teste-boost-${Date.now()}`, cargaHoraria: 10, status: 'publicado', professorId: professor.id },
+        data: { titulo: 'Curso Teste Boost', slug: `curso-teste-boost-${Date.now()}`, cargaHoraria: 10, status: 'publicado' },
       });
+      await prisma.cursoOrientadorBoost.create({ data: { cursoId: curso.id, professorId: professor.id } });
       const modulo = await prisma.moduloBoost.create({ data: { cursoId: curso.id, titulo: 'Módulo 1', ordem: 1 } });
       const aula = await prisma.aulaBoost.create({ data: { moduloId: modulo.id, titulo: 'Aula 1', ordem: 1, tipo: 'texto', conteudoTexto: 'Conteúdo de teste.' } });
 
-      return { professor: profUsuario, professorOutro: profOutroUsuario, curso, modulo, aula };
+      return { gestor, orientador, orientadorOutro, professor, professorOutro, curso, modulo, aula };
     }
 
     it('Cadastro/login público do Boost são independentes do login do Hub; catálogo é navegável sem login', async () => {
       const cenario = await montarCenarioBoost();
 
       // catálogo público — sem token nenhum
-      const catalogoRes = await request(app.getHttpServer()).get('/cursos-boost-publicos').expect(200);
+      const catalogoRes = await request(app.getHttpServer()).get('/v1/cursos-boost-publicos').expect(200);
       expect(catalogoRes.body.some((c: any) => c.id === cenario.curso.id)).toBe(true);
 
       const cadastroRes = await request(app.getHttpServer())
-        .post('/boost/cadastro')
+        .post('/v1/boost/cadastro')
         .send({ nome: 'Aluno Externo Teste', email: 'aluno.externo.teste@example.com', senha: 'SenhaExterna123' })
         .expect(201);
       expect(cadastroRes.body.accessToken).toBeDefined();
@@ -1184,20 +1463,20 @@ describe('Full API e2e tests', () => {
 
       // e-mail duplicado -> 409
       await request(app.getHttpServer())
-        .post('/boost/cadastro')
+        .post('/v1/boost/cadastro')
         .send({ nome: 'Duplicado', email: 'aluno.externo.teste@example.com', senha: 'OutraSenha123' })
         .expect(409);
 
       const loginRes = await request(app.getHttpServer())
-        .post('/boost/login')
+        .post('/v1/boost/login')
         .send({ email: 'aluno.externo.teste@example.com', senha: 'SenhaExterna123' })
         .expect(201);
       const boostToken = `Bearer ${loginRes.body.accessToken}`;
 
       // token do Hub não autentica no portal Boost, e vice-versa
-      await request(app.getHttpServer()).get('/boost/me/matriculas').set('Authorization', cenario.professor.header).expect(401);
-      await request(app.getHttpServer()).get('/turmas').set('Authorization', boostToken).expect(401);
-      await request(app.getHttpServer()).get('/boost/me/matriculas').expect(401);
+      await request(app.getHttpServer()).get('/v1/boost/me/matriculas').set('Authorization', cenario.gestor.header).expect(401);
+      await request(app.getHttpServer()).get('/v1/turmas').set('Authorization', boostToken).expect(401);
+      await request(app.getHttpServer()).get('/v1/boost/me/matriculas').expect(401);
     });
 
     it('Fluxo completo: professor publica curso, aluno externo matricula, conclui todas as aulas e recebe certificado automaticamente', async () => {
@@ -1205,13 +1484,13 @@ describe('Full API e2e tests', () => {
       const aula2 = await prisma.aulaBoost.create({ data: { moduloId: cenario.modulo.id, titulo: 'Aula 2', ordem: 2, tipo: 'texto', conteudoTexto: 'Conteúdo 2.' } });
 
       const { body: sessao } = await request(app.getHttpServer())
-        .post('/boost/cadastro')
+        .post('/v1/boost/cadastro')
         .send({ nome: 'Aluna Concluinte', email: 'aluna.concluinte@example.com', senha: 'SenhaConcluinte123' })
         .expect(201);
       const alunoHeader = `Bearer ${sessao.accessToken}`;
 
       const matriculaRes = await request(app.getHttpServer())
-        .post(`/cursos-boost/${cenario.curso.id}/matricular`)
+        .post(`/v1/cursos-boost/${cenario.curso.id}/matricular`)
         .set('Authorization', alunoHeader)
         .expect(201);
       expect(matriculaRes.body.status).toBe('ativa');
@@ -1219,25 +1498,25 @@ describe('Full API e2e tests', () => {
 
       // matricular de novo é idempotente (mesma matrícula, não duplica)
       const matriculaRepetidaRes = await request(app.getHttpServer())
-        .post(`/cursos-boost/${cenario.curso.id}/matricular`)
+        .post(`/v1/cursos-boost/${cenario.curso.id}/matricular`)
         .set('Authorization', alunoHeader)
         .expect(201);
       expect(matriculaRepetidaRes.body.id).toBe(matriculaId);
 
-      await request(app.getHttpServer()).patch(`/boost/aulas/${cenario.aula.id}/concluir`).set('Authorization', alunoHeader).expect(200);
-      const meioRes = await request(app.getHttpServer()).patch(`/boost/aulas/${cenario.aula.id}/concluir`).set('Authorization', alunoHeader).expect(200);
+      await request(app.getHttpServer()).patch(`/v1/boost/aulas/${cenario.aula.id}/concluir`).set('Authorization', alunoHeader).expect(200);
+      const meioRes = await request(app.getHttpServer()).patch(`/v1/boost/aulas/${cenario.aula.id}/concluir`).set('Authorization', alunoHeader).expect(200);
       expect(meioRes.body.progressoPct).toBe(50); // reenviar a mesma aula não conta duas vezes (upsert)
 
-      const finalRes = await request(app.getHttpServer()).patch(`/boost/aulas/${aula2.id}/concluir`).set('Authorization', alunoHeader).expect(200);
+      const finalRes = await request(app.getHttpServer()).patch(`/v1/boost/aulas/${aula2.id}/concluir`).set('Authorization', alunoHeader).expect(200);
       expect(finalRes.body.progressoPct).toBe(100);
       expect(finalRes.body.status).toBe('concluida');
 
-      const detalheRes = await request(app.getHttpServer()).get(`/boost/me/matriculas/${matriculaId}`).set('Authorization', alunoHeader).expect(200);
+      const detalheRes = await request(app.getHttpServer()).get(`/v1/boost/me/matriculas/${matriculaId}`).set('Authorization', alunoHeader).expect(200);
       expect(detalheRes.body.certificado).toBeDefined();
       expect(detalheRes.body.certificado.codigo).toMatch(/^RB-/);
 
       const downloadRes = await request(app.getHttpServer())
-        .get(`/boost/certificados/${detalheRes.body.certificado.id}/arquivo`)
+        .get(`/v1/boost/certificados/${detalheRes.body.certificado.id}/arquivo`)
         .set('Authorization', alunoHeader)
         .expect(200);
       expect(downloadRes.headers['content-type']).toBe('application/pdf');
@@ -1245,35 +1524,212 @@ describe('Full API e2e tests', () => {
 
       // outro aluno (não dono) não pode baixar o certificado
       const { body: sessaoOutra } = await request(app.getHttpServer())
-        .post('/boost/cadastro')
+        .post('/v1/boost/cadastro')
         .send({ nome: 'Outra Aluna', email: 'outra.aluna@example.com', senha: 'SenhaOutra123' })
         .expect(201);
       await request(app.getHttpServer())
-        .get(`/boost/certificados/${detalheRes.body.certificado.id}/arquivo`)
+        .get(`/v1/boost/certificados/${detalheRes.body.certificado.id}/arquivo`)
         .set('Authorization', `Bearer ${sessaoOutra.accessToken}`)
         .expect(404);
+
+      // Conferência pública: quem recebe o certificado valida o código SEM login.
+      const codigo = detalheRes.body.certificado.codigo as string;
+      const verificacao = await request(app.getHttpServer())
+        .get(`/v1/certificados-boost/verificar/${codigo}`)
+        .expect(200);
+      expect(verificacao.body.valido).toBe(true);
+      expect(verificacao.body.codigo).toBe(codigo);
+      expect(verificacao.body.curso).toBeDefined();
+      expect(verificacao.body.aluno).toBeDefined();
+
+      // Devolve só o que já está impresso no certificado — nada de e-mail ou id interno.
+      expect(Object.keys(verificacao.body).sort()).toEqual(
+        ['aluno', 'cargaHoraria', 'codigo', 'curso', 'emitidoEm', 'valido'].sort(),
+      );
+
+      // Código aceito sem diferenciar caixa nem espaço em volta (é digitado à mão).
+      await request(app.getHttpServer())
+        .get(`/v1/certificados-boost/verificar/${encodeURIComponent(`  ${codigo.toLowerCase()}  `)}`)
+        .expect(200);
+
+      // Código inexistente não é confirmado.
+      await request(app.getHttpServer()).get('/v1/certificados-boost/verificar/RB-2026-INVALIDO').expect(404);
     });
 
-    it('Professor só gerencia o próprio curso Boost — 403 em curso alheio; aluno não matriculado não vê progresso/chat', async () => {
+    it('Gestão por permissão: quem tem a permissão gere QUALQUER curso; professor orientador (sem permissão de gestão) recebe 403', async () => {
       const cenario = await montarCenarioBoost();
 
-      await request(app.getHttpServer()).get(`/cursos-boost/${cenario.curso.id}`).set('Authorization', cenario.professor.header).expect(200);
-      await request(app.getHttpServer()).get(`/cursos-boost/${cenario.curso.id}`).set('Authorization', cenario.professorOutro.header).expect(403);
+      // o gestor não é dono nem orientador de nada — e mesmo assim gerencia
+      await request(app.getHttpServer()).get(`/v1/cursos-boost/${cenario.curso.id}`).set('Authorization', cenario.gestor.header).expect(200);
       await request(app.getHttpServer())
-        .post(`/cursos-boost/${cenario.curso.id}/modulos`)
-        .set('Authorization', cenario.professorOutro.header)
-        .send({ titulo: 'Módulo indevido' })
-        .expect(403);
-      await request(app.getHttpServer()).get(`/cursos-boost/${cenario.curso.id}/alunos`).set('Authorization', cenario.professorOutro.header).expect(403);
+        .post(`/v1/cursos-boost/${cenario.curso.id}/modulos`)
+        .set('Authorization', cenario.gestor.header)
+        .send({ titulo: 'Módulo do gestor' })
+        .expect(201);
+      const criadoRes = await request(app.getHttpServer())
+        .post('/v1/cursos-boost')
+        .set('Authorization', cenario.gestor.header)
+        .send({ titulo: 'Curso criado pelo gestor', cargaHoraria: 5 })
+        .expect(201);
+      expect(criadoRes.body.professorId).toBeUndefined();
+
+      // o orientador VINCULADO ao curso continua sem poder de gestão
+      const orientadorH = cenario.orientador.header;
+      await request(app.getHttpServer()).get(`/v1/cursos-boost/${cenario.curso.id}`).set('Authorization', orientadorH).expect(403);
+      await request(app.getHttpServer()).get('/v1/cursos-boost').set('Authorization', orientadorH).expect(403);
+      await request(app.getHttpServer()).post('/v1/cursos-boost').set('Authorization', orientadorH).send({ titulo: 'Indevido', cargaHoraria: 1 }).expect(403);
+      await request(app.getHttpServer()).patch(`/v1/cursos-boost/${cenario.curso.id}`).set('Authorization', orientadorH).send({ status: 'arquivado' }).expect(403);
+      await request(app.getHttpServer()).post(`/v1/cursos-boost/${cenario.curso.id}/modulos`).set('Authorization', orientadorH).send({ titulo: 'Módulo indevido' }).expect(403);
+      await request(app.getHttpServer()).get(`/v1/cursos-boost/${cenario.curso.id}/alunos`).set('Authorization', orientadorH).expect(403);
+      await request(app.getHttpServer()).patch(`/v1/cursos-boost/${cenario.curso.id}/certificado`).set('Authorization', orientadorH).send({ emiteCertificado: false }).expect(403);
+      await request(app.getHttpServer()).put(`/v1/cursos-boost/${cenario.curso.id}/orientadores`).set('Authorization', orientadorH).send({ professorIds: [] }).expect(403);
 
       const { body: sessao } = await request(app.getHttpServer())
-        .post('/boost/cadastro')
+        .post('/v1/boost/cadastro')
         .send({ nome: 'Aluno Não Matriculado', email: 'nao.matriculado@example.com', senha: 'SenhaNaoMat123' })
         .expect(201);
       const alunoHeader = `Bearer ${sessao.accessToken}`;
 
-      await request(app.getHttpServer()).patch(`/boost/aulas/${cenario.aula.id}/concluir`).set('Authorization', alunoHeader).expect(403);
-      await request(app.getHttpServer()).get(`/boost/cursos/${cenario.curso.id}/mensagens`).set('Authorization', alunoHeader).expect(403);
+      await request(app.getHttpServer()).patch(`/v1/boost/aulas/${cenario.aula.id}/concluir`).set('Authorization', alunoHeader).expect(403);
+      await request(app.getHttpServer()).get(`/v1/boost/cursos/${cenario.curso.id}/conversa`).set('Authorization', alunoHeader).expect(403);
+    });
+
+    it('Tirar do ar: some do catálogo e bloqueia nova matrícula, mas o aluno já matriculado continua com acesso e com a conversa', async () => {
+      const cenario = await montarCenarioBoost();
+      const cadastrar = async (nome: string, email: string) => {
+        const { body } = await request(app.getHttpServer()).post('/v1/boost/cadastro').send({ nome, email, senha: 'SenhaTiraDoAr123' }).expect(201);
+        return `Bearer ${body.accessToken}`;
+      };
+      const matriculado = await cadastrar('Aluno Já Matriculado', 'ja.matriculado@example.com');
+      const novato = await cadastrar('Aluno Novato', 'novato.tira.do.ar@example.com');
+      await request(app.getHttpServer()).post(`/v1/cursos-boost/${cenario.curso.id}/matricular`).set('Authorization', matriculado).expect(201);
+
+      // só quem tem gerenciar-cursos tira do ar
+      await request(app.getHttpServer()).patch(`/v1/cursos-boost/${cenario.curso.id}`).set('Authorization', cenario.gestor.header).send({ status: 'arquivado' }).expect(200);
+
+      const catalogo = await request(app.getHttpServer()).get('/v1/cursos-boost-publicos').expect(200);
+      expect(catalogo.body.some((c: any) => c.id === cenario.curso.id)).toBe(false);
+      await request(app.getHttpServer()).post(`/v1/cursos-boost/${cenario.curso.id}/matricular`).set('Authorization', novato).expect(404);
+
+      // quem já estava dentro continua estudando e conversando
+      const minhas = await request(app.getHttpServer()).get('/v1/boost/me/matriculas').set('Authorization', matriculado).expect(200);
+      expect(minhas.body).toHaveLength(1);
+      await request(app.getHttpServer()).get(`/v1/boost/me/matriculas/${minhas.body[0].id}`).set('Authorization', matriculado).expect(200);
+      await request(app.getHttpServer()).get(`/v1/boost/cursos/${cenario.curso.id}/conversa`).set('Authorization', matriculado).expect(200);
+
+      // republicar devolve ao catálogo
+      await request(app.getHttpServer()).patch(`/v1/cursos-boost/${cenario.curso.id}`).set('Authorization', cenario.gestor.header).send({ status: 'publicado' }).expect(200);
+      const depois = await request(app.getHttpServer()).get('/v1/cursos-boost-publicos').expect(200);
+      expect(depois.body.some((c: any) => c.id === cenario.curso.id)).toBe(true);
+    });
+
+    it('Certificado: desligado, o curso conclui sem emitir (material de apoio); ligado, usa o texto configurado', async () => {
+      const cenario = await montarCenarioBoost();
+      const semCert = await request(app.getHttpServer())
+        .patch(`/v1/cursos-boost/${cenario.curso.id}/certificado`)
+        .set('Authorization', cenario.gestor.header)
+        .send({ emiteCertificado: false })
+        .expect(200);
+      expect(semCert.body.emiteCertificado).toBe(false);
+
+      const { body: sessao } = await request(app.getHttpServer())
+        .post('/v1/boost/cadastro')
+        .send({ nome: 'Aluno Sem Certificado', email: 'aluno.sem.certificado@example.com', senha: 'SenhaSemCert123' })
+        .expect(201);
+      const alunoHeader = `Bearer ${sessao.accessToken}`;
+      await request(app.getHttpServer()).post(`/v1/cursos-boost/${cenario.curso.id}/matricular`).set('Authorization', alunoHeader).expect(201);
+      await request(app.getHttpServer()).patch(`/v1/boost/aulas/${cenario.aula.id}/concluir`).set('Authorization', alunoHeader).expect(200);
+
+      const minhas = await request(app.getHttpServer()).get('/v1/boost/me/matriculas').set('Authorization', alunoHeader).expect(200);
+      expect(minhas.body[0].status).toBe('concluida');
+      expect(minhas.body[0].certificado).toBeNull();
+
+      // religa com texto próprio e confere que a configuração fica gravada (o PDF em si é coberto no teste de conclusão)
+      const comTexto = await request(app.getHttpServer())
+        .patch(`/v1/cursos-boost/${cenario.curso.id}/certificado`)
+        .set('Authorization', cenario.gestor.header)
+        .send({ emiteCertificado: true, certificadoTexto: 'Certificamos que {aluno} concluiu {curso} ({cargaHoraria}h).', cargaHoraria: 12 })
+        .expect(200);
+      expect(comTexto.body.emiteCertificado).toBe(true);
+      expect(comTexto.body.certificadoTexto).toContain('{aluno}');
+      expect(comTexto.body.cargaHoraria).toBe(12);
+    });
+
+    it('Orientadores: o gestor vincula professores; só orientador vinculado enxerga e responde as conversas do curso', async () => {
+      const cenario = await montarCenarioBoost();
+      const professoresRes = await request(app.getHttpServer()).get('/v1/boost-professores').set('Authorization', cenario.gestor.header).expect(200);
+      expect(professoresRes.body.some((pr: any) => pr.id === cenario.professor.id)).toBe(true);
+
+      const { body: sessao } = await request(app.getHttpServer())
+        .post('/v1/boost/cadastro')
+        .send({ nome: 'Aluno Conversa', email: 'aluno.conversa@example.com', senha: 'SenhaConversa123' })
+        .expect(201);
+      const alunoHeader = `Bearer ${sessao.accessToken}`;
+      await request(app.getHttpServer()).post(`/v1/cursos-boost/${cenario.curso.id}/matricular`).set('Authorization', alunoHeader).expect(201);
+
+      const abrir = await request(app.getHttpServer()).get(`/v1/boost/cursos/${cenario.curso.id}/conversa`).set('Authorization', alunoHeader).expect(200);
+      expect(abrir.body.orientadores.map((o: any) => o.id)).toEqual([cenario.professor.id]);
+      expect(abrir.body.mensagens).toHaveLength(0);
+
+      await request(app.getHttpServer())
+        .post(`/v1/boost/cursos/${cenario.curso.id}/conversa/mensagens`)
+        .set('Authorization', alunoHeader)
+        .send({ mensagem: 'Dúvida sobre a aula 1' })
+        .expect(201);
+
+      // caixa de entrada do orientador vinculado: 1 conversa com 1 não lida
+      const caixa = await request(app.getHttpServer()).get('/v1/boost-conversas').set('Authorization', cenario.orientador.header).expect(200);
+      expect(caixa.body).toHaveLength(1);
+      expect(caixa.body[0].naoLidas).toBe(1);
+      expect(caixa.body[0].ultimaMensagem).toBe('Dúvida sobre a aula 1');
+      const conversaId = caixa.body[0].id;
+
+      // professor NÃO vinculado: caixa vazia e 404 (não revela que a conversa existe)
+      const caixaOutro = await request(app.getHttpServer()).get('/v1/boost-conversas').set('Authorization', cenario.orientadorOutro.header).expect(200);
+      expect(caixaOutro.body).toHaveLength(0);
+      await request(app.getHttpServer()).get(`/v1/boost-conversas/${conversaId}/mensagens`).set('Authorization', cenario.orientadorOutro.header).expect(404);
+      await request(app.getHttpServer()).post(`/v1/boost-conversas/${conversaId}/mensagens`).set('Authorization', cenario.orientadorOutro.header).send({ mensagem: 'intruso' }).expect(404);
+
+      // o orientador responde; o aluno vê a resposta e ela conta como não lida para ele
+      await request(app.getHttpServer()).get(`/v1/boost-conversas/${conversaId}/mensagens`).set('Authorization', cenario.orientador.header).expect(200);
+      await request(app.getHttpServer()).patch(`/v1/boost-conversas/${conversaId}/lida`).set('Authorization', cenario.orientador.header).expect(200);
+      await request(app.getHttpServer())
+        .post(`/v1/boost-conversas/${conversaId}/mensagens`)
+        .set('Authorization', cenario.orientador.header)
+        .send({ mensagem: 'Resposta do orientador' })
+        .expect(201);
+      const caixaLida = await request(app.getHttpServer()).get('/v1/boost-conversas').set('Authorization', cenario.orientador.header).expect(200);
+      expect(caixaLida.body[0].naoLidas).toBe(0);
+
+      const doAluno = await request(app.getHttpServer()).get(`/v1/boost/cursos/${cenario.curso.id}/conversa`).set('Authorization', alunoHeader).expect(200);
+      expect(doAluno.body.mensagens.map((m: any) => m.mensagem)).toEqual(['Dúvida sobre a aula 1', 'Resposta do orientador']);
+
+      // outro aluno não enxerga a conversa dele: recebe a PRÓPRIA conversa, vazia
+      const { body: outraSessao } = await request(app.getHttpServer())
+        .post('/v1/boost/cadastro')
+        .send({ nome: 'Outro Aluno', email: 'outro.aluno.conversa@example.com', senha: 'SenhaOutroAluno123' })
+        .expect(201);
+      const outroHeader = `Bearer ${outraSessao.accessToken}`;
+      await request(app.getHttpServer()).post(`/v1/cursos-boost/${cenario.curso.id}/matricular`).set('Authorization', outroHeader).expect(201);
+      const dele = await request(app.getHttpServer()).get(`/v1/boost/cursos/${cenario.curso.id}/conversa`).set('Authorization', outroHeader).expect(200);
+      expect(dele.body.mensagens).toHaveLength(0);
+      expect(dele.body.conversaId).not.toBe(conversaId);
+
+      // gestor troca a lista: sem orientador, o aluno recebe aviso claro em vez de mandar para o vazio
+      await request(app.getHttpServer()).put(`/v1/cursos-boost/${cenario.curso.id}/orientadores`).set('Authorization', cenario.gestor.header).send({ professorIds: [] }).expect(200);
+      await request(app.getHttpServer())
+        .post(`/v1/boost/cursos/${cenario.curso.id}/conversa/mensagens`)
+        .set('Authorization', alunoHeader)
+        .send({ mensagem: 'Alguém aí?' })
+        .expect(400);
+      await request(app.getHttpServer()).get('/v1/boost-conversas').set('Authorization', cenario.orientador.header).expect(200).expect((r) => expect(r.body).toHaveLength(0));
+
+      // e um professor inexistente é recusado
+      await request(app.getHttpServer())
+        .put(`/v1/cursos-boost/${cenario.curso.id}/orientadores`)
+        .set('Authorization', cenario.gestor.header)
+        .send({ professorIds: ['00000000-0000-4000-8000-000000000000'] })
+        .expect(400);
     });
 
     it('Material de apoio: aluno matriculado baixa; aluno não matriculado recebe 403', async () => {
@@ -1283,57 +1739,178 @@ describe('Full API e2e tests', () => {
       });
 
       const { body: matriculado } = await request(app.getHttpServer())
-        .post('/boost/cadastro')
+        .post('/v1/boost/cadastro')
         .send({ nome: 'Aluno Com Material', email: 'aluno.com.material@example.com', senha: 'SenhaMaterial123' })
         .expect(201);
       const matriculadoHeader = `Bearer ${matriculado.accessToken}`;
-      await request(app.getHttpServer()).post(`/cursos-boost/${cenario.curso.id}/matricular`).set('Authorization', matriculadoHeader).expect(201);
+      await request(app.getHttpServer()).post(`/v1/cursos-boost/${cenario.curso.id}/matricular`).set('Authorization', matriculadoHeader).expect(201);
 
       // matriculado passa pela checagem de posse (404 aqui é só o arquivo de teste não existir em disco — não é 403)
       const okRes = await request(app.getHttpServer())
-        .get(`/boost/materiais/${material.id}/arquivo`)
+        .get(`/v1/boost/materiais/${material.id}/arquivo`)
         .set('Authorization', matriculadoHeader);
       expect(okRes.status).not.toBe(403);
 
       const { body: naoMatriculado } = await request(app.getHttpServer())
-        .post('/boost/cadastro')
+        .post('/v1/boost/cadastro')
         .send({ nome: 'Aluno Sem Material', email: 'aluno.sem.material@example.com', senha: 'SenhaSemMaterial123' })
         .expect(201);
       await request(app.getHttpServer())
-        .get(`/boost/materiais/${material.id}/arquivo`)
+        .get(`/v1/boost/materiais/${material.id}/arquivo`)
         .set('Authorization', `Bearer ${naoMatriculado.accessToken}`)
         .expect(403);
     });
 
-    it('Chat do curso: aluno matriculado e professor dono trocam mensagens; instrutor alheio não acessa', async () => {
+    it('Vídeo hospedado: instrutor envia, recusa mimetype errado, e o player consegue arrastar a barra (Range)', async () => {
       const cenario = await montarCenarioBoost();
+
+      // formato aceito
+      const uploadRes = await request(app.getHttpServer())
+        .post(`/v1/aulas-boost/${cenario.aula.id}/video`)
+        .set('Authorization', cenario.gestor.header)
+        .attach('arquivo', Buffer.from('conteudo-fake-de-video'.repeat(10)), 'aula.mp4')
+        .expect(201);
+      expect(uploadRes.body.tipo).toBe('video');
+      expect(uploadRes.body.videoArquivo).toBeTruthy();
+      expect(uploadRes.body.videoTamanho).toBeGreaterThan(0);
+
+      // formato recusado — nenhum arquivo chega ao handler, então é 400 (mesma resposta de "não mandou nada")
+      await request(app.getHttpServer())
+        .post(`/v1/aulas-boost/${cenario.aula.id}/video`)
+        .set('Authorization', cenario.gestor.header)
+        .attach('arquivo', Buffer.from('não é vídeo'), 'notas.txt')
+        .expect(400);
+
+      // professor de outro curso não pode enviar vídeo aqui
+      await request(app.getHttpServer())
+        .post(`/v1/aulas-boost/${cenario.aula.id}/video`)
+        .set('Authorization', cenario.orientador.header)
+        .attach('arquivo', Buffer.from('outro'), 'aula.mp4')
+        .expect(403);
+
+      // token de stream + streaming com Range (a prova de que dá pra arrastar a barra sem baixar tudo)
+      const tokenRes = await request(app.getHttpServer())
+        .get(`/v1/aulas-boost/${cenario.aula.id}/stream-token`)
+        .set('Authorization', cenario.gestor.header)
+        .expect(200);
+      expect(tokenRes.body.token).toBeTruthy();
+
+      const streamRes = await request(app.getHttpServer())
+        .get(`/v1/aulas-boost/${cenario.aula.id}/video?token=${tokenRes.body.token}`)
+        .set('Range', 'bytes=0-9')
+        .expect(206);
+      expect(streamRes.headers['content-range']).toMatch(/^bytes 0-9\//);
+      expect(streamRes.headers['accept-ranges']).toBe('bytes');
+
+      // sem token, ou com token de outra aula, a rota (pública de propósito) recusa
+      await request(app.getHttpServer()).get(`/v1/aulas-boost/${cenario.aula.id}/video`).expect(403);
+      await request(app.getHttpServer()).get(`/v1/aulas-boost/${cenario.aula.id}/video?token=token-invalido`).expect(403);
+
+      // remover o vídeo limpa os três campos
+      const removeRes = await request(app.getHttpServer())
+        .delete(`/v1/aulas-boost/${cenario.aula.id}/video`)
+        .set('Authorization', cenario.gestor.header)
+        .expect(200);
+      expect(removeRes.body.videoArquivo).toBeNull();
+    });
+
+    it('Progresso real de vídeo: retoma posição, completa automaticamente perto do fim e emite certificado na última aula', async () => {
+      const cenario = await montarCenarioBoost(); // 1 aula só, tipo texto por padrão
+      await prisma.aulaBoost.update({ where: { id: cenario.aula.id }, data: { tipo: 'video' } });
+
       const { body: sessao } = await request(app.getHttpServer())
-        .post('/boost/cadastro')
-        .send({ nome: 'Aluno Chat', email: 'aluno.chat@example.com', senha: 'SenhaChat123' })
+        .post('/v1/boost/cadastro')
+        .send({ nome: 'Aluna Progresso Video', email: 'aluna.progresso.video@example.com', senha: 'SenhaProgresso123' })
         .expect(201);
       const alunoHeader = `Bearer ${sessao.accessToken}`;
-      await request(app.getHttpServer()).post(`/cursos-boost/${cenario.curso.id}/matricular`).set('Authorization', alunoHeader).expect(201);
 
+      await request(app.getHttpServer()).post(`/v1/cursos-boost/${cenario.curso.id}/matricular`).set('Authorization', alunoHeader).expect(201);
+
+      // aluno não matriculado em NENHUM curso não recebe token de stream desta aula
+      const { body: sessaoOutra } = await request(app.getHttpServer())
+        .post('/v1/boost/cadastro')
+        .send({ nome: 'Aluna Sem Matricula', email: 'aluna.sem.matricula.video@example.com', senha: 'SenhaSemMatricula123' })
+        .expect(201);
       await request(app.getHttpServer())
-        .post(`/boost/cursos/${cenario.curso.id}/mensagens`)
+        .get(`/v1/boost/aulas/${cenario.aula.id}/stream-token`)
+        .set('Authorization', `Bearer ${sessaoOutra.accessToken}`)
+        .expect(403);
+
+      // abaixo do limiar: posição salva, mas ainda não concluída
+      const parcialRes = await request(app.getHttpServer())
+        .patch(`/v1/boost/aulas/${cenario.aula.id}/progresso`)
         .set('Authorization', alunoHeader)
-        .send({ mensagem: 'Dúvida sobre a aula 1' })
-        .expect(201);
-
-      const mensagensRes = await request(app.getHttpServer())
-        .get(`/cursos-boost/${cenario.curso.id}/mensagens`)
-        .set('Authorization', cenario.professor.header)
+        .send({ posicaoSeg: 30, percentualAssistido: 40 })
         .expect(200);
-      expect(mensagensRes.body).toHaveLength(1);
-      expect(mensagensRes.body[0].mensagem).toBe('Dúvida sobre a aula 1');
+      expect(parcialRes.body.concluida).toBe(false);
 
+      const matriculaMeio = await request(app.getHttpServer()).get('/v1/boost/me/matriculas').set('Authorization', alunoHeader).expect(200);
+      expect(matriculaMeio.body[0].status).not.toBe('concluida');
+
+      // reportar um percentual MENOR depois não faz o maior já visto regredir
       await request(app.getHttpServer())
-        .post(`/cursos-boost/${cenario.curso.id}/mensagens`)
-        .set('Authorization', cenario.professor.header)
-        .send({ mensagem: 'Resposta do professor' })
+        .patch(`/v1/boost/aulas/${cenario.aula.id}/progresso`)
+        .set('Authorization', alunoHeader)
+        .send({ posicaoSeg: 5, percentualAssistido: 10 })
+        .expect(200);
+
+      // cruzando o limiar (90%): completa sozinho, sem precisar do botão manual
+      const finalRes = await request(app.getHttpServer())
+        .patch(`/v1/boost/aulas/${cenario.aula.id}/progresso`)
+        .set('Authorization', alunoHeader)
+        .send({ posicaoSeg: 118, percentualAssistido: 95 })
+        .expect(200);
+      expect(finalRes.body.concluida).toBe(true);
+
+      const matriculaFinalRes = await request(app.getHttpServer()).get('/v1/boost/me/matriculas').set('Authorization', alunoHeader).expect(200);
+      const matriculaFinal = matriculaFinalRes.body[0];
+      expect(matriculaFinal.status).toBe('concluida');
+      expect(matriculaFinal.progressoPct).toBe(100);
+      expect(matriculaFinal.certificado).toBeDefined();
+      expect(matriculaFinal.certificado.codigo).toMatch(/^RB-/);
+    });
+
+    it('Contas externas (painel admin): lista, desativa e redefine senha; professor sem a permissão recebe 403', async () => {
+      const cenario = await montarCenarioBoost();
+      await request(app.getHttpServer())
+        .post('/v1/boost/cadastro')
+        .send({ nome: 'Aluna Painel Admin', email: 'aluna.painel.admin@example.com', senha: 'SenhaPainelAdmin123' })
         .expect(201);
 
-      await request(app.getHttpServer()).get(`/cursos-boost/${cenario.curso.id}/mensagens`).set('Authorization', cenario.professorOutro.header).expect(403);
+      // professor (mesmo apto a lecionar no Boost) não tem `boost.students.*` — gestão entre cursos, fora do modelo de posse
+      await request(app.getHttpServer()).get('/v1/boost-alunos-externos').set('Authorization', cenario.orientador.header).expect(403);
+
+      const listaRes = await request(app.getHttpServer()).get('/v1/boost-alunos-externos').set('Authorization', authHeader).expect(200);
+      const contaCriada = listaRes.body.find((c: any) => c.email === 'aluna.painel.admin@example.com');
+      expect(contaCriada).toBeDefined();
+      expect(contaCriada.ativo).toBe(true);
+
+      const desativarRes = await request(app.getHttpServer())
+        .patch(`/v1/boost-alunos-externos/${contaCriada.id}`)
+        .set('Authorization', authHeader)
+        .send({ ativo: false })
+        .expect(200);
+      expect(desativarRes.body.ativo).toBe(false);
+
+      // conta desativada não consegue mais logar
+      await request(app.getHttpServer())
+        .post('/v1/boost/login')
+        .send({ email: 'aluna.painel.admin@example.com', senha: 'SenhaPainelAdmin123' })
+        .expect(401);
+
+      const resetRes = await request(app.getHttpServer())
+        .post(`/v1/boost-alunos-externos/${contaCriada.id}/redefinir-senha`)
+        .set('Authorization', authHeader)
+        .expect(201);
+      expect(resetRes.body.senhaTemporaria).toBeTruthy();
+      expect(resetRes.body.senhaTemporaria.length).toBeGreaterThanOrEqual(8);
+
+      // reativa e confirma que a senha temporária devolvida funciona de verdade
+      await request(app.getHttpServer()).patch(`/v1/boost-alunos-externos/${contaCriada.id}`).set('Authorization', authHeader).send({ ativo: true }).expect(200);
+      await request(app.getHttpServer())
+        .post('/v1/boost/login')
+        .send({ email: 'aluna.painel.admin@example.com', senha: resetRes.body.senhaTemporaria })
+        .expect(201);
     });
   });
 
@@ -1396,28 +1973,28 @@ describe('Full API e2e tests', () => {
       const { financeiro } = await montarCenarioFinanceiro();
 
       const produtoRes = await request(app.getHttpServer())
-        .post('/produtos-financeiros')
+        .post('/v1/produtos-financeiros')
         .set('Authorization', financeiro.header)
         .send({ codigo: 'PRD-CRUD', nome: 'Caderno', preco: 20, estoque: 5, estoqueMinimo: 1 })
         .expect(201);
       await request(app.getHttpServer())
-        .patch(`/produtos-financeiros/${produtoRes.body.id}`)
+        .patch(`/v1/produtos-financeiros/${produtoRes.body.id}`)
         .set('Authorization', financeiro.header)
         .send({ preco: 25 })
         .expect(200);
       await request(app.getHttpServer())
-        .delete(`/produtos-financeiros/${produtoRes.body.id}`)
+        .delete(`/v1/produtos-financeiros/${produtoRes.body.id}`)
         .set('Authorization', financeiro.header)
         .expect(200);
 
       const descontoRes = await request(app.getHttpServer())
-        .post('/descontos')
+        .post('/v1/descontos')
         .set('Authorization', financeiro.header)
         .send({ nome: 'Bolsa Teste', tipo: 'bolsa-parcial', valor: 30, unidade: 'percent' })
         .expect(201);
 
       const listaRes = await request(app.getHttpServer())
-        .get('/descontos')
+        .get('/v1/descontos')
         .set('Authorization', financeiro.header)
         .expect(200);
       expect(listaRes.body.find((d: any) => d.id === descontoRes.body.id).beneficiarios).toBe(0);
@@ -1427,14 +2004,14 @@ describe('Full API e2e tests', () => {
       const cenario = await montarCenarioFinanceiro();
 
       const cobrancaRes = await request(app.getHttpServer())
-        .post('/cobrancas')
+        .post('/v1/cobrancas')
         .set('Authorization', cenario.financeiro.header)
         .send({ alunoId: cenario.aluno.id, tipo: 'taxa', descricao: 'Taxa de teste', valorOriginal: 100, vencimento: '2026-09-01' })
         .expect(201);
       expect(cobrancaRes.body.status).toBe('aberto');
 
       const pagaRes = await request(app.getHttpServer())
-        .post(`/cobrancas/${cobrancaRes.body.id}/marcar-pago`)
+        .post(`/v1/cobrancas/${cobrancaRes.body.id}/marcar-pago`)
         .set('Authorization', cenario.financeiro.header)
         .send({})
         .expect(201);
@@ -1443,26 +2020,26 @@ describe('Full API e2e tests', () => {
 
       // já paga: não pode cancelar
       await request(app.getHttpServer())
-        .post(`/cobrancas/${cobrancaRes.body.id}/cancelar`)
+        .post(`/v1/cobrancas/${cobrancaRes.body.id}/cancelar`)
         .set('Authorization', cenario.financeiro.header)
         .send({ motivo: 'teste' })
         .expect(400);
 
       const cobranca2 = await request(app.getHttpServer())
-        .post('/cobrancas')
+        .post('/v1/cobrancas')
         .set('Authorization', cenario.financeiro.header)
         .send({ alunoId: cenario.aluno.id, tipo: 'taxa', descricao: 'Outra taxa', valorOriginal: 200, vencimento: '2026-09-01' })
         .expect(201);
 
       const negociadaRes = await request(app.getHttpServer())
-        .post(`/cobrancas/${cobranca2.body.id}/negociar`)
+        .post(`/v1/cobrancas/${cobranca2.body.id}/negociar`)
         .set('Authorization', cenario.financeiro.header)
         .send({ motivo: 'prazo estendido', novoVencimento: '2026-10-01' })
         .expect(201);
       expect(negociadaRes.body.status).toBe('negociado');
 
       const canceladaRes = await request(app.getHttpServer())
-        .post(`/cobrancas/${cobranca2.body.id}/cancelar`)
+        .post(`/v1/cobrancas/${cobranca2.body.id}/cancelar`)
         .set('Authorization', cenario.financeiro.header)
         .send({ motivo: 'aluno desistiu' })
         .expect(201);
@@ -1475,7 +2052,7 @@ describe('Full API e2e tests', () => {
       await prisma.descontoAluno.create({ data: { alunoId: cenario.aluno.id, descontoId: desconto.id } });
 
       const primeiraRes = await request(app.getHttpServer())
-        .post('/cobrancas/gerar-lote')
+        .post('/v1/cobrancas/gerar-lote')
         .set('Authorization', cenario.financeiro.header)
         .send({ competencia: '2026-09', servicoId: cenario.servico.id, vencimento: '2026-09-10', turmaId: cenario.turma.id })
         .expect(201);
@@ -1484,7 +2061,7 @@ describe('Full API e2e tests', () => {
       expect(Number(cobrancaComDesconto.valorDesconto)).toBe(500);
 
       const segundaRes = await request(app.getHttpServer())
-        .post('/cobrancas/gerar-lote')
+        .post('/v1/cobrancas/gerar-lote')
         .set('Authorization', cenario.financeiro.header)
         .send({ competencia: '2026-09', servicoId: cenario.servico.id, vencimento: '2026-09-10', turmaId: cenario.turma.id })
         .expect(201);
@@ -1495,20 +2072,20 @@ describe('Full API e2e tests', () => {
     it('Boleto interno: emitir gera nosso número/linha digitável (47 posições) e o PDF pode ser baixado', async () => {
       const cenario = await montarCenarioFinanceiro();
       const cobrancaRes = await request(app.getHttpServer())
-        .post('/cobrancas')
+        .post('/v1/cobrancas')
         .set('Authorization', cenario.financeiro.header)
         .send({ alunoId: cenario.aluno.id, tipo: 'taxa', descricao: 'Taxa boleto', valorOriginal: 150, vencimento: '2026-09-01' })
         .expect(201);
 
       const boletoRes = await request(app.getHttpServer())
-        .post(`/cobrancas/${cobrancaRes.body.id}/emitir-boleto`)
+        .post(`/v1/cobrancas/${cobrancaRes.body.id}/emitir-boleto`)
         .set('Authorization', cenario.financeiro.header)
         .expect(201);
       expect(boletoRes.body.linhaDigitavel).toHaveLength(47);
       expect(boletoRes.body.nossoNumero).toBeDefined();
 
       const pdfRes = await request(app.getHttpServer())
-        .get(`/cobrancas/${cobrancaRes.body.id}/boleto`)
+        .get(`/v1/cobrancas/${cobrancaRes.body.id}/boleto`)
         .set('Authorization', cenario.financeiro.header)
         .expect(200);
       expect(pdfRes.headers['content-type']).toContain('application/pdf');
@@ -1517,24 +2094,24 @@ describe('Full API e2e tests', () => {
     it('Nota fiscal interna: emitir gera documento e recusa uma segunda emissão para a mesma cobrança', async () => {
       const cenario = await montarCenarioFinanceiro();
       const cobrancaRes = await request(app.getHttpServer())
-        .post('/cobrancas')
+        .post('/v1/cobrancas')
         .set('Authorization', cenario.financeiro.header)
         .send({ alunoId: cenario.aluno.id, tipo: 'produto', descricao: 'Venda produto', produtoId: cenario.produto.id, valorOriginal: 50, vencimento: '2026-09-01' })
         .expect(201);
 
       const nfRes = await request(app.getHttpServer())
-        .post(`/cobrancas/${cobrancaRes.body.id}/nota-fiscal`)
+        .post(`/v1/cobrancas/${cobrancaRes.body.id}/nota-fiscal`)
         .set('Authorization', cenario.financeiro.header)
         .expect(201);
       expect(nfRes.body.numero).toMatch(/^NFP-/);
 
       await request(app.getHttpServer())
-        .post(`/cobrancas/${cobrancaRes.body.id}/nota-fiscal`)
+        .post(`/v1/cobrancas/${cobrancaRes.body.id}/nota-fiscal`)
         .set('Authorization', cenario.financeiro.header)
         .expect(409);
 
       const listaRes = await request(app.getHttpServer())
-        .get('/notas-fiscais')
+        .get('/v1/notas-fiscais')
         .set('Authorization', cenario.financeiro.header)
         .expect(200);
       expect(listaRes.body.some((n: any) => n.id === nfRes.body.id)).toBe(true);
@@ -1543,37 +2120,65 @@ describe('Full API e2e tests', () => {
     it('Portal do aluno: só vê/baixa as próprias cobranças — 403 ao tentar acessar cobrança de outro aluno', async () => {
       const cenario = await montarCenarioFinanceiro();
       const cobrancaRes = await request(app.getHttpServer())
-        .post('/cobrancas')
+        .post('/v1/cobrancas')
         .set('Authorization', cenario.financeiro.header)
         .send({ alunoId: cenario.aluno.id, tipo: 'taxa', descricao: 'Taxa do aluno', valorOriginal: 80, vencimento: '2026-09-01' })
         .expect(201);
       await request(app.getHttpServer())
-        .post(`/cobrancas/${cobrancaRes.body.id}/emitir-boleto`)
+        .post(`/v1/cobrancas/${cobrancaRes.body.id}/emitir-boleto`)
         .set('Authorization', cenario.financeiro.header)
         .expect(201);
 
       const meRes = await request(app.getHttpServer())
-        .get('/financeiro/me/cobrancas')
+        .get('/v1/financeiro/me/cobrancas')
         .set('Authorization', cenario.alunoUsuario.header)
         .expect(200);
       expect(meRes.body.some((c: any) => c.id === cobrancaRes.body.id)).toBe(true);
 
       await request(app.getHttpServer())
-        .get(`/financeiro/me/cobrancas/${cobrancaRes.body.id}/boleto`)
+        .get(`/v1/financeiro/me/cobrancas/${cobrancaRes.body.id}/boleto`)
         .set('Authorization', cenario.alunoUsuario.header)
         .expect(200);
 
       await request(app.getHttpServer())
-        .get(`/financeiro/me/cobrancas/${cobrancaRes.body.id}/boleto`)
+        .get(`/v1/financeiro/me/cobrancas/${cobrancaRes.body.id}/boleto`)
         .set('Authorization', cenario.outroAlunoUsuario.header)
         .expect(403);
+    });
+
+    it('Cobrança criada e paga gera notificação para o aluno na caixa de entrada dele — e só dele', async () => {
+      const cenario = await montarCenarioFinanceiro();
+      const cobrancaRes = await request(app.getHttpServer())
+        .post('/v1/cobrancas')
+        .set('Authorization', cenario.financeiro.header)
+        .send({ alunoId: cenario.aluno.id, tipo: 'taxa', descricao: 'Taxa de notificação', valorOriginal: 55, vencimento: '2026-10-01' })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post(`/v1/cobrancas/${cobrancaRes.body.id}/marcar-pago`)
+        .set('Authorization', cenario.financeiro.header)
+        .send({})
+        .expect(201);
+
+      const caixa = await request(app.getHttpServer())
+        .get('/v1/notificacoes/minhas')
+        .set('Authorization', cenario.alunoUsuario.header)
+        .expect(200);
+      const titulos = caixa.body.itens.map((n: any) => n.titulo);
+      expect(titulos).toEqual(expect.arrayContaining(['Nova cobrança', 'Pagamento confirmado']));
+      expect(caixa.body.naoLidas).toBeGreaterThanOrEqual(2);
+
+      const outra = await request(app.getHttpServer())
+        .get('/v1/notificacoes/minhas')
+        .set('Authorization', cenario.outroAlunoUsuario.header)
+        .expect(200);
+      expect(outra.body.itens.some((n: any) => n.mensagem?.includes('Taxa de notificação'))).toBe(false);
     });
 
     it('Usuário sem nenhuma permissão de Finance recebe 403 ao listar cobranças', async () => {
       await montarCenarioFinanceiro();
       const semPermissao = await criarUsuarioComPermissoes('Sem Permissao Finance', 'sem.permissao.finance@example.com', []);
       await request(app.getHttpServer())
-        .get('/cobrancas')
+        .get('/v1/cobrancas')
         .set('Authorization', semPermissao.header)
         .expect(403);
     });

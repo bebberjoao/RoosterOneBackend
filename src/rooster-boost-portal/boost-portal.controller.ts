@@ -1,15 +1,19 @@
 import {
-  BadRequestException, Body, Controller, Get, NotFoundException, Param, Patch, Post, Req, Res, UseGuards,
+  BadRequestException, Body, Controller, ForbiddenException, Get, NotFoundException, Param, Patch, Post, Query, Req, Res, UseGuards,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { join } from 'path';
+import { JwtService } from '@nestjs/jwt';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../auth/public.decorator';
-import { LOGIN_THROTTLE_LIMIT, SIGNUP_THROTTLE_LIMIT } from '../auth/throttle.util';
+import { LOGIN_THROTTLE_LIMIT, SIGNUP_THROTTLE_LIMIT, VERIFICACAO_THROTTLE_LIMIT } from '../auth/throttle.util';
 import { BoostChatGateway } from '../rooster-boost/boost-chat.gateway';
-import { MATERIAIS_DIR } from '../rooster-boost/boost.controller';
+import { MATERIAIS_DIR, VIDEOS_DIR } from '../rooster-boost/boost.controller';
 import { CERTIFICADOS_DIR } from '../rooster-boost/certificado-boost.service';
+import { enviarVideoComRange } from '../common/video-stream.util';
+import { emitirTokenDeStream, validarTokenDeStream } from '../common/stream-token.util';
+import { AtualizarProgressoVideoDto } from '../rooster-boost/dto/boost.dto';
 import { BoostJwtAuthGuard } from './boost-jwt-auth.guard';
 import { BoostPortalService } from './boost-portal.service';
 import { CadastroBoostDto, LoginBoostDto } from './dto/boost-portal.dto';
@@ -23,6 +27,7 @@ export class BoostPortalController {
   constructor(
     private readonly boostPortalService: BoostPortalService,
     private readonly boostChatGateway: BoostChatGateway,
+    private readonly jwt: JwtService,
   ) {}
 
   // ===================== Autenticação =====================
@@ -48,6 +53,17 @@ export class BoostPortalController {
   @Get('cursos-boost-publicos/:slug')
   findCursoPublico(@Param('slug') slug: string) {
     return this.boostPortalService.findCursoPublico(slug);
+  }
+
+  // ===================== Conferência de certificado (aberta, sem login) =====================
+  @Get('certificados-boost/verificar/:codigo')
+  // Limite mais rígido que o global: é um endpoint aberto consultado por
+  // código, então sem isto seria possível varrer o espaço de códigos até
+  // encontrar certificados válidos e mapear quem concluiu o quê.
+  @Throttle({ default: { limit: VERIFICACAO_THROTTLE_LIMIT, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Confere a autenticidade de um certificado pelo código impresso nele (público)' })
+  verificarCertificado(@Param('codigo') codigo: string) {
+    return this.boostPortalService.verificarCertificado(codigo);
   }
 
   // ===================== Matrícula e progresso (exigem login do Boost) =====================
@@ -76,23 +92,60 @@ export class BoostPortalController {
     return this.boostPortalService.concluirAula(aulaId, (request.user as AuthedBoostUser).id);
   }
 
-  // ===================== Chat (lado aluno) =====================
-  // Caminho diferente do lado instrutor (`/cursos-boost/:id/mensagens`, em BoostController)
-  // de propósito — as duas rotas têm guards diferentes (Hub vs. Boost) e o Nest não
-  // conseguiria escolher entre duas rotas idênticas registradas em controllers distintos.
-  @Get('boost/cursos/:id/mensagens')
+  // ===================== Vídeo hospedado (progresso real) =====================
+  @Get('boost/aulas/:id/stream-token')
   @UseGuards(BoostJwtAuthGuard)
-  findMensagens(@Req() request: Request, @Param('id') cursoId: string) {
-    return this.boostPortalService.findMensagens(cursoId, (request.user as AuthedBoostUser).id);
+  @ApiOperation({ summary: 'Emite um token de 5 minutos para o player carregar o vídeo — exige matrícula no curso' })
+  async getStreamToken(@Req() request: Request, @Param('id') aulaId: string) {
+    const boostUsuarioId = (request.user as AuthedBoostUser).id;
+    await this.boostPortalService.exigirMatriculaDaAulaParaStream(aulaId, boostUsuarioId);
+    const token = await emitirTokenDeStream(this.jwt, { subjectId: boostUsuarioId, aulaId, tipo: 'boost' });
+    return { token };
   }
 
-  @Post('boost/cursos/:id/mensagens')
+  /**
+   * Fora dos guards de sessão de propósito: a tag `<video>` não anexa o
+   * cabeçalho `Authorization`. A autenticação real é o token de curta
+   * duração validado manualmente abaixo — ver `common/stream-token.util.ts`.
+   */
+  @Get('boost/aulas/:id/video')
+  async streamVideo(@Req() request: Request, @Res() response: Response, @Param('id') aulaId: string, @Query('token') token?: string) {
+    if (!token || !(await validarTokenDeStream(this.jwt, token, aulaId))) {
+      throw new ForbiddenException('Token de reprodução inválido ou expirado.');
+    }
+    const aula = await this.boostPortalService.findAulaParaStream(aulaId);
+    if (!aula.videoArquivo || !aula.videoMimeType) throw new BadRequestException('Esta aula não tem vídeo hospedado.');
+    enviarVideoComRange(request, response, join(VIDEOS_DIR, aula.videoArquivo), aula.videoMimeType);
+  }
+
+  @Patch('boost/aulas/:id/progresso')
+  @UseGuards(BoostJwtAuthGuard)
+  @ApiOperation({ summary: 'Reporta posição/percentual assistido do vídeo; completa a aula automaticamente perto do fim' })
+  atualizarProgresso(@Req() request: Request, @Param('id') aulaId: string, @Body() dto: AtualizarProgressoVideoDto) {
+    return this.boostPortalService.atualizarProgressoVideo(aulaId, (request.user as AuthedBoostUser).id, dto.posicaoSeg, dto.percentualAssistido);
+  }
+
+  // ===================== Conversa com o orientador (lado aluno) =====================
+  @Get('boost/cursos/:id/conversa')
+  @UseGuards(BoostJwtAuthGuard)
+  @ApiOperation({ summary: 'A conversa do aluno com os orientadores do curso (criada na primeira consulta)' })
+  obterConversa(@Req() request: Request, @Param('id') cursoId: string) {
+    return this.boostPortalService.obterConversa(cursoId, (request.user as AuthedBoostUser).id);
+  }
+
+  @Post('boost/cursos/:id/conversa/mensagens')
   @UseGuards(BoostJwtAuthGuard)
   async createMensagem(@Req() request: Request, @Param('id') cursoId: string, @Body('mensagem') mensagem: string) {
     if (!mensagem?.trim()) throw new BadRequestException('Informe a mensagem.');
-    const criada = await this.boostPortalService.createMensagem(cursoId, (request.user as AuthedBoostUser).id, mensagem.trim());
-    this.boostChatGateway.emitirNovaMensagem(cursoId, criada);
+    const { conversaId, mensagem: criada } = await this.boostPortalService.createMensagem(cursoId, (request.user as AuthedBoostUser).id, mensagem.trim());
+    this.boostChatGateway.emitirNovaMensagem(conversaId, cursoId, criada, 'aluno');
     return criada;
+  }
+
+  @Patch('boost/cursos/:id/conversa/lida')
+  @UseGuards(BoostJwtAuthGuard)
+  marcarConversaLida(@Req() request: Request, @Param('id') cursoId: string) {
+    return this.boostPortalService.marcarConversaLida(cursoId, (request.user as AuthedBoostUser).id);
   }
 
   // ===================== Material de apoio =====================

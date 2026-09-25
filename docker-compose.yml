@@ -1,0 +1,59 @@
+# Rooster One — ambiente completo para desenvolvimento e avaliação.
+#
+# Sobe PostgreSQL e o backend já conectados. O objetivo é que alguém consiga
+# rodar o sistema sem instalar Node nem PostgreSQL na máquina:
+#
+#   cp .env.example .env    # e definir JWT_SECRET
+#   docker compose up --build
+#
+# Depois de subir, aplicar o schema e os dados de demonstração:
+#   docker compose exec api npx prisma migrate deploy
+#   docker compose exec api npm run db:seed:dev
+#
+# Nota: isto NÃO é uma configuração de produção. Faltam, no mínimo, HTTPS,
+# segredo vindo de cofre em vez de .env, e rotina de backup do volume —
+# ver o Índice de Pendências da documentação consolidada.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rooster
+      POSTGRES_PASSWORD: rooster
+      POSTGRES_DB: rooster_one
+    ports:
+      # Exposto para dar para inspecionar o banco com um cliente local.
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # A API depende deste healthcheck: sem ele, o backend sobe antes do
+      # Postgres aceitar conexão e morre na primeira consulta.
+      test: ["CMD-SHELL", "pg_isready -U rooster -d rooster_one"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://rooster:rooster@db:5432/rooster_one?schema=public
+      # Sem valor padrão de propósito: a aplicação não sobe sem JWT_SECRET, e
+      # embutir um aqui viraria segredo de produção por acidente.
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env antes de subir}
+      PORT: 3000
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mantém anexos, certificados e notas fiscais entre recriações do container.
+      - uploads-data:/app/uploads
+
+volumes:
+  postgres-data:
+  uploads-data:

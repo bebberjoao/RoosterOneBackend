@@ -13,7 +13,7 @@ Cada linha liga uma funcionalidade (`docs/system/03-funcionalidades.md`) à rota
 | RF-H05 Gestão de setores | `/hub/setores` | `GET/POST/PATCH/DELETE /setores` | — | `setores` | `hub.setores.*` |
 | RF-H06 Gestão de permissões | `/hub/acessos` | `GET/POST/PATCH/DELETE /permissoes`, `/usuarios-permissoes` | RN001, RN002 | `permissoes`, `modulos`, `usuarios_permissoes`, `logs_auditoria` | `hub.acessos.*` |
 | RF-H07 Consulta de acesso efetivo | interno (usado por várias telas) | `GET /usuarios/:id/acesso` | RN002 | `usuarios_permissoes` | qualquer autenticado |
-| RF-H08 Notificações | — (não identificada tela dedicada no frontend) | `GET/POST/PATCH/DELETE /notificacoes` | — | `notificacoes` | `hub.*` aplicável |
+| RF-H08 Notificações | Sino da barra superior; `/notifications`; `/student/notifications` | `GET /notificacoes/minhas`, `PATCH /notificacoes/minhas/:id/lida`, `POST /notificacoes/minhas/marcar-todas-lidas` (+ CRUD administrativo) | RN039 | `notificacoes` | Caixa própria: qualquer autenticado; CRUD: `hub.*` |
 | RF-H09 Log de auditoria | `/hub` (card "Atividade recente") | `GET /logs-auditoria` | RN016 | `logs_auditoria` | leitura do Hub |
 
 ## Rooster Desk

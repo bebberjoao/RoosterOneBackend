@@ -112,7 +112,8 @@ A última linha é a integração Learn → Academy: ao publicar uma atividade c
 
 | Relação | Cardinalidade | Campo FK | onDelete |
 |---|---|---|---|
-| Professor (Academy) → CursoBoost | 1:N | `CursoBoost.professorId` | Restrict |
+| CursoBoost → CursoOrientadorBoost | 1:N | `CursoOrientadorBoost.cursoId` | Cascade |
+| Professor (Academy) → CursoOrientadorBoost | 1:N | `CursoOrientadorBoost.professorId` | Restrict |
 | CursoBoost → ModuloBoost | 1:N | `ModuloBoost.cursoId` | Cascade |
 | ModuloBoost → AulaBoost | 1:N | `AulaBoost.moduloId` | Cascade |
 | AulaBoost → MaterialApoio | 1:N | `MaterialApoio.aulaId` | Cascade |
@@ -121,7 +122,9 @@ A última linha é a integração Learn → Academy: ao publicar uma atividade c
 | MatriculaBoost → ProgressoAula | 1:N | `ProgressoAula.matriculaId` | Cascade |
 | AulaBoost → ProgressoAula | 1:N | `ProgressoAula.aulaId` | Cascade |
 | MatriculaBoost ↔ CertificadoBoost | 1:1 (opcional) | `CertificadoBoost.matriculaId` (`@unique`) | Cascade |
-| CursoBoost → MensagemBoost | 1:N | `MensagemBoost.cursoId` | Cascade |
+| CursoBoost → ConversaBoost | 1:N | `ConversaBoost.cursoId` | Cascade |
+| BoostUsuario → ConversaBoost | 1:N | `ConversaBoost.boostUsuarioId` | Cascade |
+| ConversaBoost → MensagemBoost | 1:N | `MensagemBoost.conversaId` | Cascade |
 | BoostUsuario → MensagemBoost | 1:N (opcional) | `MensagemBoost.boostUsuarioId` | — (sem `onDelete` explícito) |
 | Professor (Academy) → MensagemBoost | 1:N (opcional) | `MensagemBoost.professorId` | — (sem `onDelete` explícito) |
 
@@ -567,5 +570,6 @@ Cada aresta do diagrama acima foi checada linha a linha contra `prisma/schema.pr
 - **Academy**: 15 relações — conferidas contra `Curso`, `PeriodoLetivo`, `Disciplina`, `Professor`, `Aluno`, `Turma`, `Matricula`, `RegistroFrequencia`, `ItemAvaliativo`, `Nota`, `DocumentoAcademico`, incluindo as duas relações 1:1 opcionais novas em `Usuario` (`professorAcademico`, `alunoAcademico`). `EventoCalendarioAcademico` foi deliberadamente deixada de fora do diagrama — não tem nenhuma FK/`@relation` no schema.
 - **Learn**: 6 relações — conferidas contra `Atividade`, `Entrega`, `AnexoEntrega`, incluindo a relação cruzada 1:1 opcional `Atividade ↔ ItemAvaliativo` (Learn → Academy), que é como uma atividade publicada passa a contar nota no Academy sem duplicar dado.
 - **Boost**: 12 relações — conferidas contra `BoostUsuario`, `CursoBoost`, `ModuloBoost`, `AulaBoost`, `MaterialApoio`, `MatriculaBoost`, `ProgressoAula`, `MensagemBoost`, `CertificadoBoost`, incluindo a relação cruzada `Professor (Academy) → CursoBoost`/`MensagemBoost` (Boost reaproveita o instrutor do Academy) e a 1:1 opcional `MatriculaBoost ↔ CertificadoBoost`. `BoostUsuario` não tem nenhuma relação com `Usuario` (Hub) — cadastro deliberadamente independente, ver `docs/security/03-rbac.md`.
+- **Finance**: 7 relações — conferidas contra `Produto`, `Servico`, `Desconto`, `DescontoAluno`, `Cobranca`, `NotaFiscal`. O eixo é a relação cruzada `Aluno (Academy) 1:N Cobranca`: toda cobrança aponta para um `Aluno` real do Academy, nunca para uma identidade de aluno paralela. `Cobranca` tem três FKs opcionais de origem (`produtoId`, `servicoId`, `descontoId`), pois uma cobrança pode ser de mensalidade (serviço), de produto, de taxa avulsa ou nenhum dos três; `Cobranca ↔ NotaFiscal` é 1:1 opcional (toda nota documenta exatamente uma cobrança existente); `DescontoAluno` é a junção N:N entre `Aluno` e `Desconto`, com `@@unique([alunoId, descontoId])`.
 
 Nenhuma relação foi inventada ou simplificada: campos sem `@relation` no Prisma (`Reserva.responsavelId/setorId/decididoPor`, `Patrimonio.localizacaoId/responsavelUserId/chamadoManutencaoId`, `DocumentoAcademico.autorId`, `RegistroFrequencia.registradoPorId`, `Nota.lancadoPorId`, `Entrega.corrigidoPorId`) foram deliberadamente deixados de fora do diagrama, pois não são relações reconhecidas pelo Prisma Client (apenas colunas UUID/texto sem constraint FK modelada).

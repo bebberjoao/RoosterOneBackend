@@ -1,0 +1,33 @@
+sequenceDiagram
+  actor S as Solicitante
+  actor T as Tecnico
+  participant FE as Frontend
+  participant CTRL as RoosterDeskController
+  participant SVC as RoosterDeskService
+  participant WS as MensagensGateway
+  participant DB as PostgreSQL
+
+  S->>FE: descreve o problema
+  FE->>CTRL: POST /chamados
+  CTRL->>SVC: validateTicketClassification()
+  SVC->>DB: cria Ticket status=Aberto
+  CTRL-->>FE: 201
+
+  T->>FE: assume o chamado
+  FE->>CTRL: PATCH /chamados/:id/atribuir
+  CTRL->>SVC: verifica tecnico pertence ao setor
+  SVC->>DB: atualiza tecnicoId
+  SVC->>DB: cria HistoricoTicket (RN009)
+
+  T->>FE: responde ao solicitante
+  FE->>CTRL: POST /chamados/:id/mensagens
+  CTRL->>SVC: createMensagemChamado()
+  SVC->>DB: cria MensagemTicket
+  SVC->>WS: emite evento em tempo real
+  WS-->>FE: mensagem aparece na conversa do solicitante
+
+  T->>FE: marca como resolvido
+  FE->>CTRL: PATCH /chamados/:id/status
+  CTRL->>CTRL: statusTransitionAction() exige 'encerrar' (RN005)
+  CTRL->>SVC: derivarEncerradoEm() (RN006)
+  SVC->>DB: atualiza status + encerradoEm + historico

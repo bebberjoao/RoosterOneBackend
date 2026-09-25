@@ -1,0 +1,47 @@
+erDiagram
+  Usuario ||--o{ UsuarioPermissao : possui
+  Permissao ||--o{ UsuarioPermissao : concedida_em
+  Modulo ||--o{ Permissao : agrupa
+  Usuario ||--o{ UsuarioSetor : pertence
+  Setor ||--o{ UsuarioSetor : reune
+  Usuario ||--o{ Notificacao : recebe
+  Usuario ||--o{ Sessao : abre
+  Usuario ||--o{ RedefinicaoSenha : solicita
+  Usuario ||--o{ LogAuditoria : gera
+
+  Usuario {
+    uuid id PK
+    string nome
+    string email UK
+    string senhaHash
+    bool ativo
+    datetime ultimoLogin
+  }
+  Permissao {
+    uuid id PK
+    uuid moduloId FK
+    string nome
+    string recurso
+    string acao
+  }
+  Modulo {
+    uuid id PK
+    string nome UK
+    string rota
+    bool ativo
+  }
+  UsuarioPermissao {
+    uuid id PK
+    uuid usuarioId FK
+    uuid permissaoId FK
+  }
+  Setor {
+    uuid id PK
+    string nome
+  }
+  LogAuditoria {
+    uuid id PK
+    string acao
+    string entidade
+    datetime criadoEm
+  }

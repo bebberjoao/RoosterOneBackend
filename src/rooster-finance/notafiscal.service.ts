@@ -1,11 +1,11 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { existsSync, mkdirSync, createWriteStream, writeFileSync } from 'fs';
+import { createWriteStream, writeFileSync } from 'fs';
 import { join } from 'path';
 import PDFDocument from 'pdfkit';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
+import { PASTAS } from '../common/storage.config';
 
-export const NOTAS_FISCAIS_DIR = join(process.cwd(), 'uploads', 'notas-fiscais');
-if (!existsSync(NOTAS_FISCAIS_DIR)) mkdirSync(NOTAS_FISCAIS_DIR, { recursive: true });
+export const NOTAS_FISCAIS_DIR = PASTAS.notasFiscais();
 
 /**
  * Emite um documento interno de nota fiscal (PDF + XML simples), sempre atrelado

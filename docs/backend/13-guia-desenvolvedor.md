@@ -36,5 +36,9 @@ Esse comando já recria o banco SQLite de teste (`prisma:db:push:test`) antes de
 - [ ] `schema.test.prisma` espelhado, com shim se houver campo array.
 - [ ] Permissão nova (se houver) adicionada ao seed e usada no `@RequirePermission`.
 - [ ] `npm run test:e2e` passando.
-- [ ] `npx tsc --noEmit` sem erro.
-- [ ] Documentação correspondente atualizada — ver `docs/system/`, `docs/api/`, `docs/database/`, conforme o que mudou.
+- [ ] `npx tsc --noEmit` sem erro (apague `dist/tsconfig.tsbuildinfo` antes — o cache incremental já mascarou erro real).
+- [ ] Documentação correspondente atualizada — ver o mapa de impacto em `docs/engineering/12-processo-de-desenvolvimento.md`.
+
+## Processo, commit e revisão
+
+Este guia cobre **como implementar**. Para **como entregar** — padrão de mensagem de commit, branch, pull request e o checklist de revisão de código derivado do histórico de defeitos deste projeto — ver `docs/engineering/12-processo-de-desenvolvimento.md` e o `CONTRIBUTING.md` na raiz do repositório.

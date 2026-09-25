@@ -1,0 +1,33 @@
+graph TB
+  subgraph Externo[" "]
+    AI[Aluno matriculado]
+    PR[Professor]
+    CO[Coordenacao]
+    TE[Tecnico / Atendente]
+    AD[Administrador]
+    FI[Equipe financeira]
+    EX[Aluno externo - Boost]
+  end
+
+  RO(["ROOSTER ONE<br/>Sistema de gestao institucional<br/>9 modulos integrados"])
+
+  PG[("PostgreSQL<br/>62 tabelas")]
+  FS[["Disco local<br/>uploads/"]]
+  SMTP[/"Servidor SMTP<br/>(opcional)"/]
+
+  AI --> RO
+  PR --> RO
+  CO --> RO
+  TE --> RO
+  AD --> RO
+  FI --> RO
+  EX --> RO
+
+  RO --> PG
+  RO --> FS
+  RO -.->|redefinicao de senha| SMTP
+
+  classDef sistema fill:#1F3864,stroke:#1F3864,color:#fff
+  classDef dados fill:#E8EEF7,stroke:#2E5395,color:#1F3864
+  class RO sistema
+  class PG,FS,SMTP dados

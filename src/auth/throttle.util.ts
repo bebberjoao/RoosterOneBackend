@@ -10,3 +10,10 @@ const isTest = process.env.NODE_ENV === 'test';
 export const GLOBAL_THROTTLE_LIMIT = isTest ? 10_000 : 120;
 export const LOGIN_THROTTLE_LIMIT = isTest ? 10_000 : 8;
 export const SIGNUP_THROTTLE_LIMIT = isTest ? 10_000 : 5;
+
+/**
+ * Conferência pública de certificado. Consulta legítima é pontual — alguém
+ * digita o código impresso num certificado que recebeu. Um limite baixo
+ * impede varrer o espaço de códigos para descobrir quem concluiu o quê.
+ */
+export const VERIFICACAO_THROTTLE_LIMIT = isTest ? 10_000 : 20;

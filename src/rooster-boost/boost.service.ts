@@ -6,12 +6,19 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { randomUUID } from 'crypto';
+import { randomUUID, randomBytes } from 'crypto';
+import { existsSync, unlinkSync } from 'fs';
+import { join } from 'path';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
+import { PaginacaoQueryDto, montarPagina, pediuPaginacao, prismaSkipTake } from '../common/pagination';
+import { PASTAS } from '../common/storage.config';
 import {
-  CreateAulaBoostDto, CreateCursoBoostDto, CreateModuloBoostDto,
+  ConfigurarCertificadoDto, CreateAulaBoostDto, CreateCursoBoostDto, CreateModuloBoostDto,
   UpdateAulaBoostDto, UpdateCursoBoostDto, UpdateModuloBoostDto,
 } from './dto/boost.dto';
+
+const SALT_ROUNDS = 10;
 
 @Injectable()
 export class BoostService {
@@ -25,7 +32,7 @@ export class BoostService {
   }
 
   // ===================== Curso =====================
-  async createCurso(professorId: string, dto: CreateCursoBoostDto) {
+  async createCurso(dto: CreateCursoBoostDto) {
     const base = this.slugify(dto.titulo) || randomUUID().slice(0, 8);
     let slug = base;
     let tentativa = 1;
@@ -34,26 +41,18 @@ export class BoostService {
     }
     try {
       return await this.prisma.cursoBoost.create({
-        data: { ...dto, slug, professorId, criadoEm: new Date(), atualizadoEm: new Date() },
+        data: { ...dto, slug, criadoEm: new Date(), atualizadoEm: new Date() },
       });
     } catch (error) {
       this.handleError(error, 'criar curso');
     }
   }
 
-  findCursosDoProfessor(professorId: string) {
-    return this.prisma.cursoBoost.findMany({
-      where: { professorId },
-      orderBy: { criadoEm: 'desc' },
-      include: { _count: { select: { matriculas: true, modulos: true } } },
-    });
-  }
-
   findAllCursos() {
     return this.prisma.cursoBoost.findMany({
       orderBy: { criadoEm: 'desc' },
       include: {
-        professor: { include: { usuario: { select: { id: true, nome: true } } } },
+        orientadores: { include: { professor: { include: { usuario: { select: { id: true, nome: true } } } } } },
         _count: { select: { matriculas: true, modulos: true } },
       },
     });
@@ -63,7 +62,7 @@ export class BoostService {
     const curso = await this.prisma.cursoBoost.findUnique({
       where: { id },
       include: {
-        professor: { include: { usuario: { select: { id: true, nome: true, email: true } } } },
+        orientadores: { include: { professor: { include: { usuario: { select: { id: true, nome: true, email: true } } } } } },
         modulos: { orderBy: { ordem: 'asc' }, include: { aulas: { orderBy: { ordem: 'asc' }, include: { materiais: true } } } },
       },
     });
@@ -72,18 +71,20 @@ export class BoostService {
   }
 
   /**
-   * `MaterialApoio.tamanho` é BigInt — qualquer resposta que aninhe
-   * curso -> módulos -> aulas -> materiais precisa passar por aqui antes do
-   * JSON (mesmo padrão de `AnexoTicket`/`DocumentoAcademico`/`AnexoEntrega`).
+   * `MaterialApoio.tamanho` e `AulaBoost.videoTamanho` são BigInt — qualquer
+   * resposta que aninhe curso -> módulos -> aulas -> materiais precisa passar
+   * por aqui antes do JSON (mesmo padrão de `AnexoTicket`/`DocumentoAcademico`/`AnexoEntrega`).
    */
-  serializeCursoAninhado<T extends { modulos?: Array<{ aulas?: Array<{ materiais?: Array<{ tamanho: bigint | null }> }> }> }>(curso: T) {
+  serializeCursoAninhado<
+    T extends { modulos?: Array<{ aulas?: Array<{ videoTamanho: bigint | null; materiais?: Array<{ tamanho: bigint | null }> }> }> },
+  >(curso: T) {
     if (!curso.modulos) return curso;
     return {
       ...curso,
       modulos: curso.modulos.map((modulo) => ({
         ...modulo,
         aulas: (modulo.aulas ?? []).map((aula) => ({
-          ...aula,
+          ...this.serializeAula(aula),
           materiais: (aula.materiais ?? []).map((material) => this.serializeMaterial(material)),
         })),
       })),
@@ -108,9 +109,49 @@ export class BoostService {
     }
   }
 
-  async isCursoDoProfessor(cursoId: string, professorId: string) {
-    const curso = await this.prisma.cursoBoost.findUnique({ where: { id: cursoId }, select: { professorId: true } });
-    return curso?.professorId === professorId;
+  /** Liga/desliga o certificado e ajusta o texto/carga horária — ação `certificado`, separada da edição do curso. */
+  async configurarCertificado(id: string, dto: ConfigurarCertificadoDto) {
+    await this.findOneCurso(id);
+    const data: Prisma.CursoBoostUpdateInput = { atualizadoEm: new Date() };
+    if (dto.emiteCertificado !== undefined) data.emiteCertificado = dto.emiteCertificado;
+    if (dto.certificadoTexto !== undefined) data.certificadoTexto = dto.certificadoTexto.trim() || null;
+    if (dto.cargaHoraria !== undefined) data.cargaHoraria = dto.cargaHoraria;
+    try {
+      return await this.prisma.cursoBoost.update({ where: { id }, data });
+    } catch (error) {
+      this.handleError(error, 'configurar certificado');
+    }
+  }
+
+  // ===================== Orientadores =====================
+  findOrientadores(cursoId: string) {
+    return this.prisma.cursoOrientadorBoost.findMany({
+      where: { cursoId },
+      orderBy: { criadoEm: 'asc' },
+      include: { professor: { include: { usuario: { select: { id: true, nome: true, email: true } } } } },
+    });
+  }
+
+  /** Substitui a lista de orientadores do curso (só cria/remove o que mudou). */
+  async definirOrientadores(cursoId: string, professorIds: string[]) {
+    await this.findOneCurso(cursoId);
+    const encontrados = await this.prisma.professor.findMany({ where: { id: { in: professorIds } }, select: { id: true } });
+    if (encontrados.length !== professorIds.length) {
+      throw new BadRequestException('Um ou mais professores informados não existem.');
+    }
+    const atuais = await this.prisma.cursoOrientadorBoost.findMany({ where: { cursoId }, select: { professorId: true } });
+    const atuaisIds = atuais.map((o) => o.professorId);
+    const remover = atuaisIds.filter((id) => !professorIds.includes(id));
+    const criar = professorIds.filter((id) => !atuaisIds.includes(id));
+    if (remover.length) await this.prisma.cursoOrientadorBoost.deleteMany({ where: { cursoId, professorId: { in: remover } } });
+    for (const professorId of criar) {
+      await this.prisma.cursoOrientadorBoost.create({ data: { cursoId, professorId, criadoEm: new Date() } });
+    }
+    return this.findOrientadores(cursoId);
+  }
+
+  async professorOrientaCurso(professorId: string, cursoId: string) {
+    return Boolean(await this.prisma.cursoOrientadorBoost.findUnique({ where: { cursoId_professorId: { cursoId, professorId } } }));
   }
 
   // ===================== Módulo =====================
@@ -158,7 +199,8 @@ export class BoostService {
   async createAula(moduloId: string, dto: CreateAulaBoostDto) {
     await this.findOneModulo(moduloId);
     try {
-      return await this.prisma.aulaBoost.create({ data: { ...dto, moduloId } });
+      const aula = await this.prisma.aulaBoost.create({ data: { ...dto, moduloId } });
+      return this.serializeAula(aula);
     } catch (error) {
       this.handleError(error, 'criar aula');
     }
@@ -167,25 +209,33 @@ export class BoostService {
   async findOneAula(id: string) {
     const aula = await this.prisma.aulaBoost.findUnique({ where: { id }, include: { materiais: true } });
     if (!aula) throw new NotFoundException(`Aula com id ${id} não encontrada.`);
-    return { ...aula, materiais: aula.materiais.map((material) => this.serializeMaterial(material)) };
+    return { ...this.serializeAula(aula), materiais: aula.materiais.map((material) => this.serializeMaterial(material)) };
   }
 
   async updateAula(id: string, dto: UpdateAulaBoostDto) {
     await this.findOneAula(id);
     try {
-      return await this.prisma.aulaBoost.update({ where: { id }, data: dto });
+      const aula = await this.prisma.aulaBoost.update({ where: { id }, data: dto });
+      return this.serializeAula(aula);
     } catch (error) {
       this.handleError(error, 'atualizar aula');
     }
   }
 
   async removeAula(id: string) {
-    await this.findOneAula(id);
+    const aulaAtual = await this.findOneAulaBruta(id);
+    if (aulaAtual.videoArquivo) this.apagarArquivoVideo(aulaAtual.videoArquivo);
     try {
-      return await this.prisma.aulaBoost.delete({ where: { id } });
+      const aula = await this.prisma.aulaBoost.delete({ where: { id } });
+      return this.serializeAula(aula);
     } catch (error) {
       this.handleError(error, 'remover aula');
     }
+  }
+
+  /** `videoTamanho` é BigInt — toda resposta que devolve a aula crua precisa passar por aqui antes do JSON. */
+  serializeAula<T extends { videoTamanho: bigint | null }>(aula: T) {
+    return { ...aula, videoTamanho: aula.videoTamanho === null ? null : Number(aula.videoTamanho) };
   }
 
   /** Curso dono da aula, atravessando o módulo (para checagem de escopo no controller). */
@@ -193,6 +243,59 @@ export class BoostService {
     const aula = await this.prisma.aulaBoost.findUnique({ where: { id: aulaId }, select: { modulo: { select: { cursoId: true } } } });
     if (!aula) throw new NotFoundException(`Aula com id ${aulaId} não encontrada.`);
     return aula.modulo.cursoId;
+  }
+
+  // ===================== Vídeo hospedado =====================
+  /**
+   * Grava o vídeo hospedado da aula. Se já havia um (instrutor substituindo o
+   * arquivo), apaga o antigo primeiro — diferente de `removeMaterial`, que
+   * não limpa o arquivo do disco, vídeo precisa disso: até 2GB por arquivo,
+   * deixar órfão a cada substituição esgota disco rápido.
+   */
+  async setVideoAula(aulaId: string, arquivo: { filename: string; mimetype: string; size: number }) {
+    const aulaAtual = await this.findOneAulaBruta(aulaId);
+    if (aulaAtual.videoArquivo) this.apagarArquivoVideo(aulaAtual.videoArquivo);
+
+    try {
+      const aula = await this.prisma.aulaBoost.update({
+        where: { id: aulaId },
+        data: {
+          tipo: 'video',
+          videoArquivo: arquivo.filename,
+          videoTamanho: BigInt(arquivo.size),
+          videoMimeType: arquivo.mimetype,
+        },
+      });
+      return this.serializeAula(aula);
+    } catch (error) {
+      this.handleError(error, 'salvar vídeo da aula');
+    }
+  }
+
+  async removeVideoAula(aulaId: string) {
+    const aula = await this.findOneAulaBruta(aulaId);
+    if (aula.videoArquivo) this.apagarArquivoVideo(aula.videoArquivo);
+    try {
+      const atualizada = await this.prisma.aulaBoost.update({
+        where: { id: aulaId },
+        data: { videoArquivo: null, videoTamanho: null, videoMimeType: null },
+      });
+      return this.serializeAula(atualizada);
+    } catch (error) {
+      this.handleError(error, 'remover vídeo da aula');
+    }
+  }
+
+  /** Aula sem serialização de material — usado internamente por setVideoAula/removeVideoAula. */
+  private async findOneAulaBruta(id: string) {
+    const aula = await this.prisma.aulaBoost.findUnique({ where: { id } });
+    if (!aula) throw new NotFoundException(`Aula com id ${id} não encontrada.`);
+    return aula;
+  }
+
+  private apagarArquivoVideo(nomeArquivo: string) {
+    const caminho = join(PASTAS.videosBoost(), nomeArquivo);
+    if (existsSync(caminho)) unlinkSync(caminho);
   }
 
   // ===================== Material de apoio =====================
@@ -243,25 +346,128 @@ export class BoostService {
     });
   }
 
-  // ===================== Chat (lado instrutor) =====================
-  async findMensagens(cursoId: string) {
-    await this.findOneCurso(cursoId);
-    return this.prisma.mensagemBoost.findMany({
-      where: { cursoId },
-      orderBy: { criadoEm: 'asc' },
+  // ===================== Conversas aluno ↔ orientador (lado orientador) =====================
+  // Uma conversa contínua por (curso, aluno), atendida por qualquer orientador do curso. A única
+  // "posse" do módulo é o vínculo de orientador: quem não está vinculado ao curso recebe 404.
+
+  private static readonly INCLUDE_AUTORES = {
+    boostUsuario: { select: { id: true, nome: true } },
+    professor: { select: { id: true, usuario: { select: { id: true, nome: true } } } },
+  } as const;
+
+  /** Caixa de entrada do orientador: só as conversas dos cursos em que ele está vinculado. */
+  async findConversasDoOrientador(professorId: string) {
+    const conversas = await this.prisma.conversaBoost.findMany({
+      where: { curso: { orientadores: { some: { professorId } } } },
+      orderBy: { ultimaMensagemEm: 'desc' },
       include: {
         boostUsuario: { select: { id: true, nome: true } },
-        professor: { select: { id: true, usuario: { select: { id: true, nome: true } } } },
+        curso: { select: { id: true, titulo: true } },
+        mensagens: { orderBy: { criadoEm: 'desc' }, take: 1 },
+        _count: { select: { mensagens: { where: { boostUsuarioId: { not: null }, lidaEm: null } } } },
       },
+    });
+    return conversas.map(({ mensagens, _count, ...conversa }) => ({
+      ...conversa,
+      ultimaMensagem: mensagens[0]?.mensagem ?? null,
+      naoLidas: _count.mensagens,
+    }));
+  }
+
+  /** Devolve a conversa se o professor orienta o curso dela; senão 404 (não revela que existe). */
+  async exigirConversaDoOrientador(conversaId: string, professorId: string) {
+    const conversa = await this.prisma.conversaBoost.findFirst({
+      where: { id: conversaId, curso: { orientadores: { some: { professorId } } } },
+      include: { boostUsuario: { select: { id: true, nome: true } }, curso: { select: { id: true, titulo: true } } },
+    });
+    if (!conversa) throw new NotFoundException('Conversa não encontrada.');
+    return conversa;
+  }
+
+  findMensagensDaConversa(conversaId: string) {
+    return this.prisma.mensagemBoost.findMany({
+      where: { conversaId },
+      orderBy: { criadoEm: 'asc' },
+      include: BoostService.INCLUDE_AUTORES,
     });
   }
 
-  async createMensagemComoProfessor(cursoId: string, professorId: string, mensagem: string) {
-    await this.findOneCurso(cursoId);
-    return this.prisma.mensagemBoost.create({
-      data: { cursoId, professorId, mensagem, criadoEm: new Date() },
-      include: { professor: { select: { id: true, usuario: { select: { id: true, nome: true } } } } },
+  async createMensagemComoOrientador(conversaId: string, professorId: string, mensagem: string) {
+    const agora = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      const criada = await tx.mensagemBoost.create({
+        data: { conversaId, professorId, mensagem, criadoEm: agora },
+        include: BoostService.INCLUDE_AUTORES,
+      });
+      await tx.conversaBoost.update({ where: { id: conversaId }, data: { ultimaMensagemEm: agora } });
+      return criada;
     });
+  }
+
+  /** O orientador abriu a conversa: as mensagens do aluno passam a contar como lidas. */
+  async marcarConversaLidaPeloOrientador(conversaId: string) {
+    const r = await this.prisma.mensagemBoost.updateMany({
+      where: { conversaId, boostUsuarioId: { not: null }, lidaEm: null },
+      data: { lidaEm: new Date() },
+    });
+    return { atualizadas: r.count };
+  }
+
+  // ===================== Contas externas (BoostUsuario) — painel admin =====================
+  // Gestão entre cursos, por isso fora do modelo de posse "dono do curso"
+  // usado no resto deste service — checagem de permissão fica só no controller.
+
+  async findAllBoostUsuarios(paginacao: PaginacaoQueryDto = {}) {
+    const consulta = {
+      orderBy: { criadoEm: 'desc' },
+      select: {
+        id: true, nome: true, email: true, ativo: true, criadoEm: true,
+        _count: { select: { matriculas: true } },
+      },
+    } satisfies Prisma.BoostUsuarioFindManyArgs;
+
+    if (!pediuPaginacao(paginacao)) {
+      return this.prisma.boostUsuario.findMany(consulta);
+    }
+    const [total, dados] = await this.prisma.$transaction([
+      this.prisma.boostUsuario.count(),
+      this.prisma.boostUsuario.findMany({ ...consulta, ...prismaSkipTake(paginacao) }),
+    ]);
+    return montarPagina(dados, total, paginacao);
+  }
+
+  async toggleAtivoBoostUsuario(id: string, ativo: boolean) {
+    const existente = await this.prisma.boostUsuario.findUnique({ where: { id } });
+    if (!existente) throw new NotFoundException(`Aluno externo com id ${id} não encontrado.`);
+    try {
+      return await this.prisma.boostUsuario.update({
+        where: { id },
+        data: { ativo },
+        select: { id: true, nome: true, email: true, ativo: true },
+      });
+    } catch (error) {
+      this.handleError(error, 'atualizar situação do aluno externo');
+    }
+  }
+
+  /**
+   * `BoostUsuario` não tem uma tabela de token de redefinição por e-mail
+   * (equivalente a `RedefinicaoSenha`, do Hub) — construir esse fluxo
+   * inteiro só para a conta externa não se pagava neste momento. Em vez
+   * disso, gera uma senha temporária aleatória, salva o hash e devolve o
+   * valor em texto plano **uma única vez** — o admin repassa por fora, mesmo
+   * espírito informal de `PATCH /usuarios/:id` com `senhaHash` no Hub.
+   */
+  async redefinirSenhaBoostUsuario(id: string) {
+    const existente = await this.prisma.boostUsuario.findUnique({ where: { id } });
+    if (!existente) throw new NotFoundException(`Aluno externo com id ${id} não encontrado.`);
+
+    const senhaTemporaria = randomBytes(9).toString('base64url'); // 12 chars, sem caractere ambíguo
+    await this.prisma.boostUsuario.update({
+      where: { id },
+      data: { senhaHash: await bcrypt.hash(senhaTemporaria, SALT_ROUNDS) },
+    });
+    return { id, email: existente.email, senhaTemporaria };
   }
 
   private handleError(error: unknown, action: string): never {

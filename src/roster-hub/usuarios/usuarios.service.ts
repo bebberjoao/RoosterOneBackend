@@ -14,9 +14,20 @@ import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { JwtService } from '@nestjs/jwt';
 import { MailService } from '../../mail/mail.service';
+import { PaginacaoQueryDto, montarPagina, pediuPaginacao, prismaSkipTake } from '../../common/pagination';
+import { AdministradoresService } from '../shared/administradores.service';
 
 const SALT_ROUNDS = 10;
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1h
+
+/**
+ * Validade do refresh token. O access token expira em 8h (`jwt-config.ts`);
+ * o refresh existe justamente para não obrigar o usuário a digitar a senha de
+ * novo a cada 8h, então tem validade bem maior — mas finita, e revogável.
+ */
+const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dias
+
+const hashDeToken = (bruto: string) => createHash('sha256').update(bruto).digest('hex');
 
 /** Nunca incluir `senhaHash` em uma resposta HTTP — aplicado em toda leitura/gravação de Usuario que retorna ao controller. */
 const USUARIO_SAFE_SELECT = {
@@ -35,6 +46,7 @@ export class UsuariosService {
     private readonly jwt: JwtService,
     private readonly auditoria: AuditoriaService,
     private readonly mail: MailService,
+    private readonly administradores: AdministradoresService,
   ) {}
 
   // =====================================================
@@ -64,18 +76,28 @@ export class UsuariosService {
     }
   }
 
-  async findAll(ativo?: boolean) {
+  async findAll(ativo?: boolean, paginacao: PaginacaoQueryDto = {}) {
     const where: Prisma.UsuarioWhereInput = {};
 
     if (ativo !== undefined) {
       where.ativo = ativo;
     }
 
-    return this.prisma.usuario.findMany({
+    const consulta = {
       where,
       orderBy: { criadoEm: 'desc' },
       select: USUARIO_SAFE_SELECT,
-    });
+    } satisfies Prisma.UsuarioFindManyArgs;
+
+    if (!pediuPaginacao(paginacao)) {
+      return this.prisma.usuario.findMany(consulta);
+    }
+
+    const [total, dados] = await this.prisma.$transaction([
+      this.prisma.usuario.count({ where }),
+      this.prisma.usuario.findMany({ ...consulta, ...prismaSkipTake(paginacao) }),
+    ]);
+    return montarPagina(dados, total, paginacao);
   }
 
   async findOne(id: string) {
@@ -117,7 +139,97 @@ export class UsuariosService {
       usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email },
       acesso: await this.getAccess(usuario.id),
       accessToken: await this.jwt.signAsync({ sub: usuario.id, email: usuario.email }),
+      refreshToken: await this.emitirRefreshToken(usuario.id, contexto),
     };
+  }
+
+  /**
+   * Cria uma sessão e devolve o refresh token **bruto** — o banco guarda
+   * apenas o hash SHA-256, mesmo padrão do token de redefinição de senha:
+   * quem obtiver acesso de leitura à tabela não consegue se passar por
+   * ninguém.
+   */
+  private async emitirRefreshToken(usuarioId: string, contexto?: { ip?: string; userAgent?: string }) {
+    const bruto = randomBytes(32).toString('hex');
+    await this.prisma.sessao.create({
+      data: {
+        usuarioId,
+        refreshToken: hashDeToken(bruto),
+        ip: contexto?.ip,
+        navegador: contexto?.userAgent,
+        expiraEm: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+        revogada: false,
+        criadoEm: new Date(),
+      },
+    });
+    return bruto;
+  }
+
+  /**
+   * Troca um refresh token válido por um novo par de tokens.
+   *
+   * A sessão antiga é sempre revogada e uma nova é criada (rotação): se um
+   * refresh token vazar e for usado, o uso seguinte do token legítimo já
+   * encontra a sessão revogada e falha — o problema aparece em vez de passar
+   * despercebido. Também revalida `usuario.ativo`, para que desativar alguém
+   * encerre o acesso dele sem precisar esperar o access token expirar.
+   */
+  async refreshSession(refreshToken: string, contexto?: { ip?: string; userAgent?: string }) {
+    const sessao = await this.prisma.sessao.findFirst({
+      where: { refreshToken: hashDeToken(refreshToken), revogada: false },
+      include: { usuario: true },
+    });
+
+    if (!sessao || !sessao.usuario || !sessao.usuario.ativo) {
+      throw new UnauthorizedException('Sessão inválida ou expirada.');
+    }
+    if (sessao.expiraEm && sessao.expiraEm.getTime() < Date.now()) {
+      await this.prisma.sessao.update({ where: { id: sessao.id }, data: { revogada: true } });
+      throw new UnauthorizedException('Sessão inválida ou expirada.');
+    }
+
+    await this.prisma.sessao.update({ where: { id: sessao.id }, data: { revogada: true } });
+    const usuario = sessao.usuario;
+
+    await this.auditoria.registrar({
+      usuarioId: usuario.id,
+      modulo: 'Rooster Hub',
+      acao: 'sessao_renovada',
+      entidade: 'sessao',
+      entidadeId: sessao.id,
+      ip: contexto?.ip,
+      navegador: contexto?.userAgent,
+    });
+
+    return {
+      usuario: { id: usuario.id, nome: usuario.nome, email: usuario.email },
+      acesso: await this.getAccess(usuario.id),
+      accessToken: await this.jwt.signAsync({ sub: usuario.id, email: usuario.email }),
+      refreshToken: await this.emitirRefreshToken(usuario.id, contexto),
+    };
+  }
+
+  /**
+   * Encerra a sessão correspondente ao refresh token. Idempotente de
+   * propósito: sair de uma sessão que já não existe não é erro, e responder
+   * diferente permitiria descobrir se um token é válido.
+   */
+  async logout(refreshToken: string, contexto?: { ip?: string; userAgent?: string }) {
+    const sessao = await this.prisma.sessao.findFirst({
+      where: { refreshToken: hashDeToken(refreshToken), revogada: false },
+    });
+    if (!sessao) return;
+
+    await this.prisma.sessao.update({ where: { id: sessao.id }, data: { revogada: true } });
+    await this.auditoria.registrar({
+      usuarioId: sessao.usuarioId,
+      modulo: 'Rooster Hub',
+      acao: 'logout',
+      entidade: 'sessao',
+      entidadeId: sessao.id,
+      ip: contexto?.ip,
+      navegador: contexto?.userAgent,
+    });
   }
 
   /**
@@ -202,6 +314,12 @@ export class UsuariosService {
       return null;
     }
 
+    // Desativar o último administrador tranca a instituição para fora tanto
+    // quanto excluí-lo: usuário inativo não autentica nem resolve permissão.
+    if (updateUsuarioDto.ativo === false) {
+      await this.administradores.assertNaoEhUltimoAdministrador(id, 'desativar este usuário');
+    }
+
     const data: Prisma.UsuarioUpdateInput = {
       ...updateUsuarioDto,
       ...(updateUsuarioDto.senhaHash ? { senhaHash: await bcrypt.hash(updateUsuarioDto.senhaHash, SALT_ROUNDS) } : {}),
@@ -232,6 +350,8 @@ export class UsuariosService {
     if (!existing) {
       return null;
     }
+
+    await this.administradores.assertNaoEhUltimoAdministrador(id, 'excluir este usuário');
 
     try {
       const usuario = await this.prisma.usuario.delete({ where: { id }, select: USUARIO_SAFE_SELECT });

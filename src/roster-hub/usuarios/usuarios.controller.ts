@@ -20,10 +20,12 @@ import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { LoginDto } from './dto/login.dto';
 import { EsqueciSenhaDto } from './dto/esqueci-senha.dto';
 import { RedefinirSenhaDto } from './dto/redefinir-senha.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { UsuariosService } from './usuarios.service';
 import { Public } from '../../auth/public.decorator';
 import { PermissionGuard } from '../../auth/permission.guard';
 import { RequirePermission } from '../../auth/require-permission.decorator';
+import { PaginacaoQueryDto } from '../../common/pagination';
 
 @ApiTags('Autenticação')
 @Controller('auth')
@@ -59,6 +61,30 @@ export class AuthController {
   async redefinirSenha(@Body() dto: RedefinirSenhaDto) {
     await this.usuariosService.resetPasswordWithToken(dto.token, dto.novaSenha);
     return { message: 'Senha redefinida com sucesso.' };
+  }
+
+  @Post('refresh')
+  @Public()
+  @Throttle({ default: { limit: LOGIN_THROTTLE_LIMIT, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Troca um refresh token válido por um novo par de tokens (a sessão antiga é revogada)' })
+  refresh(@Body() dto: RefreshTokenDto, @Req() request: Request) {
+    return this.usuariosService.refreshSession(dto.refreshToken, {
+      ip: request.ip,
+      userAgent: request.headers['user-agent'],
+    });
+  }
+
+  @Post('logout')
+  @Public()
+  @ApiOperation({ summary: 'Revoga a sessão do refresh token informado' })
+  async logout(@Body() dto: RefreshTokenDto, @Req() request: Request) {
+    await this.usuariosService.logout(dto.refreshToken, {
+      ip: request.ip,
+      userAgent: request.headers['user-agent'],
+    });
+    // Resposta única, exista ou não a sessão: responder diferente permitiria
+    // descobrir se um refresh token é válido.
+    return { message: 'Sessão encerrada.' };
   }
 }
 
@@ -97,8 +123,8 @@ export class UsuariosController {
 
   @Get()
   @RequirePermission(MODULO, TELA, 'acessar')
-  findAll() {
-    return this.usuariosService.findAll();
+  findAll(@Query() paginacao: PaginacaoQueryDto) {
+    return this.usuariosService.findAll(undefined, paginacao);
   }
 
   @Get(':id/acesso')

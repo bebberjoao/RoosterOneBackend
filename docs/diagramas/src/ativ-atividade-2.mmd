@@ -1,0 +1,8 @@
+flowchart TD
+  A([Atividade publicada]) --> B{"Aluno enviou ate o prazo?"}
+  B -->|Sim| C["Entrega registrada no prazo"]
+  B -->|Nao| D["Entrega atrasada, ou recusada se a atividade nao permitir"]
+  C --> E["Professor corrige com nota e feedback"]
+  D --> E
+  E --> F["Nota propagada ao Academy na mesma transacao"]
+  F --> G([Aluno ve a nota; media da turma atualizada])

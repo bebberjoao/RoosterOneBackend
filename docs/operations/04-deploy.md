@@ -1,47 +1,139 @@
 # Deploy
 
-## Estado atual: não identificado no código analisado
+Status: setembro/2026. O **caminho oficial de implantação é instalação nativa em Windows Server**, com PostgreSQL dedicado ao sistema. O container existe e funciona, mas está posicionado como ambiente de desenvolvimento e avaliação — ver "Por que não container" no fim.
 
-Não há pipeline, `Dockerfile`, `docker-compose`, arquivo de configuração de plataforma (ex.: `Procfile`, `render.yaml`, `fly.toml`, `vercel.json`, `netlify.toml`) nem qualquer outro artefato de deploy em nenhum dos dois repositórios (`RoosterOneBackend-main`, `RoosterOneFrontEnd-main`). Isso foi confirmado por varredura direta dos dois repositórios — nenhum arquivo com esses nomes/padrões existe.
+O que ainda não existe é o ambiente provisionado: as máquinas de teste foram definidas, mas nenhuma instalação foi feita.
 
-Em outras palavras: **este projeto, no estado atual do código, não tem um caminho de deploy definido.** Qualquer publicação em um ambiente real (homologação, produção) exigiria decisões de infraestrutura que ainda não foram tomadas/documentadas no repositório.
+## Pré-requisitos no servidor
 
----
+| Item | Observação |
+|---|---|
+| Windows Server | Ambiente alvo definido para os locais de teste |
+| PostgreSQL para Windows (16+) | **Dedicado ao sistema** — não compartilhado com outra aplicação |
+| Node.js 22 LTS | Necessário para rodar o backend (e o frontend, se ele for servido pela mesma máquina) |
+| NSSM ou `node-windows` | Para manter o processo vivo e subir após reboot — ver "Rodando como serviço" |
 
-## Recomendação futura
+A pasta `bin` do PostgreSQL precisa estar no `PATH` (normalmente `C:\Program Files\PostgreSQL\16\bin`), senão `pg_dump`/`pg_restore` não são encontrados pelos scripts de backup.
 
-O que segue **não existe hoje** — é uma sugestão de passos mínimos, baseada apenas nos scripts que o `package.json` de cada repositório já expõe, para caso a equipe decida estruturar um deploy manual ou automatizado no futuro.
+## Instalação do backend
 
-### Backend (Recomendação futura)
+```powershell
+# 1. Código no servidor (cópia ou git clone), e dependências de produção
+npm ci --omit=dev
 
-```bash
-npm install
-npm run prisma:generate
-npm run prisma:deploy   # aplica migrations em produção, sem prompts interativos
-npm run build           # nest build -> gera dist/
-npm run start:prod      # node dist/src/main.js
+# 2. Client do Prisma e schema do banco
+npx prisma generate
+npx prisma migrate deploy
+
+# 3. Build
+npm run build
+
+# 4. Dados iniciais — só na primeira instalação
+npm run db:seed:dev
 ```
 
-Pré-condições que precisariam existir no ambiente de destino, hoje não automatizadas por nada no repositório:
-- Variáveis de ambiente de produção definidas (`DATABASE_URL`, `JWT_SECRET`, `FRONTEND_URL`, `PORT`, e `SMTP_*`/`MAIL_FROM` se o envio real de e-mail for necessário) — ver `01-configuracao.md`.
-- PostgreSQL de produção acessível a partir do ambiente de deploy.
-- Processo supervisionado (ex.: `pm2`, serviço systemd, orquestrador de containers) para manter `start:prod` rodando e reiniciar em caso de falha — nada disso está configurado no repositório.
+### Variáveis de ambiente
 
-### Frontend (Recomendação futura)
+Em Windows, há duas formas, e a escolha importa:
 
-```bash
-npm install
-npm run build      # vite build -> gera o artefato estático/SSR
-npm run preview    # apenas para validar localmente; não é um servidor de produção
+- **`.env` na raiz da aplicação** — simples, e é o que os scripts de backup também leem. Aceitável para os ambientes de teste.
+- **Variáveis de sistema** (`[Environment]::SetEnvironmentVariable(..., 'Machine')`) — preferível quando a aplicação roda como serviço, porque o serviço não depende do diretório de trabalho.
+
+Obrigatórias: `DATABASE_URL` e `JWT_SECRET`. A aplicação **se recusa a subir sem `JWT_SECRET`**, de propósito. Gere um valor longo e aleatório:
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 ```
 
-Pré-condições que precisariam existir, hoje não automatizadas por nada no repositório:
-- `VITE_API_URL` de produção apontando para a URL pública do backend.
-- Uma plataforma de hospedagem para servir o resultado do build (o projeto usa `@tanstack/react-start` com Nitro — o `vite.config.ts` comenta que o build usa `cloudflare` como target padrão do Nitro, o que sugere Cloudflare como plataforma alvo mais provável, mas isso é uma inferência de configuração de build, não uma configuração de deploy efetivamente presente ou documentada no repositório).
+Ver `01-configuracao.md` para a lista completa.
 
-### O que falta para isso deixar de ser "recomendação" e virar processo real
+## Rodando como serviço
 
-- Definir e versionar a infraestrutura alvo (servidor, PaaS, containers).
-- Escrever os artefatos de deploy correspondentes (`Dockerfile`, arquivo de configuração da plataforma escolhida, etc.).
-- Definir estratégia de segredos em produção (hoje o `.env` é só um arquivo local, sem gestão de secrets).
-- Definir estratégia de execução de migrations em produção (`prisma:deploy` existe como script, mas não há automação que o dispare).
+`npm run start:prod` sozinho **não se recupera de falha nem volta depois de reiniciar a máquina** — esse é o ponto que mais frequentemente falta numa instalação Windows. Duas opções:
+
+### NSSM (recomendado)
+
+```powershell
+nssm install RoosterOneAPI "C:\Program Files\nodejs\node.exe" "C:\rooster\backend\dist\src\main.js"
+nssm set RoosterOneAPI AppDirectory C:\rooster\backend
+nssm set RoosterOneAPI AppEnvironmentExtra DATABASE_URL=postgresql://... JWT_SECRET=...
+nssm set RoosterOneAPI Start SERVICE_AUTO_START
+nssm start RoosterOneAPI
+```
+
+`AppDirectory` é obrigatório: a aplicação grava em `uploads/` por caminho relativo ao diretório de trabalho, e sem isso os arquivos vão parar no lugar errado.
+
+### node-windows
+
+Alternativa em JavaScript, útil se preferir versionar a configuração do serviço junto do código, em vez de depender de um executável externo.
+
+## Frontend
+
+Se o frontend for servido pela **mesma máquina**, ele também precisa de Node — o build usa Nitro e não é estático puro:
+
+```powershell
+npm ci
+$env:VITE_API_URL="http://servidor:3000"; npm run build
+node .output/server/index.mjs
+```
+
+E, como o backend, precisa de um serviço próprio para sobreviver a reboot — **são dois serviços, não um**.
+
+Duas observações sobre `VITE_API_URL`:
+
+- Leva **só o host, sem `/v1`** — o prefixo de versão é acrescentado pelo cliente HTTP, e a mesma base é usada pelos WebSockets, que não são versionados.
+- É variável de **build**: mudar o endereço da API exige **reconstruir**, não apenas reiniciar.
+
+Se preferir IIS na frente (para HTTPS e porta 80/443), ele atua como proxy reverso para os dois processos Node — o que também resolve o item de HTTPS, hoje em aberto.
+
+## Ordem do deploy, quando há mudança de schema
+
+Migration **antes** da nova versão subir, sempre:
+
+```powershell
+# 1. backup — antes de qualquer migration (ver 06-backup-e-recuperacao.md)
+.\scripts\backup.ps1
+
+# 2. parar o serviço
+nssm stop RoosterOneAPI
+
+# 3. atualizar código, dependências e schema
+npm ci --omit=dev
+npx prisma migrate deploy
+npm run build
+
+# 4. subir e conferir
+nssm start RoosterOneAPI
+curl http://localhost:3000/health
+```
+
+A ordem importa porque as migrations deste projeto são aditivas na maior parte, mas nem todas: subir código novo contra schema antigo quebra imediatamente. Ver o procedimento de mudança de schema em `docs/engineering/13-governanca.md`.
+
+## Rollback
+
+Da aplicação: voltar o código à versão anterior, `npm ci --omit=dev`, `npm run build`, reiniciar o serviço.
+
+**Do banco é o caso difícil, e precisa ser dito com clareza**: o Prisma não gera migration de reversão. Desfazer uma mudança de schema significa restaurar o backup tomado antes dela (`06-backup-e-recuperacao.md`) — e tudo que foi gravado depois se perde. É exatamente por isso que o passo 1 do deploy é o backup.
+
+Na prática, a estratégia segura é preferir migration aditiva (coluna nova opcional, tabela nova) e deixar a remoção para um deploy seguinte, quando a versão anterior já não estiver em uso.
+
+## Por que não container
+
+O `Dockerfile` e o `docker-compose.yml` continuam no repositório e funcionam — são úteis para subir o sistema inteiro numa máquina de desenvolvimento com um comando, e é assim que estão documentados em `05-cicd.md`.
+
+Para os servidores de teste, porém, a escolha foi instalação nativa, por razões operacionais:
+
+- **Windows Server + Docker Desktop traz atrito real** (WSL2, e a questão de licenciamento comercial do Desktop) que não agrega nada aqui.
+- **O PostgreSQL é dedicado ao sistema**, então o Postgres embutido no compose — que existia justamente para não conflitar com banco de terceiros — deixa de ter propósito.
+- Quem administra um servidor Windows tende a operar com mais segurança um serviço registrado do que containers.
+
+Se o cenário mudar (servidor Linux, ou vários ambientes a manter em paralelo), o caminho do container já está pronto e testado no CI.
+
+## O que falta para isto virar rotina
+
+- Provisionar as máquinas e instalar os pré-requisitos.
+- HTTPS (via IIS como proxy reverso, ou certificado direto no Node).
+- Cofre de segredos em lugar de `.env`/variável de máquina.
+- Agendar o backup (Agendador de Tarefas chamando `backup.ps1`) e **testar a restauração** antes do primeiro uso real.
+
+Todos no Índice de Pendências.

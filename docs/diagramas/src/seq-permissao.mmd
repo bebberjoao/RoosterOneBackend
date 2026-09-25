@@ -1,0 +1,24 @@
+sequenceDiagram
+  actor A as Administrador
+  participant FE as Frontend
+  participant CTRL as UsuariosPermissoesController
+  participant PG as PermissionGuard
+  participant SVC as UsuariosPermissoesService
+  participant AUD as AuditoriaService
+  participant DB as PostgreSQL
+
+  A->>FE: escolhe usuario e permissao
+  FE->>CTRL: POST /usuarios-permissoes
+  CTRL->>PG: exige hub.acessos.conceder
+  PG-->>CTRL: admin passa por bypass
+  CTRL->>SVC: create(usuarioId, permissaoId)
+  SVC->>DB: insere UsuarioPermissao
+  alt vinculo ja existe
+    DB-->>SVC: erro P2002 (unique)
+    SVC-->>FE: 409 Conflito
+  else criado
+    SVC->>AUD: registra permissao_concedida
+    SVC-->>FE: 201
+    FE-->>A: permissao concedida
+  end
+  Note over FE,DB: A proxima requisicao do usuario<br/>ja reflete a nova permissao:<br/>getAccess() nao usa cache

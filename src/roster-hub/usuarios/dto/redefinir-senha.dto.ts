@@ -12,9 +12,14 @@ export class RedefinirSenhaDto {
 
   @ApiProperty({
     example: 'NovaSenha123',
-    description: 'Nova senha em texto plano que substituirá a senha atual do usuário',
+    description: 'Nova senha em texto plano que substituirá a senha atual do usuário (mínimo 8 caracteres)',
+    minLength: 8,
   })
+  // Era `@Length(6, 200)`, enquanto a criação de usuário e o cadastro do Boost
+  // exigiam 8. A diferença não era só inconsistência de documentação: dava para
+  // contornar o mínimo de 8 usando o fluxo de "esqueci minha senha" para
+  // definir uma senha de 6 caracteres.
   @IsString()
-  @Length(6, 200)
+  @Length(8, 200)
   novaSenha: string;
 }

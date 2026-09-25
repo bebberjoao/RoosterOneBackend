@@ -1,0 +1,20 @@
+flowchart LR
+  COORD((Coordenacao))
+  PROF((Professor))
+  ALU((Aluno))
+  FIN((Financeiro))
+  EXT((Aluno externo))
+
+  U8([Gerenciar turmas e matriculas])
+  U9([Registrar frequencia, notas e atividades])
+  U11([Consultar meus dados academicos e cobrancas])
+  U13([Gerenciar cobrancas e notas fiscais])
+  U14([Publicar curso extracurricular])
+  U15([Matricular-se e obter certificado])
+
+  COORD --> U8
+  PROF --> U9
+  PROF --> U14
+  ALU --> U11
+  FIN --> U13
+  EXT --> U15

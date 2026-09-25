@@ -1,0 +1,18 @@
+erDiagram
+  Campus ||--o{ Bloco : agrupa
+  Bloco ||--o{ Ambiente : contem
+  Ambiente ||--o{ Reserva : reservado_em
+  Usuario ||--o{ Reserva : solicita
+  Reserva ||--o{ ReservaMensagem : conversa
+  Reserva ||--o{ ReservaHistorico : registra
+
+  Ambiente {
+    uuid id PK
+    int capacidade
+    string_array diasFuncionamento
+  }
+  Reserva {
+    uuid id PK
+    date data
+    string status
+  }

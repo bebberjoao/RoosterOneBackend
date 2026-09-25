@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
+import { NotificacoesService } from '../roster-hub/notificacoes/notificacoes.service';
+import { PaginacaoQueryDto, montarPagina, pediuPaginacao, prismaSkipTake } from '../common/pagination';
 import {
   AtribuirDescontoDto, CancelarCobrancaDto, CreateCobrancaDto, CreateDescontoDto,
   CreateProdutoDto, CreateServicoDto, GerarLoteMensalidadeDto, MarcarPagoDto,
@@ -17,7 +19,24 @@ type CobrancaComoStatus = { status: string; vencimento: Date };
 
 @Injectable()
 export class FinanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificacoes: NotificacoesService,
+  ) {}
+
+  /** Avisa o aluno (via o Usuario do Hub vinculado a ele) sobre algo na cobrança dele. */
+  private async avisarAluno(alunoId: string, titulo: string, mensagem: string) {
+    const aluno = await this.prisma.aluno.findUnique({ where: { id: alunoId }, select: { usuarioId: true } });
+    await this.notificacoes.notificar(aluno?.usuarioId, titulo, mensagem);
+  }
+
+  private static fmtBRL(v: unknown) {
+    return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
+  private static fmtData(d: Date) {
+    return d.toISOString().slice(0, 10).split('-').reverse().join('/');
+  }
 
   // ===================== Produto =====================
   async createProduto(dto: CreateProdutoDto) {
@@ -149,7 +168,7 @@ export class FinanceService {
       this.handleError(error, 'atribuir desconto ao aluno');
     }
   }
-  async removerDesconto(descontoId: string, alunoId: string) {
+  async desvincularDescontoDoAluno(descontoId: string, alunoId: string) {
     const registro = await this.prisma.descontoAluno.findUnique({
       where: { alunoId_descontoId: { alunoId, descontoId } },
     });
@@ -176,8 +195,9 @@ export class FinanceService {
     if (dto.produtoId) await this.findOneProduto(dto.produtoId);
     if (dto.servicoId) await this.findOneServico(dto.servicoId);
     if (dto.descontoId) await this.findOneDesconto(dto.descontoId);
+    let criada;
     try {
-      return await this.prisma.cobranca.create({
+      criada = await this.prisma.cobranca.create({
         data: {
           alunoId: dto.alunoId,
           tipo: dto.tipo,
@@ -198,20 +218,72 @@ export class FinanceService {
     } catch (error) {
       this.handleError(error, 'criar cobrança');
     }
+    await this.avisarAluno(
+      dto.alunoId,
+      'Nova cobrança',
+      `${dto.descricao} — ${FinanceService.fmtBRL(Number(dto.valorOriginal) - Number(dto.valorDesconto ?? 0))}, vence em ${FinanceService.fmtData(criada.vencimento)}.`,
+    );
+    return criada;
   }
 
-  async findAllCobrancas(filtros: { status?: string; alunoId?: string; tipo?: string }) {
+  /**
+   * Filtro de status traduzido para condição de banco, não aplicado em memória.
+   *
+   * "vencido" é derivado (`aberto` + `vencimento < hoje`), e a versão anterior
+   * filtrava depois de carregar tudo. Isso impedia paginar corretamente: a
+   * página vinha do banco com N registros e o filtro em memória devolvia menos
+   * que N, quebrando a contagem. Traduzindo a derivação para `where`, o filtro
+   * e a paginação passam a acontecer no mesmo lugar.
+   */
+  private whereStatusCobranca(status?: string) {
+    const agora = new Date();
+    if (status === 'vencido') return { status: 'aberto', vencimento: { lt: agora } };
+    if (status === 'aberto') return { status: 'aberto', vencimento: { gte: agora } };
+    return status ? { status } : {};
+  }
+
+  private whereCobrancas(filtros: { status?: string; alunoId?: string; tipo?: string }) {
+    return {
+      alunoId: filtros.alunoId,
+      tipo: filtros.tipo,
+      ...this.whereStatusCobranca(filtros.status),
+    };
+  }
+
+  private static readonly INCLUDE_COBRANCA = {
+    aluno: { include: { usuario: { select: { id: true, nome: true, email: true } } } },
+    notaFiscal: true,
+  };
+
+  /** Lista completa do filtro, sem paginação — usada internamente (ex.: exportação CSV). */
+  private async listarCobrancas(filtros: { status?: string; alunoId?: string; tipo?: string }) {
     const rows = await this.prisma.cobranca.findMany({
-      where: {
-        alunoId: filtros.alunoId,
-        tipo: filtros.tipo,
-        ...(filtros.status && filtros.status !== 'vencido' ? { status: filtros.status } : {}),
-      },
-      include: { aluno: { include: { usuario: { select: { id: true, nome: true, email: true } } } }, notaFiscal: true },
+      where: this.whereCobrancas(filtros),
+      include: FinanceService.INCLUDE_COBRANCA,
       orderBy: { vencimento: 'desc' },
     });
-    const comStatus = rows.map((c) => ({ ...c, status: this.statusEfetivo(c) }));
-    return filtros.status ? comStatus.filter((c) => c.status === filtros.status) : comStatus;
+    return rows.map((c) => ({ ...c, status: this.statusEfetivo(c) }));
+  }
+
+  async findAllCobrancas(
+    filtros: { status?: string; alunoId?: string; tipo?: string },
+    paginacao: PaginacaoQueryDto = {},
+  ) {
+    if (!pediuPaginacao(paginacao)) return this.listarCobrancas(filtros);
+
+    const where = this.whereCobrancas(filtros);
+    const { skip, take } = prismaSkipTake(paginacao);
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.cobranca.findMany({
+        where,
+        include: FinanceService.INCLUDE_COBRANCA,
+        orderBy: { vencimento: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.cobranca.count({ where }),
+    ]);
+    return montarPagina(rows.map((c) => ({ ...c, status: this.statusEfetivo(c) })), total, paginacao);
   }
 
   async findOneCobranca(id: string) {
@@ -242,7 +314,7 @@ export class FinanceService {
     if (cobranca.status === 'pago') throw new BadRequestException('Esta cobrança já está paga.');
     if (cobranca.status === 'cancelado') throw new BadRequestException('Não é possível marcar uma cobrança cancelada como paga.');
     const valorDevido = this.valorDevido(cobranca);
-    return this.prisma.cobranca.update({
+    const paga = await this.prisma.cobranca.update({
       where: { id },
       data: {
         status: 'pago',
@@ -252,6 +324,8 @@ export class FinanceService {
         atualizadoEm: new Date(),
       },
     });
+    await this.avisarAluno(cobranca.alunoId, 'Pagamento confirmado', `${cobranca.descricao} — ${FinanceService.fmtBRL(paga.valorPago)}.`);
+    return paga;
   }
 
   async negociar(id: string, dto: NegociarCobrancaDto) {
@@ -259,7 +333,7 @@ export class FinanceService {
     if (cobranca.status === 'pago' || cobranca.status === 'cancelado') {
       throw new BadRequestException('Não é possível negociar uma cobrança paga ou cancelada.');
     }
-    return this.prisma.cobranca.update({
+    const negociada = await this.prisma.cobranca.update({
       where: { id },
       data: {
         status: 'negociado',
@@ -269,15 +343,23 @@ export class FinanceService {
         atualizadoEm: new Date(),
       },
     });
+    await this.avisarAluno(
+      cobranca.alunoId,
+      'Cobrança renegociada',
+      `${cobranca.descricao} — vence em ${FinanceService.fmtData(negociada.vencimento)}, valor ${FinanceService.fmtBRL(negociada.valorOriginal)}.`,
+    );
+    return negociada;
   }
 
   async cancelar(id: string, dto: CancelarCobrancaDto) {
     const cobranca = await this.findOneCobranca(id);
     if (cobranca.status === 'pago') throw new BadRequestException('Não é possível cancelar uma cobrança já paga.');
-    return this.prisma.cobranca.update({
+    const cancelada = await this.prisma.cobranca.update({
       where: { id },
       data: { status: 'cancelado', motivoCancelamento: dto.motivo, atualizadoEm: new Date() },
     });
+    await this.avisarAluno(cobranca.alunoId, 'Cobrança cancelada', `${cobranca.descricao}. Motivo: ${dto.motivo}`);
+    return cancelada;
   }
 
   /** Idempotente por competência: rodar duas vezes pra mesma competência/serviço/aluno não duplica cobrança. */
@@ -322,12 +404,15 @@ export class FinanceService {
         },
       });
       geradas.push(cobranca);
+      await this.avisarAluno(alunoId, 'Nova mensalidade', `${cobranca.descricao} — ${FinanceService.fmtBRL(valorOriginal - valorDesconto)}, vence em ${FinanceService.fmtData(cobranca.vencimento)}.`);
     }
     return { geradas: geradas.length, ignoradas: matriculas.length - geradas.length, cobrancas: geradas };
   }
 
   async exportarCobrancasCsv(filtros: { status?: string; alunoId?: string; tipo?: string }) {
-    const cobrancas = await this.findAllCobrancas(filtros);
+    // Exportação é deliberadamente sem paginação: o CSV precisa do conjunto
+    // completo do filtro, não de uma página dele.
+    const cobrancas = await this.listarCobrancas(filtros);
     const linhas = [
       'aluno,ra,descricao,competencia,vencimento,valor,status',
       ...cobrancas.map((c) => {

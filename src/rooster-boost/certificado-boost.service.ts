@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { existsSync, mkdirSync, createWriteStream } from 'fs';
+import { createWriteStream } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 import PDFDocument from 'pdfkit';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
+import { PASTAS } from '../common/storage.config';
 
-export const CERTIFICADOS_DIR = join(process.cwd(), 'uploads', 'certificados-boost');
-if (!existsSync(CERTIFICADOS_DIR)) mkdirSync(CERTIFICADOS_DIR, { recursive: true });
+export const CERTIFICADOS_DIR = PASTAS.certificadosBoost();
 
 /**
  * Gera o PDF do certificado de conclusão e grava o registro `CertificadoBoost`.
@@ -36,6 +36,7 @@ export class CertificadoBoostService {
       alunoNome: matricula.boostUsuario.nome,
       cursoTitulo: matricula.curso.titulo,
       cargaHoraria: matricula.curso.cargaHoraria,
+      textoPersonalizado: matricula.curso.certificadoTexto,
       codigo,
       data: new Date(),
     });
@@ -45,9 +46,14 @@ export class CertificadoBoostService {
     });
   }
 
+  /** Troca {aluno}, {curso}, {cargaHoraria} e {data}; chave desconhecida é mantida como está. */
+  static aplicarModelo(modelo: string, valores: Record<string, string>): string {
+    return modelo.replace(/\{(\w+)\}/g, (inteiro, chave: string) => valores[chave] ?? inteiro);
+  }
+
   private gerarPdf(
     caminho: string,
-    info: { alunoNome: string; cursoTitulo: string; cargaHoraria: number; codigo: string; data: Date },
+    info: { alunoNome: string; cursoTitulo: string; cargaHoraria: number; textoPersonalizado?: string | null; codigo: string; data: Date },
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ layout: 'landscape', size: 'A4', margin: 50 });
@@ -66,22 +72,34 @@ export class CertificadoBoostService {
       doc.font('Helvetica-Bold').fontSize(30).fillColor('#111827')
         .text('Certificado de Conclusão', 0, 110, { align: 'center' });
 
-      doc.font('Helvetica').fontSize(14).fillColor('#374151')
-        .text('Certificamos que', 0, 175, { align: 'center' });
-
-      doc.font('Helvetica-Bold').fontSize(24).fillColor('#111827')
-        .text(info.alunoNome, 0, 200, { align: 'center' });
-
-      doc.font('Helvetica').fontSize(14).fillColor('#374151')
-        .text('concluiu com êxito o curso', 0, 240, { align: 'center' });
-
-      doc.font('Helvetica-Bold').fontSize(18).fillColor('#2b3a67')
-        .text(info.cursoTitulo, 0, 262, { align: 'center' });
-
-      doc.font('Helvetica').fontSize(13).fillColor('#374151')
-        .text(`carga horária de ${info.cargaHoraria} horas`, 0, 296, { align: 'center' });
-
       const dataFormatada = info.data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+
+      if (info.textoPersonalizado) {
+        // Texto definido pelo gestor do curso: um único parágrafo centralizado no lugar do bloco padrão.
+        const texto = CertificadoBoostService.aplicarModelo(info.textoPersonalizado, {
+          aluno: info.alunoNome,
+          curso: info.cursoTitulo,
+          cargaHoraria: String(info.cargaHoraria),
+          data: dataFormatada,
+        });
+        doc.font('Helvetica').fontSize(18).fillColor('#111827')
+          .text(texto, 90, 190, { align: 'center', width: largura - 180, lineGap: 6 });
+      } else {
+        doc.font('Helvetica').fontSize(14).fillColor('#374151')
+          .text('Certificamos que', 0, 175, { align: 'center' });
+
+        doc.font('Helvetica-Bold').fontSize(24).fillColor('#111827')
+          .text(info.alunoNome, 0, 200, { align: 'center' });
+
+        doc.font('Helvetica').fontSize(14).fillColor('#374151')
+          .text('concluiu com êxito o curso', 0, 240, { align: 'center' });
+
+        doc.font('Helvetica-Bold').fontSize(18).fillColor('#2b3a67')
+          .text(info.cursoTitulo, 0, 262, { align: 'center' });
+
+        doc.font('Helvetica').fontSize(13).fillColor('#374151')
+          .text(`carga horária de ${info.cargaHoraria} horas`, 0, 296, { align: 'center' });
+      }
       doc.font('Helvetica').fontSize(11).fillColor('#6b7280')
         .text(`Emitido em ${dataFormatada}`, 0, altura - 100, { align: 'center' });
       doc.font('Helvetica').fontSize(10).fillColor('#6b7280')

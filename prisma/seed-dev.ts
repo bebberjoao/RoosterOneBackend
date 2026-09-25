@@ -190,6 +190,7 @@ function permissionDefinitions(
     ['desk.tickets.transferir', 'Transferir chamado', deskModulo, '/desk/tickets', 'transferir'],
     ['desk.tickets.anexar', 'Anexar arquivo', deskModulo, '/desk/tickets', 'anexar'],
     ['desk.tickets.nota-interna', 'Registrar nota interna', deskModulo, '/desk/tickets', 'nota-interna'],
+    ['desk.tickets.ver-sla', 'Visualizar SLA', deskModulo, '/desk/tickets', 'ver-sla'],
     ['desk.categories.criar', 'Criar categoria', deskModulo, '/desk/categories', 'criar'],
     ['desk.categories.editar', 'Editar categoria', deskModulo, '/desk/categories', 'editar'],
     ['desk.categories.excluir', 'Excluir categoria', deskModulo, '/desk/categories', 'excluir'],
@@ -202,6 +203,8 @@ function permissionDefinitions(
     ['rooms.structure.editar', 'Editar estrutura física', roomsModulo, '/rooms/structure', 'editar'],
     ['rooms.structure.excluir', 'Excluir estrutura física', roomsModulo, '/rooms/structure', 'excluir'],
     ['rooms.book.solicitar', 'Solicitar reserva', roomsModulo, '/rooms/book', 'solicitar'],
+    ['rooms.book.solicitar-recorrente', 'Solicitar reserva recorrente', roomsModulo, '/rooms/book', 'solicitar-recorrente'],
+    ['rooms.book.prazo-estendido', 'Reservar com prazo estendido (sem limite de 15 dias)', roomsModulo, '/rooms/book', 'prazo-estendido'],
     ['rooms.manage.aprovar', 'Aprovar reserva', roomsModulo, '/rooms/manage', 'aprovar'],
     ['rooms.manage.responder', 'Responder solicitante (equipe)', roomsModulo, '/rooms/manage', 'responder'],
     ['rooms.manage.alterar-horario', 'Alterar horário (equipe)', roomsModulo, '/rooms/manage', 'alterar-horario'],
@@ -274,7 +277,14 @@ function permissionDefinitions(
     ['boost.manage.gerenciar-cursos', 'Gerenciar cursos Boost', boostModulo, '/boost/manage', 'gerenciar-cursos'],
     ['boost.manage.gerenciar-conteudo', 'Gerenciar módulos, aulas e materiais', boostModulo, '/boost/manage', 'gerenciar-conteudo'],
     ['boost.manage.ver-progresso', 'Ver progresso dos alunos', boostModulo, '/boost/manage', 'ver-progresso'],
-    ['boost.manage.mensagem', 'Conversar com alunos', boostModulo, '/boost/manage', 'mensagem'],
+    ['boost.manage.certificado', 'Configurar certificado do curso', boostModulo, '/boost/manage', 'certificado'],
+    ['boost.manage.vincular-orientadores', 'Vincular orientadores ao curso', boostModulo, '/boost/manage', 'vincular-orientadores'],
+    // Conversa aluno ↔ orientador: o professor vinculado a um curso só conversa (não gere o curso).
+    ['boost.conversas.acessar', 'Acessar conversas com alunos', boostModulo, '/boost/conversas', 'acessar'],
+    ['boost.conversas.responder', 'Responder alunos', boostModulo, '/boost/conversas', 'responder'],
+    // Contas externas (BoostUsuario) — gestão entre cursos, por isso tela própria.
+    ['boost.students.acessar', 'Ver contas externas do Boost', boostModulo, '/boost/students', 'acessar'],
+    ['boost.students.gerenciar', 'Ativar/desativar e redefinir senha de conta externa', boostModulo, '/boost/students', 'gerenciar'],
 
     // Rooster Finance
     ['finance.dashboard.acessar', 'Acessar Rooster Finance', financeModulo, '/finance', 'acessar'],
@@ -319,11 +329,18 @@ const deskManagementKeys = [
   'desk.categories.criar', 'desk.categories.editar', 'desk.categories.excluir',
   'desk.categories.subcategorias', 'desk.team.vincular-categoria',
 ];
+// SLA não entra em deskTicketOperationKeys de propósito: o solicitante parte de "não vê SLA"
+// (a permissão existe justamente para liberar/retirar isso), a equipe recebe por padrão.
+const deskSlaKeys = ['desk.tickets.ver-sla'];
 const roomsViewKeys = ['rooms.dashboard.acessar'];
 const roomsSelfServiceKeys = ['rooms.book.solicitar', 'rooms.reservations.mensagem', 'rooms.reservations.alterar-horario', 'rooms.reservations.cancelar'];
 const roomsManagementKeys = [
   'rooms.structure.criar', 'rooms.structure.editar', 'rooms.structure.excluir',
   'rooms.manage.aprovar', 'rooms.manage.responder', 'rooms.manage.alterar-horario', 'rooms.manage.cancelar',
+  // Prazo estendido / recorrência não são "gestão de sala" propriamente, mas ficam aqui (não em
+  // roomsSelfServiceKeys) de propósito: só quem já tem perfil de coordenação recebe essas duas
+  // por padrão — um solicitante comum fica limitado a 15 dias e sem recorrência.
+  'rooms.book.solicitar-recorrente', 'rooms.book.prazo-estendido',
 ];
 const assetsViewKeys = ['assets.dashboard.acessar'];
 const assetsOperationalKeys = ['assets.inventory.criar', 'assets.inventory.editar', 'assets.inventory.movimentar'];
@@ -350,12 +367,15 @@ const academyProfessorKeys = [
   'academy.grades.acessar', 'academy.grades.lancar-notas', 'academy.grades.configurar-pesos',
   'learn.dashboard.acessar', 'learn.classes.acessar', 'learn.classes.criar-atividade', 'learn.classes.corrigir', 'learn.classes.excluir',
   'student.documents.acessar',
-  // Instrutor do Boost = Professor do Academy que também dá curso lá (sem cadastro à parte).
-  // Sem `boost.manage.acessar` de propósito — essa é a permissão AMPLA (bypass de dono),
-  // exclusiva de coordenação/admin; o professor só gerencia o próprio curso (ownership
-  // check em `exigirDonoOuGestor`, igual ao Academy).
-  'boost.dashboard.acessar', 'boost.manage.gerenciar-cursos',
-  'boost.manage.gerenciar-conteudo', 'boost.manage.ver-progresso', 'boost.manage.mensagem',
+  // Orientador do Boost = Professor do Academy vinculado a um curso: SÓ conversa com os alunos
+  // dele. Gerir curso (criar, editar, tirar do ar, certificado) é permissão de gestão, abaixo.
+  'boost.conversas.acessar', 'boost.conversas.responder',
+];
+/** Gestão do Boost: age sobre TODOS os cursos (não existe mais "dono"). */
+const boostGestaoKeys = [
+  'boost.dashboard.acessar', 'boost.manage.acessar', 'boost.manage.gerenciar-cursos',
+  'boost.manage.gerenciar-conteudo', 'boost.manage.ver-progresso',
+  'boost.manage.certificado', 'boost.manage.vincular-orientadores',
 ];
 /** Aluno: portal do Rooster Student + as ações do Rooster Learn como respondente. */
 const alunoKeys = [
@@ -391,10 +411,12 @@ async function clearDatabase() {
     prisma.certificadoBoost.deleteMany(),
     prisma.progressoAula.deleteMany(),
     prisma.mensagemBoost.deleteMany(),
+    prisma.conversaBoost.deleteMany(),
     prisma.matriculaBoost.deleteMany(),
     prisma.materialApoio.deleteMany(),
     prisma.aulaBoost.deleteMany(),
     prisma.moduloBoost.deleteMany(),
+    prisma.cursoOrientadorBoost.deleteMany(),
     prisma.cursoBoost.deleteMany(),
     prisma.boostUsuario.deleteMany(),
     prisma.anexoEntrega.deleteMany(),
@@ -491,10 +513,10 @@ async function main() {
   await grant(ids.users.admin, [...permissions.keys()]);
 
   const solicitantePermissions = [...deskTicketOperationKeys.filter((k) => k !== 'desk.tickets.encerrar' && k !== 'desk.tickets.reabrir' && k !== 'desk.tickets.transferir'), ...roomsViewKeys, ...roomsSelfServiceKeys];
-  const atendentePermissions = [...deskTicketOperationKeys, ...roomsViewKeys, ...assetsViewKeys, ...assetsOperationalKeys];
+  const atendentePermissions = [...deskTicketOperationKeys, ...deskSlaKeys, ...roomsViewKeys, ...assetsViewKeys, ...assetsOperationalKeys];
   const visualizadorPermissions = ['desk.dashboard.acessar', 'desk.tickets.acessar', ...roomsViewKeys, ...assetsViewKeys];
   const coordenadorPermissions = [
-    ...deskTicketOperationKeys, ...deskManagementKeys,
+    ...deskTicketOperationKeys, ...deskSlaKeys, ...deskManagementKeys,
     ...roomsViewKeys, ...roomsSelfServiceKeys, ...roomsManagementKeys,
     ...assetsViewKeys, ...assetsOperationalKeys, ...assetsManagementKeys,
   ];
@@ -710,7 +732,7 @@ async function main() {
   // Rooster Academy / Learn / Student — usuários e dados de exemplo
   // =====================================================
   await prisma.usuario.create({ data: { id: ids.academyUsers.coordenador, nome: 'Coordenadora Julia Prado', email: 'coordenacao.academica@rooster.local', senhaHash: await senha('Coordenador123!'), ativo: true } });
-  await grant(ids.academyUsers.coordenador, academyCoordenadorKeys);
+  await grant(ids.academyUsers.coordenador, [...academyCoordenadorKeys, ...boostGestaoKeys]);
 
   await prisma.usuario.create({ data: { id: ids.academyUsers.professorLima, nome: 'Prof. Ricardo Lima', email: 'ricardo.lima@rooster.local', senhaHash: await senha('Professor123!'), ativo: true } });
   await grant(ids.academyUsers.professorLima, academyProfessorKeys);
@@ -904,9 +926,10 @@ async function main() {
       titulo: 'Fundamentos de Lógica de Programação', slug: 'fundamentos-logica-programacao',
       descricao: 'Introdução a variáveis, estruturas de decisão, laços e lógica algorítmica, com exercícios práticos.',
       categoria: 'Tecnologia', nivel: 'iniciante', cargaHoraria: 20, status: 'publicado', emiteCertificado: true,
-      professorId: ids.professores.lima, criadoEm: new Date(), atualizadoEm: new Date(),
+      criadoEm: new Date(), atualizadoEm: new Date(),
     },
   });
+  await prisma.cursoOrientadorBoost.create({ data: { cursoId: cursoBoost.id, professorId: ids.professores.lima, criadoEm: new Date() } });
   const moduloBoost1 = await prisma.moduloBoost.create({ data: { cursoId: cursoBoost.id, titulo: 'Primeiros passos', ordem: 1 } });
   const moduloBoost2 = await prisma.moduloBoost.create({ data: { cursoId: cursoBoost.id, titulo: 'Estruturas de controle', ordem: 2 } });
   const aulaBoost1 = await prisma.aulaBoost.create({ data: { moduloId: moduloBoost1.id, titulo: 'O que é lógica de programação', ordem: 1, tipo: 'texto', conteudoTexto: 'Lógica de programação é a técnica de encadear pensamentos para atingir um objetivo definido.', duracaoMin: 15 } });
@@ -924,11 +947,14 @@ async function main() {
       { matriculaId: matriculaBoost.id, aulaId: aulaBoost2.id, concluidoEm: new Date() },
     ],
   });
-  await prisma.mensagemBoost.create({
-    data: { cursoId: cursoBoost.id, boostUsuarioId: boostAluno.id, mensagem: 'Professor, qual a diferença entre laço "para" e "enquanto"?', criadoEm: new Date() },
+  const conversaBoost = await prisma.conversaBoost.create({
+    data: { cursoId: cursoBoost.id, boostUsuarioId: boostAluno.id, criadoEm: new Date(), ultimaMensagemEm: new Date() },
   });
   await prisma.mensagemBoost.create({
-    data: { cursoId: cursoBoost.id, professorId: ids.professores.lima, mensagem: 'Boa pergunta! Veremos isso em detalhes na próxima aula.', criadoEm: new Date() },
+    data: { conversaId: conversaBoost.id, boostUsuarioId: boostAluno.id, mensagem: 'Professor, qual a diferença entre laço "para" e "enquanto"?', lidaEm: new Date(), criadoEm: new Date() },
+  });
+  await prisma.mensagemBoost.create({
+    data: { conversaId: conversaBoost.id, professorId: ids.professores.lima, mensagem: 'Boa pergunta! Veremos isso em detalhes na próxima aula.', criadoEm: new Date() },
   });
 
   console.log('Banco de desenvolvimento limpo e populado.');
@@ -941,7 +967,7 @@ async function main() {
   console.log('Academy/Learn/Student: coordenacao.academica@rooster.local / Coordenador123!');
   console.log('  Professores: ricardo.lima@rooster.local, fernanda.costa@rooster.local / Professor123!');
   console.log('  Alunos: joao.pereira@rooster.local (turma ALG101-A), maria.santos@rooster.local (turma BD101-A) / Aluno123!');
-  console.log('Rooster Boost: instrutor ricardo.lima@rooster.local / Professor123! (curso "Fundamentos de Lógica de Programação")');
+  console.log('Rooster Boost: orientador ricardo.lima@rooster.local / Professor123! (só conversas); gestão: coordenacao.academica@rooster.local e admin (curso "Fundamentos de Lógica de Programação")');
   console.log('  Aluno externo (login próprio, fora do Hub): camila.externa@example.com / Boost123!');
   console.log('Rooster Finance: financeiro@rooster.local / Financeiro123!');
   console.log('  João (sem desconto): paga, vencida com boleto emitido e futura. Maria (bolsa 50%): paga e futura.');

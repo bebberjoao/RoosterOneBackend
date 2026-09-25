@@ -1,6 +1,6 @@
 # Entidades — Rooster One
 
-Fonte: `prisma/schema.prisma`. Todos os models estão documentados (45 no total), agrupados pelos 6 módulos de negócio com backend (Hub, Desk, Rooms, Assets, Academy, Learn). Nomes de coluna reais indicados quando há `@map`; nome da tabela real indicado pelo `@@map`.
+Fonte: `prisma/schema.prisma`. Todos os models estão documentados (**60 no total**), agrupados pelos **8 módulos de negócio com tabelas próprias** (Hub, Desk, Rooms, Assets, Academy, Learn, Boost, Finance). Rooster Student não tem tabela própria — usa as do Academy/Learn/Finance. Nomes de coluna reais indicados quando há `@map`; nome da tabela real indicado pelo `@@map`.
 
 Legenda de nullability: **obrigatório** = coluna `NOT NULL` no Postgres (campo sem `?` no Prisma); **opcional** = coluna aceita `NULL` (campo com `?`).
 
@@ -202,11 +202,13 @@ Tabela de junção N:N entre `SubcategoriaTicket` e `Usuario` (atendentes vincul
 
 ### PrioridadeTicket — tabela `prioridades_tickets`
 
-PK: `id` — **atenção**: `id String @id` **sem** `@default(uuid())` e **sem** `@db.Uuid` (coluna é `TEXT`, não `UUID`). Isso porque os valores são fixos/curados (`"1"`..`"4"`) e inseridos manualmente na migration `20260819203000_fixed_ticket_priorities`, não gerados como UUID.
+PK: `id String @id @default(uuid())`, **sem** `@db.Uuid` (coluna é `TEXT`, não `UUID`, mas o valor gerado é um UUID em formato de texto). As 4 prioridades do seed (`"1"`..`"4"`) têm id manual/curado, inserido pela migration `20260819203000_fixed_ticket_priorities`; qualquer prioridade criada depois via API recebe um id gerado pelo `@default(uuid())`.
+
+> **Bug de schema corrigido (setembro/2026).** Essa migration, ao converter a coluna de UUID pra TEXT, tinha derrubado o `@default(uuid())` do `schema.prisma` de produção (só `schema.test.prisma`, o schema de teste em SQLite, mantinha o default — por isso o bug nunca apareceu nos testes e2e). Qualquer `PrioridadeTicket` criada via API real (PostgreSQL) teria falhado com violação de `NOT NULL` na coluna `id`. Restaurado o `@default(uuid())`; como esse default é gerado pelo **Prisma Client**, não uma `DEFAULT` do Postgres (confirmado por auditoria do histórico de migrations — nenhuma gerou SQL para esse default em nenhum model do projeto), a correção não exigiu nenhuma migration nova, só regenerar o client (`prisma generate`). Ver também o bug irmão em `CreateTicketDto.prioridadeId` (`docs/api/02-endpoints.md`, seção "POST /chamados").
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability |
 |---|---|---|---|
-| id | id | Text (String, sem `@db.Uuid`) | obrigatório, id manual (`"1"`, `"2"`, `"3"`, `"4"`) |
+| id | id | Text (String, sem `@db.Uuid`) | obrigatório, `@default(uuid())`; 4 valores do seed são manuais (`"1"`..`"4"`) |
 | nome | nome | VarChar(50) | obrigatório |
 | cor | cor | VarChar(20) | opcional |
 | criadoEm | criado_em | Timestamp | opcional |
@@ -812,9 +814,9 @@ PK: `id`. FK: `entregaId` → `Entrega.id` (`ON DELETE CASCADE`).
 
 ---
 
-## Módulo Boost (9 entidades)
+## Módulo Boost (11 entidades)
 
-`BoostUsuario` é uma tabela de login **paralela** a `Usuario` (Hub) — cadastro público e independente, nunca ligada a `usuarios`. O instrutor de um `CursoBoost` é sempre um `Professor` (FK existente do Academy); o aluno é sempre um `BoostUsuario`. Ver `docs/security/03-rbac.md` para o racional dos dois logins.
+`BoostUsuario` é uma tabela de login **paralela** a `Usuario` (Hub) — cadastro público e independente, nunca ligada a `usuarios`. O `CursoBoost` **não tem dono**: quem gerencia é quem tem a permissão. Professores do Academy entram como **orientadores** (`CursoOrientadorBoost`) só para conversar com os alunos; o aluno é sempre um `BoostUsuario`. Ver `docs/security/03-rbac.md` para o racional dos dois logins.
 
 ### BoostUsuario — tabela `boost_usuarios`
 
@@ -829,11 +831,11 @@ PK: `id`.
 | ativo | ativo | Boolean | obrigatório | default `true` |
 | criadoEm | criado_em | Timestamp | opcional | |
 
-Relações: `matriculas` → `MatriculaBoost[]`, `mensagens` → `MensagemBoost[]`.
+Relações: `matriculas` → `MatriculaBoost[]`, `mensagens` → `MensagemBoost[]`, `conversas` → `ConversaBoost[]`.
 
 ### CursoBoost — tabela `cursos_boost`
 
-PK: `id`. FK: `professorId` → `Professor.id`.
+PK: `id`. Sem FK de professor (não há dono; ver `CursoOrientadorBoost`).
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
 |---|---|---|---|---|
@@ -846,11 +848,22 @@ PK: `id`. FK: `professorId` → `Professor.id`.
 | cargaHoraria | carga_horaria | Int | obrigatório | horas — impressa no certificado |
 | capa | capa | VarChar(255) | opcional | |
 | status | status | VarChar(20) | obrigatório | default `rascunho`; `rascunho` \| `publicado` \| `arquivado` — só `publicado` aparece no catálogo público |
-| emiteCertificado | emite_certificado | Boolean | obrigatório | default `true` |
-| professorId | professor_id | Uuid | obrigatório | dono/instrutor — nunca reatribuído após criado |
+| emiteCertificado | emite_certificado | Boolean | obrigatório | default `true`. Desligado, o curso é só material de apoio: conclui sem emitir certificado. Só se altera pela ação `certificado` |
+| certificadoTexto | certificado_texto | Text | opcional | modelo do texto impresso no certificado (`{aluno}`, `{curso}`, `{cargaHoraria}`, `{data}`); vazio = texto padrão. Adicionado em setembro/2026 |
 | criadoEm / atualizadoEm | criado_em / atualizado_em | Timestamp | opcional | |
 
-Relações: `professor` → `Professor`, `modulos` → `ModuloBoost[]`, `matriculas` → `MatriculaBoost[]`, `mensagens` → `MensagemBoost[]`.
+Relações: `modulos` → `ModuloBoost[]`, `matriculas` → `MatriculaBoost[]`, `orientadores` → `CursoOrientadorBoost[]`, `conversas` → `ConversaBoost[]`.
+
+### CursoOrientadorBoost — tabela `cursos_orientadores_boost`
+
+Professor vinculado a um curso para conversar com os alunos dele — **não dá poder de gestão**. PK: `id`. FK: `cursoId` → `CursoBoost.id` (`ON DELETE CASCADE`), `professorId` → `Professor.id` (`RESTRICT`). `@@unique([cursoId, professorId])`.
+
+| Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
+|---|---|---|---|---|
+| id | id | Uuid | obrigatório | |
+| cursoId | curso_id | Uuid | obrigatório | |
+| professorId | professor_id | Uuid | obrigatório | |
+| criadoEm | criado_em | Timestamp | opcional | |
 
 ### ModuloBoost — tabela `modulos_boost`
 
@@ -879,6 +892,9 @@ PK: `id`. FK: `moduloId` → `ModuloBoost.id` (`ON DELETE CASCADE`).
 | conteudoUrl | conteudo_url | VarChar(500) | opcional | link externo (ex.: vídeo) |
 | conteudoTexto | conteudo_texto | Text | opcional | |
 | duracaoMin | duracao_min | Int | opcional | |
+| videoArquivo | video_arquivo | VarChar(255) | opcional | **vídeo hospedado** (setembro/2026): nome do arquivo em disco, na pasta configurada por `BOOST_VIDEOS_DIR` (padrão `uploads/videos-boost/`). Presença deste campo é o que distingue vídeo hospedado de link externo (`conteudoUrl`) — não há enum/flag separado, de propósito, para os dois nunca poderem divergir sobre qual é a fonte real |
+| **videoTamanho** | video_tamanho | **BigInt** | opcional | até 2GB, então excede o `Int` de 32 bits. Mesmo padrão de `MaterialApoio.tamanho` — convertido para `Number` antes da resposta JSON (`BoostService.serializeAula`/`serializeCursoAninhado`). Toda resposta que devolve a aula crua precisa passar por esse serializador, senão `JSON.stringify` lança `TypeError` |
+| videoMimeType | video_mime_type | VarChar(80) | opcional | `video/mp4`, `video/webm` ou `video/quicktime` — usado como `Content-Type` no streaming |
 
 Relações: `modulo` → `ModuloBoost`, `materiais` → `MaterialApoio[]`, `progresso` → `ProgressoAula[]`.
 
@@ -920,20 +936,39 @@ PK: `id`. FK: `matriculaId` → `MatriculaBoost.id` (`ON DELETE CASCADE`), `aula
 | id | id | Uuid | obrigatório | |
 | matriculaId | matricula_id | Uuid | obrigatório | |
 | aulaId | aula_id | Uuid | obrigatório | |
-| concluidoEm | concluido_em | Timestamp | opcional | upsert — marcar a mesma aula de novo atualiza a data, não duplica a linha |
+| concluidoEm | concluido_em | Timestamp | opcional | upsert — marcar a mesma aula de novo atualiza a data, não duplica a linha. **Só este campo indica "aula concluída"** — ver a advertência abaixo |
+| posicaoSeg | posicao_seg | Int | opcional | default `0` — posição do vídeo em segundos, para retomar de onde parou (setembro/2026) |
+| percentualAssistido | percentual_assistido | Int | opcional | default `0` — o **maior** percentual já assistido; nunca regride mesmo que o aluno volte o vídeo. Ao cruzar 90%, a aula se completa sozinha |
 
-### MensagemBoost — tabela `mensagens_boost`
+**Advertência — a existência da linha deixou de significar "concluída".** Antes do progresso real de vídeo, só `concluirAula` criava linhas em `ProgressoAula`, sempre já com `concluidoEm` preenchido; contar linhas era equivalente a contar aulas concluídas. Agora `PATCH /boost/aulas/:id/progresso` também cria linhas para registrar posição sem necessariamente concluir a aula. Por isso o cálculo de `progressoPct` da matrícula filtra `concluidoEm: { not: null }` explicitamente (`BoostPortalService.recalcularProgressoEEmitirCertificado`). Qualquer consulta futura que queira saber "quais aulas foram concluídas" precisa fazer o mesmo.
 
-PK: `id`. FK: `cursoId` → `CursoBoost.id` (`ON DELETE CASCADE`), `boostUsuarioId` → `BoostUsuario.id` (opcional), `professorId` → `Professor.id` (opcional).
+### ConversaBoost — tabela `conversas_boost`
+
+Uma conversa contínua por (curso, aluno), atendida por qualquer orientador do curso. Criada na primeira consulta do aluno. PK: `id`. FK: `cursoId` → `CursoBoost.id` e `boostUsuarioId` → `BoostUsuario.id` (ambas `ON DELETE CASCADE`). `@@unique([cursoId, boostUsuarioId])`.
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
 |---|---|---|---|---|
 | id | id | Uuid | obrigatório | |
 | cursoId | curso_id | Uuid | obrigatório | |
-| boostUsuarioId | boost_usuario_id | Uuid | opcional | preenchido quando o autor é o aluno |
-| professorId | professor_id | Uuid | opcional | preenchido quando o autor é o instrutor — os dois campos nunca são preenchidos juntos, mas isso é garantido pela aplicação (`BoostService.createMensagemComoProfessor` / `BoostPortalService.createMensagem`), não por uma constraint do banco |
-| mensagem | mensagem | Text | obrigatório | |
+| boostUsuarioId | boost_usuario_id | Uuid | obrigatório | o aluno dono da conversa |
 | criadoEm | criado_em | Timestamp | opcional | |
+| ultimaMensagemEm | ultima_mensagem_em | Timestamp | opcional | ordena a caixa de entrada do orientador |
+
+### MensagemBoost — tabela `mensagens_boost`
+
+Mensagem de uma `ConversaBoost`. PK: `id`. FK: `conversaId` → `ConversaBoost.id` (`ON DELETE CASCADE`), `boostUsuarioId` → `BoostUsuario.id` (opcional), `professorId` → `Professor.id` (opcional).
+
+| Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
+|---|---|---|---|---|
+| id | id | Uuid | obrigatório | |
+| conversaId | conversa_id | Uuid | obrigatório | substituiu `cursoId` (o chat deixou de ser uma sala única por curso) |
+| boostUsuarioId | boost_usuario_id | Uuid | opcional | preenchido quando o autor é o aluno |
+| professorId | professor_id | Uuid | opcional | preenchido quando o autor é o orientador — os dois campos nunca são preenchidos juntos, garantido pela aplicação (`BoostService.createMensagemComoOrientador` / `BoostPortalService.createMensagem`) |
+| mensagem | mensagem | Text | obrigatório | |
+| lidaEm | lida_em | Timestamp | opcional | lida pela **outra ponta**: mensagem do aluno lida por um orientador; resposta do orientador lida pelo aluno. Sem `lidaEm` = não lida (contador da caixa de entrada) |
+| criadoEm | criado_em | Timestamp | opcional | |
+
+Índice: `(conversaId, criadoEm)`.
 
 ### CertificadoBoost — tabela `certificados_boost`
 
@@ -1077,4 +1112,4 @@ Documento **interno**, gerado por `NotaFiscalService.emitir()` (PDF via `pdfkit`
 | Finance | 6 |
 | **Total** | **60** |
 
-O total de 54 corresponde exatamente ao número de `model` declarados em `prisma/schema.prisma` (confirmado por leitura integral do arquivo, sem nenhum model omitido).
+O total de 60 corresponde exatamente ao número de `model` declarados em `prisma/schema.prisma` (confirmado por contagem direta: `grep -c "^model " prisma/schema.prisma`).

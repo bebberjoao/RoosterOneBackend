@@ -36,6 +36,7 @@ model Usuario {
   redefinicoesSenha RedefinicaoSenha[]
   professorAcademico Professor?
   alunoAcademico     Aluno?
+  subcategoriasAtendidas AtendimentoSubcategoria[]
 }
 
 model RedefinicaoSenha {
@@ -167,9 +168,28 @@ model SubcategoriaTicket {
   nome String
   descricao String?
   ativo Boolean @default(true)
+  slaHoras Int @default(8)
   criadoEm DateTime?
   categoria CategoriaTicket? @relation(fields: [categoriaId], references: [id])
   tickets Ticket[]
+  atendentes AtendimentoSubcategoria[]
+}
+
+// Espelho de AtendimentoSubcategoria (schema.prisma) — faltava neste schema de
+// teste, o que fazia GET /chamados-categorias (findCategoriesForUser, que
+// inclui subcategorias.atendentes) estourar 500 sempre que exercitado contra
+// SQLite. Nenhum teste chamava esse endpoint antes, então nunca foi pego —
+// achado real, ao adicionar cobertura para o formulário de novo chamado.
+model AtendimentoSubcategoria {
+  id             String @id @default(uuid())
+  subcategoriaId String
+  usuarioId      String
+  criadoEm       DateTime?
+
+  subcategoria SubcategoriaTicket @relation(fields: [subcategoriaId], references: [id], onDelete: Cascade)
+  usuario      Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([subcategoriaId, usuarioId])
 }
 
 model PrioridadeTicket {
@@ -497,7 +517,7 @@ model Professor {
   usuario Usuario @relation(fields: [usuarioId], references: [id])
   turmas Turma[]
   atividades Atividade[]
-  cursosBoost CursoBoost[]
+  orientacoesBoost CursoOrientadorBoost[]
   mensagensBoost MensagemBoost[]
 }
 
@@ -687,6 +707,7 @@ model BoostUsuario {
   criadoEm DateTime?
   matriculas MatriculaBoost[]
   mensagens MensagemBoost[]
+  conversas ConversaBoost[]
 }
 
 model CursoBoost {
@@ -700,13 +721,35 @@ model CursoBoost {
   capa String?
   status String @default("rascunho")
   emiteCertificado Boolean @default(true)
-  professorId String
+  certificadoTexto String?
   criadoEm DateTime?
   atualizadoEm DateTime?
-  professor Professor @relation(fields: [professorId], references: [id])
   modulos ModuloBoost[]
   matriculas MatriculaBoost[]
+  orientadores CursoOrientadorBoost[]
+  conversas ConversaBoost[]
+}
+
+model CursoOrientadorBoost {
+  id String @id @default(uuid())
+  cursoId String
+  professorId String
+  criadoEm DateTime?
+  curso CursoBoost @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  professor Professor @relation(fields: [professorId], references: [id])
+  @@unique([cursoId, professorId])
+}
+
+model ConversaBoost {
+  id String @id @default(uuid())
+  cursoId String
+  boostUsuarioId String
+  criadoEm DateTime?
+  ultimaMensagemEm DateTime?
+  curso CursoBoost @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  boostUsuario BoostUsuario @relation(fields: [boostUsuarioId], references: [id], onDelete: Cascade)
   mensagens MensagemBoost[]
+  @@unique([cursoId, boostUsuarioId])
 }
 
 model ModuloBoost {
@@ -727,6 +770,9 @@ model AulaBoost {
   conteudoUrl String?
   conteudoTexto String?
   duracaoMin Int?
+  videoArquivo String?
+  videoTamanho BigInt?
+  videoMimeType String?
   modulo ModuloBoost @relation(fields: [moduloId], references: [id], onDelete: Cascade)
   materiais MaterialApoio[]
   progresso ProgressoAula[]
@@ -764,6 +810,8 @@ model ProgressoAula {
   matriculaId String
   aulaId String
   concluidoEm DateTime?
+  posicaoSeg Int? @default(0)
+  percentualAssistido Int? @default(0)
   matricula MatriculaBoost @relation(fields: [matriculaId], references: [id], onDelete: Cascade)
   aula AulaBoost @relation(fields: [aulaId], references: [id], onDelete: Cascade)
 
@@ -772,12 +820,13 @@ model ProgressoAula {
 
 model MensagemBoost {
   id String @id @default(uuid())
-  cursoId String
+  conversaId String
   boostUsuarioId String?
   professorId String?
   mensagem String
+  lidaEm DateTime?
   criadoEm DateTime?
-  curso CursoBoost @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  conversa ConversaBoost @relation(fields: [conversaId], references: [id], onDelete: Cascade)
   boostUsuario BoostUsuario? @relation(fields: [boostUsuarioId], references: [id])
   professor Professor? @relation(fields: [professorId], references: [id])
 }

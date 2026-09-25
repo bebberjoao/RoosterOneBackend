@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { CreateLogAuditoriaDto } from './dto/create-log-auditoria.dto';
 import { UpdateLogAuditoriaDto } from './dto/update-log-auditoria.dto';
+import { PaginacaoQueryDto, montarPagina, pediuPaginacao, prismaSkipTake } from '../../common/pagination';
 
 @Injectable()
 export class LogsAuditoriaService {
@@ -25,8 +26,24 @@ export class LogsAuditoriaService {
     }
   }
 
-  async findAll() {
-    return this.prisma.logAuditoria.findMany({ orderBy: { criadoEm: 'desc' } });
+  /**
+   * Sem `pagina`/`limite`, devolve a lista completa (contrato histórico).
+   * Com qualquer um dos dois, devolve o envelope paginado.
+   *
+   * Esta é a tabela que mais cresce do sistema: nada é expurgado dela (não há
+   * política de retenção — ver docs/engineering/13-governanca.md, risco R-08).
+   */
+  async findAll(paginacao: PaginacaoQueryDto = {}) {
+    const orderBy = { criadoEm: 'desc' } as const;
+    if (!pediuPaginacao(paginacao)) {
+      return this.prisma.logAuditoria.findMany({ orderBy });
+    }
+    const { skip, take } = prismaSkipTake(paginacao);
+    const [dados, total] = await this.prisma.$transaction([
+      this.prisma.logAuditoria.findMany({ orderBy, skip, take }),
+      this.prisma.logAuditoria.count(),
+    ]);
+    return montarPagina(dados, total, paginacao);
   }
 
   async findOne(id: string) {

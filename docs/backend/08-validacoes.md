@@ -25,7 +25,9 @@ Um `Create*Dto` por entidade, decorado campo a campo; `Update*Dto` sempre `exten
 @IsOptional() @Transform(...) @IsBoolean() ativo?: boolean;
 ```
 
-**Inconsistência observada**: a criação de usuário exige senha com no mínimo **8** caracteres (`CreateUsuarioDto`), mas o fluxo de redefinição de senha (`RedefinirSenhaDto`, esqueci-minha-senha) aceita a partir de **6** caracteres. Não há um valor mínimo único de senha em todo o sistema.
+**Senha mínima: 8 caracteres, em todo fluxo que define senha** — `CreateUsuarioDto.senhaHash`, `RedefinirSenhaDto.novaSenha` e o cadastro público do Boost. `LoginDto.senha` e o login do Boost não impõem mínimo de propósito: senha curta ali é credencial errada (`401`), não requisição malformada (`400`), e recusar por tamanho vazaria a política de senha para quem tenta adivinhar.
+
+> **Inconsistência corrigida (setembro/2026)**: `RedefinirSenhaDto` aceitava **6** caracteres enquanto os demais exigiam 8. Não era só divergência de documentação — dava para contornar o mínimo de 8 usando o fluxo de "esqueci minha senha" para definir uma senha de 6. Unificado em 8, com teste travando a regressão em `src/common/validacao-dtos.spec.ts`.
 
 ### Exemplo — `CreateReservaDto` (`src/rooster-rooms/dto/create-reserva.dto.ts`)
 

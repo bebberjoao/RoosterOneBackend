@@ -1,0 +1,24 @@
+sequenceDiagram
+  actor P as Professor
+  participant FE as Frontend
+  participant CTRL as LearnController
+  participant LS as LearnService
+  participant AS as AcademyService
+  participant DB as PostgreSQL
+
+  P->>FE: lanca nota + feedback na entrega
+  FE->>CTRL: PATCH /entregas/:id/corrigir
+  CTRL->>AS: isTurmaDoProfessor(turmaId, professorId)
+  alt nao e dono da turma e nao e gestor
+    CTRL-->>FE: 403 Forbidden
+  else tem posse ou e coordenacao
+    CTRL->>LS: corrigirEntrega(id, nota, feedback)
+    LS->>DB: BEGIN TRANSACTION
+    LS->>DB: atualiza Entrega (nota, feedback)
+    LS->>DB: busca ItemAvaliativo origem=learn da Atividade
+    LS->>DB: upsert Nota do Aluno no ItemAvaliativo
+    LS->>DB: COMMIT
+    LS-->>CTRL: entrega corrigida
+    CTRL-->>FE: 200
+    FE-->>P: nota ja refletida no Academy
+  end

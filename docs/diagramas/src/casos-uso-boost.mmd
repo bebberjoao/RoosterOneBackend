@@ -1,0 +1,29 @@
+flowchart LR
+  INS((Instrutor - login do Hub))
+  EXT((Aluno externo - login proprio))
+  VIS((Visitante nao autenticado))
+
+  subgraph Boost[Rooster Boost]
+    B1([Criar e publicar curso])
+    B2([Organizar modulos e aulas])
+    B3([Anexar material de apoio])
+    B4([Acompanhar progresso da turma])
+    B5([Conversar no chat do curso])
+    B6([Navegar no catalogo publico])
+    B7([Cadastrar-se])
+    B8([Matricular-se em curso])
+    B9([Concluir aulas])
+    B10([Baixar certificado])
+  end
+
+  INS --> B1
+  INS --> B2
+  INS --> B3
+  INS --> B4
+  INS --> B5
+  VIS --> B6
+  VIS --> B7
+  EXT --> B8
+  EXT --> B9
+  EXT --> B10
+  EXT --> B5

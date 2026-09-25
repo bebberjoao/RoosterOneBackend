@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
+import { PaginacaoQueryDto, montarPagina, pediuPaginacao, prismaSkipTake } from '../common/pagination';
 import {
   CreateAlunoDto, CreateCursoDto, CreateDisciplinaDto, CreateEventoCalendarioDto,
   CreateItemAvaliativoDto, CreateMatriculaDto, CreatePeriodoLetivoDto, CreateProfessorDto,
@@ -199,12 +200,23 @@ export class AcademyService {
       this.handleError(error, 'criar aluno');
     }
   }
-  findAllAlunos(cursoId?: string) {
-    return this.prisma.aluno.findMany({
-      where: cursoId ? { cursoId } : undefined,
+  async findAllAlunos(cursoId?: string, paginacao: PaginacaoQueryDto = {}) {
+    const where = cursoId ? { cursoId } : {};
+    const consulta = {
+      where,
       orderBy: { criadoEm: 'desc' },
       include: { usuario: { select: { id: true, nome: true, email: true, ativo: true } }, curso: true },
-    });
+    } satisfies Prisma.AlunoFindManyArgs;
+
+    if (!pediuPaginacao(paginacao)) {
+      return this.prisma.aluno.findMany(consulta);
+    }
+
+    const [total, dados] = await this.prisma.$transaction([
+      this.prisma.aluno.count({ where }),
+      this.prisma.aluno.findMany({ ...consulta, ...prismaSkipTake(paginacao) }),
+    ]);
+    return montarPagina(dados, total, paginacao);
   }
   async findOneAluno(id: string) {
     const aluno = await this.prisma.aluno.findUnique({
@@ -252,13 +264,17 @@ export class AcademyService {
       this.handleError(error, 'criar turma');
     }
   }
-  findAllTurmas(filtros: { disciplinaId?: string; periodoLetivoId?: string; professorId?: string }) {
-    return this.prisma.turma.findMany({
-      where: {
-        ...(filtros.disciplinaId ? { disciplinaId: filtros.disciplinaId } : {}),
-        ...(filtros.periodoLetivoId ? { periodoLetivoId: filtros.periodoLetivoId } : {}),
-        ...(filtros.professorId ? { professorId: filtros.professorId } : {}),
-      },
+  async findAllTurmas(
+    filtros: { disciplinaId?: string; periodoLetivoId?: string; professorId?: string },
+    paginacao: PaginacaoQueryDto = {},
+  ) {
+    const where = {
+      ...(filtros.disciplinaId ? { disciplinaId: filtros.disciplinaId } : {}),
+      ...(filtros.periodoLetivoId ? { periodoLetivoId: filtros.periodoLetivoId } : {}),
+      ...(filtros.professorId ? { professorId: filtros.professorId } : {}),
+    };
+    const consulta = {
+      where,
       orderBy: { criadoEm: 'desc' },
       include: {
         disciplina: true,
@@ -266,7 +282,17 @@ export class AcademyService {
         professor: { include: { usuario: { select: { id: true, nome: true } } } },
         _count: { select: { matriculas: true } },
       },
-    });
+    } satisfies Prisma.TurmaFindManyArgs;
+
+    if (!pediuPaginacao(paginacao)) {
+      return this.prisma.turma.findMany(consulta);
+    }
+
+    const [total, dados] = await this.prisma.$transaction([
+      this.prisma.turma.count({ where }),
+      this.prisma.turma.findMany({ ...consulta, ...prismaSkipTake(paginacao) }),
+    ]);
+    return montarPagina(dados, total, paginacao);
   }
   async findOneTurma(id: string) {
     const turma = await this.prisma.turma.findUnique({

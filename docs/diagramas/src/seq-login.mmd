@@ -1,0 +1,29 @@
+sequenceDiagram
+  actor U as Usuario
+  participant FE as Frontend
+  participant API as AuthController
+  participant SVC as UsuariosService
+  participant DB as PostgreSQL
+  participant AUD as AuditoriaService
+
+  U->>FE: e-mail + senha
+  FE->>API: POST /auth/login
+  API->>SVC: login(email, senha)
+  SVC->>DB: busca Usuario por email
+  DB-->>SVC: usuario + senhaHash
+  SVC->>SVC: bcrypt.compare(senha, senhaHash)
+  alt senha valida e usuario ativo
+    SVC->>DB: atualiza ultimoLogin
+    SVC->>AUD: registra login_sucesso
+    SVC-->>API: accessToken (JWT 8h)
+    API-->>FE: 200 { accessToken, usuario }
+    FE->>API: GET /usuarios/:id/acesso
+    API-->>FE: permissoes + modulos
+    FE->>FE: monta navegacao so com o permitido
+    FE-->>U: dashboard
+  else falha
+    SVC->>AUD: registra login_falha
+    SVC-->>API: UnauthorizedException
+    API-->>FE: 401
+    FE-->>U: credenciais invalidas
+  end

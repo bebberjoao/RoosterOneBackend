@@ -1,0 +1,51 @@
+erDiagram
+  Professor ||--o{ CursoOrientadorBoost : orienta
+  CursoBoost ||--o{ CursoOrientadorBoost : tem
+  CursoBoost ||--o{ ModuloBoost : organiza
+  ModuloBoost ||--o{ AulaBoost : contem
+  AulaBoost ||--o{ MaterialApoio : anexa
+  BoostUsuario ||--o{ MatriculaBoost : matricula
+  CursoBoost ||--o{ MatriculaBoost : recebe
+  MatriculaBoost ||--o{ ProgressoAula : progride
+  AulaBoost ||--o{ ProgressoAula : concluida_em
+  MatriculaBoost ||--o| CertificadoBoost : emite
+  CursoBoost ||--o{ ConversaBoost : abre
+  BoostUsuario ||--o{ ConversaBoost : conversa
+  ConversaBoost ||--o{ MensagemBoost : contem
+
+  BoostUsuario {
+    uuid id PK
+    string email UK
+    string senhaHash
+  }
+  CursoBoost {
+    uuid id PK
+    string slug UK
+    string status
+    bool emiteCertificado
+    string certificadoTexto
+  }
+  CursoOrientadorBoost {
+    uuid id PK
+    uuid cursoId FK
+    uuid professorId FK
+  }
+  ConversaBoost {
+    uuid id PK
+    uuid cursoId FK
+    uuid boostUsuarioId FK
+  }
+  MensagemBoost {
+    uuid id PK
+    uuid conversaId FK
+    datetime lidaEm
+  }
+  MatriculaBoost {
+    uuid id PK
+    string status
+    int progressoPct
+  }
+  CertificadoBoost {
+    uuid id PK
+    string codigo UK
+  }

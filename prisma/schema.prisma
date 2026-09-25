@@ -214,7 +214,16 @@ model AtendimentoSubcategoria {
 }
 
 model PrioridadeTicket {
-  id       String  @id
+  // Sem @default até 2026-09: a migration 20260819203000_fixed_ticket_priorities
+  // trocou o tipo de UUID para TEXT (pra caber os ids fixos '1'-'4' do seed) e
+  // derrubou o @default(uuid()) junto — sem querer, a julgar pelo schema de
+  // teste (schema.test.prisma), que nunca perdeu o default. Efeito real: criar
+  // uma prioridade nova via POST /chamados-prioridades funcionava no SQLite de
+  // teste (tinha default) e falharia no Postgres de produção (não tinha) —
+  // "null value in column id violates not-null constraint". Nunca chegou a
+  // quebrar em produção porque ninguém tinha cadastrado uma prioridade além
+  // das 4 do seed ainda.
+  id       String  @id @default(uuid())
   nome     String  @db.VarChar(50)
   cor      String? @db.VarChar(20)
   criadoEm DateTime? @map("criado_em") @db.Timestamp()
@@ -605,8 +614,8 @@ model Professor {
   usuario    Usuario     @relation(fields: [usuarioId], references: [id])
   turmas     Turma[]
   atividades Atividade[]
-  cursosBoost    CursoBoost[]
-  mensagensBoost MensagemBoost[]
+  orientacoesBoost CursoOrientadorBoost[]
+  mensagensBoost   MensagemBoost[]
 
   @@map("professores")
 }
@@ -827,9 +836,10 @@ model AnexoEntrega {
 //
 // Plataforma de cursos pública, com cadastro/login PRÓPRIOS (BoostUsuario),
 // separados do login do Hub (Usuario) — ver src/rooster-boost-portal/ e
-// docs/security. Instrutor de um CursoBoost é sempre um Professor já
-// cadastrado no Academy (login do Hub); aluno é sempre um BoostUsuario
-// (login público, nunca ligado a Usuario).
+// docs/security. Curso não tem dono: quem gerencia é quem tem a permissão
+// (RBAC do Hub). Professores do Academy entram como ORIENTADORES
+// (CursoOrientadorBoost) e só conversam com os alunos; aluno é sempre um
+// BoostUsuario (login público, nunca ligado a Usuario).
 // =====================================================================
 
 model BoostUsuario {
@@ -842,6 +852,7 @@ model BoostUsuario {
 
   matriculas MatriculaBoost[]
   mensagens  MensagemBoost[]
+  conversas  ConversaBoost[]
 
   @@map("boost_usuarios")
 }
@@ -857,16 +868,47 @@ model CursoBoost {
   capa             String?   @db.VarChar(255)
   status           String    @default("rascunho") @db.VarChar(20) // rascunho | publicado | arquivado
   emiteCertificado Boolean   @default(true) @map("emite_certificado")
-  professorId      String    @map("professor_id") @db.Uuid
+  certificadoTexto String?   @map("certificado_texto") // modelo com {aluno}, {curso}, {cargaHoraria}, {data}
   criadoEm         DateTime? @map("criado_em") @db.Timestamp()
   atualizadoEm     DateTime? @map("atualizado_em") @db.Timestamp()
 
-  professor  Professor        @relation(fields: [professorId], references: [id])
-  modulos    ModuloBoost[]
-  matriculas MatriculaBoost[]
-  mensagens  MensagemBoost[]
+  modulos      ModuloBoost[]
+  matriculas   MatriculaBoost[]
+  orientadores CursoOrientadorBoost[]
+  conversas    ConversaBoost[]
 
   @@map("cursos_boost")
+}
+
+// Professor vinculado a um curso para conversar com os alunos dele. Não dá poder
+// de edição: a gestão do curso é só por permissão.
+model CursoOrientadorBoost {
+  id          String    @id @default(uuid()) @db.Uuid
+  cursoId     String    @map("curso_id") @db.Uuid
+  professorId String    @map("professor_id") @db.Uuid
+  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+
+  curso     CursoBoost @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  professor Professor  @relation(fields: [professorId], references: [id])
+
+  @@unique([cursoId, professorId])
+  @@map("cursos_orientadores_boost")
+}
+
+// Uma conversa contínua por (curso, aluno), atendida por qualquer orientador do curso.
+model ConversaBoost {
+  id               String    @id @default(uuid()) @db.Uuid
+  cursoId          String    @map("curso_id") @db.Uuid
+  boostUsuarioId   String    @map("boost_usuario_id") @db.Uuid
+  criadoEm         DateTime? @map("criado_em") @db.Timestamp()
+  ultimaMensagemEm DateTime? @map("ultima_mensagem_em") @db.Timestamp()
+
+  curso        CursoBoost      @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  boostUsuario BoostUsuario    @relation(fields: [boostUsuarioId], references: [id], onDelete: Cascade)
+  mensagens    MensagemBoost[]
+
+  @@unique([cursoId, boostUsuarioId])
+  @@map("conversas_boost")
 }
 
 model ModuloBoost {
@@ -890,6 +932,14 @@ model AulaBoost {
   conteudoUrl   String? @map("conteudo_url") @db.VarChar(500)
   conteudoTexto String? @map("conteudo_texto")
   duracaoMin    Int?    @map("duracao_min")
+
+  // Vídeo hospedado no servidor (arquivo em PASTAS.videosBoost(), nunca S3/nuvem).
+  // Presença de videoArquivo é o que distingue "vídeo hospedado" de "link
+  // externo" (conteudoUrl) — não há enum/flag separado de propósito, pra não
+  // deixar os dois campos poderem divergir sobre qual é a fonte real.
+  videoArquivo  String? @map("video_arquivo") @db.VarChar(255)
+  videoTamanho  BigInt? @map("video_tamanho")
+  videoMimeType String? @map("video_mime_type") @db.VarChar(80)
 
   modulo    ModuloBoost     @relation(fields: [moduloId], references: [id], onDelete: Cascade)
   materiais MaterialApoio[]
@@ -936,6 +986,13 @@ model ProgressoAula {
   aulaId      String    @map("aula_id") @db.Uuid
   concluidoEm DateTime? @map("concluido_em") @db.Timestamp()
 
+  // Progresso real de vídeo: posição para retomar de onde parou, e o maior
+  // percentual já assistido (usado para completar automaticamente perto do
+  // fim). Ficam null/0 para aulas que não são vídeo — o botão manual de
+  // concluir continua sendo o caminho normal pra elas.
+  posicaoSeg          Int? @default(0) @map("posicao_seg")
+  percentualAssistido Int? @default(0) @map("percentual_assistido")
+
   matricula MatriculaBoost @relation(fields: [matriculaId], references: [id], onDelete: Cascade)
   aula      AulaBoost      @relation(fields: [aulaId], references: [id], onDelete: Cascade)
 
@@ -945,16 +1002,18 @@ model ProgressoAula {
 
 model MensagemBoost {
   id             String    @id @default(uuid()) @db.Uuid
-  cursoId        String    @map("curso_id") @db.Uuid
+  conversaId     String    @map("conversa_id") @db.Uuid
   boostUsuarioId String?   @map("boost_usuario_id") @db.Uuid // autor se for aluno
-  professorId    String?   @map("professor_id") @db.Uuid // autor se for instrutor
+  professorId    String?   @map("professor_id") @db.Uuid // autor se for orientador
   mensagem       String
+  lidaEm         DateTime? @map("lida_em") @db.Timestamp() // lida pela OUTRA ponta
   criadoEm       DateTime? @map("criado_em") @db.Timestamp()
 
-  curso        CursoBoost    @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  conversa     ConversaBoost @relation(fields: [conversaId], references: [id], onDelete: Cascade)
   boostUsuario BoostUsuario? @relation(fields: [boostUsuarioId], references: [id])
   professor    Professor?    @relation(fields: [professorId], references: [id])
 
+  @@index([conversaId, criadoEm])
   @@map("mensagens_boost")
 }
 

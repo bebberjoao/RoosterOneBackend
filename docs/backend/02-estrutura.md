@@ -85,17 +85,8 @@ Cada submódulo do Hub (`usuarios/`, `setores/`, etc.) segue internamente o mesm
 - DTOs de atualização quase sempre estendem o de criação via `PartialType` de `@nestjs/mapped-types` (ex.: `UpdateUsuarioDto extends PartialType(CreateUsuarioDto)`), em vez de declarar campos duplicados.
 - Toda regra de RBAC de controller usa duas constantes locais no topo do arquivo, `MODULO` e (quando a tela é única) `TELA`, para compor `@RequirePermission(MODULO, TELA, 'acao')` — ex. em `usuarios.controller.ts`: `const MODULO = 'Rooster Hub'; const TELA = '/hub/usuarios';`.
 
-### Rotas em português com aliases em inglês — confirmado apenas no Desk
+### Rotas do Desk — só português, sem alias
 
-Verificado em `src/rooster-desk/rooster-desk.controller.ts`: o controller expõe **duas rotas para o mesmo handler** em vários recursos — uma em português ("nome de domínio", usando a palavra `chamados`) e um alias que usa o termo emprestado do inglês `tickets`:
+Todo recurso de `src/rooster-desk/rooster-desk.controller.ts` (`chamados`, `chamados-categorias`, `chamados-subcategorias`, `chamados-status`, `chamados-prioridades`) usa só o nome de domínio em português. O controller chegou a expor, por um tempo, um segundo path em inglês por recurso (ex.: `categorias-tickets` ao lado de `chamados-categorias`), delegando para o mesmo handler — nunca usado pelo frontend e removido na limpeza de código morto de setembro/2026 (ver `docs/engineering/08-divida-tecnica.md`; alguns desses aliases tinham inclusive um bug real de permissão, por não herdar o `@RequirePermission` do método original).
 
-```ts
-@Post('chamados-categorias')
-async createCategoria(...) { ... }
-@Post('categorias-tickets')
-createCategoriaAlias(@Req() request: Request, @Body() dto: CreateCategoriaTicketDto) { return this.createCategoria(request, dto); }
-```
-
-Padrão repetido para `chamados` / `tickets`, `chamados-categorias` / `categorias-tickets`, `chamados-subcategorias` / `subcategorias-tickets`, `chamados-status` / `status-tickets`, `chamados-prioridades` / `prioridades-tickets`. O alias sempre delega para o método principal (nunca duplica lógica).
-
-**Isso não se repete em Rooms nem em Assets**: `rooms.controller.ts` usa só rotas em português/latim (`campus`, `blocos`, `ambientes`, `reservas`, sem alias em inglês) e `assets.controller.ts` usa só `patrimonio*`. A convenção de alias bilíngue é específica do Desk, não um padrão geral do backend.
+Isso é consistente com `rooms.controller.ts` (`campus`, `blocos`, `ambientes`, `reservas`) e `assets.controller.ts` (`patrimonio*`): nenhum módulo do backend usa alias bilíngue de rota.

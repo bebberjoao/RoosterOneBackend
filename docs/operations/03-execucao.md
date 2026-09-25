@@ -38,6 +38,10 @@ npm run dev
 | Repositório | Comando | Efeito |
 |---|---|---|
 | Backend | `npm run test:e2e` | Roda a suíte de testes end-to-end contra um banco SQLite isolado (`prisma/dev-test.db`), com `DATABASE_URL` e `JWT_SECRET` sobrescritos via `cross-env` — não usa o PostgreSQL de desenvolvimento. |
+
+**Instabilidade conhecida no Windows**: a primeira execução logo após `prisma/prisma-test-client` ser regenerado (o próprio `test:e2e` faz isso via `prisma:db:push:test`) às vezes falha com `PrismaClientConstructorValidationError` na suíte que roda por último — sintoma consistente de antivírus/Windows Defender escaneando o binário novo do query engine (`query_engine-windows.dll.node`) no instante em que o Node tenta carregá-lo. Rodar `npm run test:e2e` de novo sempre resolve (confirmado repetidas vezes: falha só na primeira execução após regenerar, nunca na segunda). Não é uma falha de teste real — se acontecer, rode de novo antes de investigar qualquer outra coisa.
+
+**Outro modo de falha, diferente da instabilidade acima (setembro/2026)**: `Unique constraint failed on the fields: (nome)` ao criar um `Modulo` no `beforeAll` de um arquivo de teste. Causa: a ordem de execução dos arquivos de teste pelo Jest **não é determinística**, e `app.e2e-spec.ts` deliberadamente não limpa o banco no seu `afterAll` (a limpeza fica centralizada no `globalTeardown`) — então, se outro arquivo (ex.: `rooms-reservas.e2e-spec.ts`) rodar depois e seu `beforeAll` fizer um `create` incondicional de um `Modulo` com o mesmo `nome` que já ficou no banco, colide. Corrigido tornando esses `beforeAll` idempotentes (`findFirst ?? create`, o mesmo padrão já usado em `app.e2e-spec.ts`). Se esse erro aparecer de novo ao adicionar um teste novo, o `beforeAll` dele provavelmente precisa do mesmo tratamento.
 | Frontend | `npm run lint` | Roda o ESLint sobre o projeto. |
 | Frontend | `npm run format` | Formata o código com Prettier (`--write`, altera os arquivos). |
 | Frontend | `npm run preview` | Serve localmente o resultado de `npm run build` (útil para validar o build de produção antes de publicar). |

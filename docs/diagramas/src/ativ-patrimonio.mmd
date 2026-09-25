@@ -1,0 +1,22 @@
+flowchart TD
+  A([Item adquirido]) --> B[Cadastro com codigo, categoria e valor]
+  B --> C[Status disponivel]
+  C --> D{Tipo de movimentacao}
+  D -->|Setor/Sala| E{Informou destino?}
+  E -->|Nao| F[Rejeitado - RN014]
+  F --> D
+  E -->|Sim| G[Item alocado]
+  D -->|Emprestimo| H[Define data de devolucao prevista]
+  H --> I{Devolvido no prazo?}
+  I -->|Sim| J[Devolucao registrada - volta a disponivel]
+  I -->|Nao| K[Aparece na lista de atrasados]
+  K --> J
+  D -->|Manutencao| L[Item em manutencao]
+  L --> M[Retorno - volta a disponivel]
+  G --> N{Baixar item?}
+  J --> N
+  M --> N
+  N -->|Sim| O[Status baixado]
+  N -->|Nao| C
+  O --> P[Nenhuma movimentacao e mais aceita - RN013]
+  P --> Q([Fim do ciclo de vida])

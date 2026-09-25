@@ -1,0 +1,37 @@
+erDiagram
+  Aluno ||--o{ Cobranca : deve
+  Produto ||--o{ Cobranca : origem
+  Servico ||--o{ Cobranca : origem
+  Desconto ||--o{ Cobranca : aplicado
+  Aluno ||--o{ DescontoAluno : beneficiario
+  Desconto ||--o{ DescontoAluno : concedido
+  Cobranca ||--o| NotaFiscal : documentada_por
+
+  Cobranca {
+    uuid id PK
+    uuid alunoId FK
+    string tipo
+    string competencia
+    decimal valorOriginal
+    decimal valorDesconto
+    decimal valorPago
+    date vencimento
+    string status
+    string nossoNumero UK
+    string linhaDigitavel
+    string pixCopiaECola
+  }
+  NotaFiscal {
+    uuid id PK
+    string numero UK
+    string tipo
+    string caminhoPdf
+    string status
+  }
+  Desconto {
+    uuid id PK
+    string nome
+    string tipo
+    decimal valor
+    string unidade
+  }

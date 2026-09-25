@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FindReservasQueryDto } from './dto/find-reservas-query.dto';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
@@ -29,6 +30,11 @@ import { UpdateReservaDto } from './dto/update-reserva.dto';
 import { RoomsService } from './rooms.service';
 
 const MODULO = 'Rooster Rooms';
+
+/** Quem não tem `/rooms/book` `prazo-estendido` só pode reservar dentro desse horizonte. */
+const ANTECEDENCIA_PADRAO_DIAS = 15;
+/** Teto mesmo para quem tem o prazo estendido — evita reserva "pro ano 9999" por engano de digitação. */
+const ANTECEDENCIA_ESTENDIDA_DIAS = 365;
 
 @ApiTags('Rooster Rooms')
 @Controller()
@@ -167,21 +173,32 @@ export class RoomsController {
   @RequirePermission(MODULO, '/rooms/book', 'solicitar')
   @ApiOperation({ summary: 'Cria uma reserva' })
   @ApiBody({ type: CreateReservaDto })
-  createReserva(@Body() dto: CreateReservaDto) {
+  async createReserva(@Req() request: Request, @Body() dto: CreateReservaDto) {
+    await this.assertDentroDoPrazo(request, dto.data);
     return this.roomsService.createReserva(dto);
   }
 
   @Get('reservas')
   @RequirePermission(MODULO, '/rooms', 'acessar')
-  findAllReservas(@Query('ambienteId') ambienteId?: string, @Query('data') data?: string, @Query('status') status?: string) {
-    return this.roomsService.findAllReservas(ambienteId, data, status);
+  findAllReservas(@Query() query: FindReservasQueryDto) {
+    return this.roomsService.findAllReservas(query.ambienteId, query.data, query.status, query, {
+      dataInicio: query.dataInicio,
+      dataFim: query.dataFim,
+    });
   }
 
   @Post('reservas/serie')
   @RequirePermission(MODULO, '/rooms/book', 'solicitar')
   @ApiOperation({ summary: 'Cria uma série de reservas recorrentes (mesma sala/horário, uma linha por ocorrência, até 26 ocorrências)' })
   @ApiBody({ type: CreateReservaSerieDto })
-  createReservaSerie(@Body() dto: CreateReservaSerieDto) {
+  async createReservaSerie(@Req() request: Request, @Body() dto: CreateReservaSerieDto) {
+    const usuarioId = (request.user as { id?: string } | undefined)?.id;
+    if (!usuarioId) throw new ForbiddenException('Usuário não autenticado.');
+    if (!(await this.usuariosService.hasPermission(usuarioId, MODULO, '/rooms/book', 'solicitar-recorrente'))) {
+      throw new ForbiddenException('Sem permissão para solicitar reserva recorrente.');
+    }
+    // a data que importa pro limite de antecedência é a mais distante da série, não a primeira
+    await this.assertDentroDoPrazo(request, dto.repetirAte);
     return this.roomsService.createReservaSerie(dto);
   }
 
@@ -280,5 +297,30 @@ export class RoomsController {
     }
 
     throw new ForbiddenException('Sem permissão para alterar esta reserva.');
+  }
+
+  /**
+   * Horizonte máximo de antecedência pra reservar: 15 dias por padrão, ou 365
+   * pra quem tem `/rooms/book` `prazo-estendido` (ex.: coordenação organizando
+   * o semestre inteiro). Sem essa checagem, qualquer um poderia reservar uma
+   * sala "pro ano inteiro" — a permissão existe justamente pra restringir
+   * quem pode fazer isso.
+   */
+  private async assertDentroDoPrazo(request: Request, dataIso: string) {
+    const usuarioId = (request.user as { id?: string } | undefined)?.id;
+    if (!usuarioId) throw new ForbiddenException('Usuário não autenticado.');
+
+    const estendido = await this.usuariosService.hasPermission(usuarioId, MODULO, '/rooms/book', 'prazo-estendido');
+    const limiteDias = estendido ? ANTECEDENCIA_ESTENDIDA_DIAS : ANTECEDENCIA_PADRAO_DIAS;
+
+    const hoje = new Date(); hoje.setUTCHours(0, 0, 0, 0);
+    const alvo = new Date(`${dataIso.slice(0, 10)}T00:00:00.000Z`);
+    const diasDeAntecedencia = Math.round((alvo.getTime() - hoje.getTime()) / 86_400_000);
+
+    if (diasDeAntecedencia > limiteDias) {
+      throw new ForbiddenException(
+        `Você só pode reservar com até ${limiteDias} dias de antecedência (a data pedida está a ${diasDeAntecedencia} dias). Fale com a coordenação se precisar de um prazo maior.`,
+      );
+    }
   }
 }

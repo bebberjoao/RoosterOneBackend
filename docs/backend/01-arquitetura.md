@@ -1,13 +1,15 @@
 # Arquitetura
 
-Status: baseado em leitura direta do código em `src/` e `prisma/schema.prisma` (verificado em 2026-09-17).
+Status: baseado em leitura direta do código em `src/` e `prisma/schema.prisma` (revisado em 2026-09-22).
 
 ## Stack
 
 - **NestJS 11** (`@nestjs/common`, `@nestjs/core` `^11.0.1`) como framework de aplicação.
-- **Prisma 6** (`@prisma/client` `^6.0.0`) como ORM, contra **PostgreSQL** (`prisma/schema.prisma`, `datasource db { provider = "postgresql" }`).
-- **@nestjs/jwt** + **passport-jwt** para emissão/verificação de JWT (autenticação própria via guard, não via estratégia Passport registrada — ver `09-autenticacao.md`).
-- **@nestjs/websockets** + **socket.io** para o gateway de mensagens do Desk.
+- **Prisma 6** (`@prisma/client` `^6.0.0`) como ORM, contra **PostgreSQL** (`prisma/schema.prisma`, `datasource db { provider = "postgresql" }`) — **62 models**.
+- **@nestjs/jwt** para emissão/verificação de JWT. A verificação é feita manualmente em `src/auth/jwt-auth.guard.ts` (`jwt.verifyAsync`), **sem Passport** — `passport`, `passport-jwt` e `@nestjs/passport` foram removidos do `package.json` por não terem uso real. Ver `09-autenticacao.md`.
+- **@nestjs/websockets** + **socket.io** para os gateways de chat do Desk e do Boost.
+- **nodemailer** (via `src/mail/`) para envio de e-mail de redefinição de senha, opcional — sem SMTP configurado, cai em modo de log.
+- **pdfkit** para geração de PDF (certificado do Boost, boleto e nota fiscal do Finance).
 - **@nestjs/swagger** para documentação OpenAPI, servida em `/api/docs`.
 - **class-validator** / **class-transformer** para validação de DTOs.
 - **bcryptjs** para hash de senha.
@@ -18,7 +20,18 @@ Status: baseado em leitura direta do código em `src/` e `prisma/schema.prisma` 
 
 ```ts
 @Module({
-  imports: [AuthModule, RoosterHubModule, RoosterDeskModule, RoosterRoomsModule, RoosterAssetsModule],
+  imports: [
+    AuthModule,
+    RoosterHubModule,
+    RoosterDeskModule,
+    RoosterRoomsModule,
+    RoosterAssetsModule,
+    RoosterAcademyModule,
+    RoosterLearnModule,
+    RoosterBoostModule,
+    RoosterBoostPortalModule,
+    RoosterFinanceModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
@@ -29,15 +42,25 @@ export class AppModule {}
 
 ## Módulos de negócio com backend real
 
-Confirmado por leitura de `src/`:
+Confirmado por leitura de `src/` — **todos os 9 módulos do produto têm backend**:
 
 - `src/roster-hub/` — núcleo administrativo (usuários, setores, módulos, permissões, RBAC, notificações, sessões, logs de auditoria).
 - `src/rooster-desk/` — chamados/tickets (service desk).
 - `src/rooster-rooms/` — reserva de ambientes/salas.
 - `src/rooster-assets/` — inventário de patrimônio.
-- `src/auth/` — guards JWT e de permissão, decorators, configuração do JWT.
+- `src/rooster-academy/` — gestão acadêmica (cursos, disciplinas, turmas, matrícula, frequência, notas, calendário, documentos) e as rotas `/me/*` do portal do aluno.
+- `src/rooster-learn/` — atividades e entregas, com propagação de nota para o Academy.
+- `src/rooster-boost/` — lado instrutor da plataforma de cursos extracurriculares (autenticado pelo Hub).
+- `src/rooster-boost-portal/` — lado aluno externo do Boost, com login próprio (`BoostUsuario`) e guard dedicado.
+- `src/rooster-finance/` — cobranças, produtos, serviços, descontos, boleto e nota fiscal internos.
 
-**Não identificado no código analisado**: não existe `src/mail/` nem qualquer `MailService` no repositório (busca por `MailService`, `nodemailer`, `smtp` em todo `src/` não retornou nenhum arquivo). O contexto da tarefa presumia esse módulo; ele não está presente nesta base de código. Ver `12-logs.md`.
+Módulos transversais:
+
+- `src/auth/` — guards JWT e de permissão, decorators, configuração do JWT.
+- `src/mail/` — `MailService` (nodemailer), usado na redefinição de senha; sem SMTP configurado, registra o link em log em vez de enviar. Ver `12-logs.md` e `docs/engineering/06-integracoes.md`.
+- `src/common/` — `PrismaExceptionFilter`, filtro global de exceção do Prisma (rede de segurança para erro de banco não tratado em um service).
+
+**Rooster Student** não tem módulo NestJS próprio: é um módulo apenas de permissão, cujas rotas (`/me/*`, `/financeiro/me/*`) são servidas por `AcademyController`, `LearnController` e `FinanceController`.
 
 ## Padrão de camadas
 
@@ -69,4 +92,7 @@ PrismaService (client Prisma, acesso direto ao PostgreSQL)
 
 ## Websocket
 
-`MensagensGateway` (`src/rooster-desk/mensagens.gateway.ts`) expõe o namespace `/desk` via Socket.IO. Autentica cada conexão/handler validando o JWT enviado em `handshake.auth.token` contra o mesmo `JwtService`/`PrismaService` usados no REST. O REST continua sendo a fonte da verdade para persistência; o gateway só emite `mensagem:nova` para quem está na sala `ticket:<id>` depois que o controller já persistiu a mensagem.
+Dois gateways Socket.IO existem no sistema:
+
+- `MensagensGateway` (`src/rooster-desk/mensagens.gateway.ts`), namespace `/desk`. Autentica cada conexão/handler validando o JWT enviado em `handshake.auth.token` contra o mesmo `JwtService`/`PrismaService` usados no REST. O REST continua sendo a fonte da verdade para persistência; o gateway só emite `mensagem:nova` para quem está na sala `ticket:<id>` depois que o controller já persistiu a mensagem.
+- `BoostChatGateway` (`src/rooster-boost/boost-chat.gateway.ts`), namespace `/boost`, para o chat de um curso. É o **único ponto do sistema que autentica os dois tipos de token** (Hub e Boost): decodifica o JWT e escolhe a tabela (`usuarios` ou `boost_usuarios`) pelo claim `tipo`. Ver `docs/security/03-rbac.md`.

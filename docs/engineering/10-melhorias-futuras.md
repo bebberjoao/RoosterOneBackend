@@ -4,16 +4,18 @@ Todo item aqui é proposta, não funcionalidade existente. Nada deste documento 
 
 ## Curto prazo
 
-- Criar `.env.example` nos dois repositórios, listando toda variável usada (ver `docs/operations/01-configuracao.md`).
-- Resolver o acoplamento entre o RoleSwitcher de demonstração e a resolução de permissão real no frontend (`docs/engineering/08-divida-tecnica.md`).
+- ~~Criar `.env.example` nos dois repositórios~~ — **feito (setembro/2026)**. Backend: `DATABASE_URL` e `JWT_SECRET` (obrigatórias), `PORT`, `FRONTEND_URL` e o bloco SMTP (opcionais). Frontend: `VITE_API_URL`, com o aviso de que tudo prefixado por `VITE_` vai para o bundle e é público. O `.gitignore` do frontend também passou a ignorar `.env` — antes não ignorava, e um arquivo de ambiente ali seria versionado. Ver `docs/operations/01-configuracao.md`.
+- ~~Resolver o acoplamento entre o RoleSwitcher e a permissão real~~ — resolvido: o seletor foi removido e o perfil é deduzido das permissões (`docs/engineering/08-divida-tecnica.md`).
+- Notificações: adicionar campo de link (exige migration) para a notificação abrir a tela de origem; emitir aviso de nota lançada (Academy/Learn) e de atribuição de chamado; trocar o polling de 30 s por WebSocket, como no chat do Desk.
 - Remover `x-user-id` do CORS do backend (cabeçalho de esquema de autenticação anterior, não usado).
-- Adicionar paginação às listagens principais (chamados, reservas, patrimônio, usuários, e agora também turmas/matrículas/entregas do Academy/Learn).
+- ~~Adicionar paginação às listagens principais~~ — **feito (setembro/2026)**. `PaginacaoQueryDto` (`src/common/pagination.ts`) cobre as 9 listagens que crescem sem limite com o uso: usuários, chamados, logs de auditoria, reservas, cobranças, patrimônio, movimentações de patrimônio, alunos e turmas. Listagens filhas (matrículas de uma turma, entregas de uma atividade) ficaram de fora de propósito — são limitadas pela capacidade da turma. Ver `docs/api/01-visao-geral.md`.
 - Adicionar waitlist (lista de espera) para `POST /turmas/:id/matriculas` quando a turma já atingiu `capacidade` — hoje a matrícula é simplesmente rejeitada com `409 ConflictException`, sem nenhuma fila ou notificação de vaga futura (`academy.service.ts::createMatricula`).
 
 ## Médio prazo
 
-- Implementar refresh token de verdade, aproveitando a tabela `Sessao` já existente (ou removê-la, se a decisão for não ter renovação de sessão).
-- Adicionar testes automatizados de frontend (hoje zero) e testes unitários de backend (hoje só e2e).
+- ~~Implementar refresh token de verdade, aproveitando a tabela `Sessao`~~ — **feito (setembro/2026)**. `POST /auth/login` passou a devolver também um `refreshToken`; `POST /auth/refresh` troca por um par novo **com rotação** (a sessão antiga é revogada a cada uso, então um token vazado deixa rastro em vez de passar despercebido) e `POST /auth/logout` revoga. O banco guarda só o hash SHA-256, mesmo padrão do token de redefinição de senha. O frontend renova sozinho ao receber 401 e repete a chamada, sem o usuário perceber. Ver `docs/api/03-autenticacao.md`.
+- ~~Adicionar testes automatizados de frontend e testes unitários de backend~~ — **feito (setembro/2026)**. Vitest + Testing Library no frontend (48 testes) e suíte unitária separada no backend (`jest-unit.json`, 28 testes), além dos 62 e2e. Ver `14-estrategia-de-testes.md`, que traz também a matriz teste ↔ requisito.
+- Adicionar teste de jornada em navegador (Playwright ou Cypress) — os testes de frontend atuais cobrem lógica e componente isolado, não o fluxo completo de tela.
 - Mover armazenamento de anexo de chamado de disco local para um armazenamento de objeto externo (vale também para `documentos-academicos` e `anexos-entregas` do Academy/Learn, que seguem o mesmo padrão de disco local).
 - Adicionar índice composto em `Reserva(ambienteId, data)` — a checagem de conflito de horário filtra exatamente por essa combinação; os índices que já tinham uma consulta real comprovando o uso (`Ticket(categoriaId)`/`Ticket(criadoEm)`/`CategoriaTicket(setorId)`/`LogAuditoria(criadoEm)`) já foram adicionados, ver `docs/engineering/09-performance.md`.
 - **Ligar `Turma.sala` a uma FK real para `Ambiente` (Rooster Rooms)** em vez de texto livre. Hoje `sala` é um `VarChar` digitado manualmente, sem nenhuma checagem de conflito de horário/capacidade entre a grade de aulas do Academy e a disponibilidade de ambientes gerenciada pelo Rooms — os dois módulos não se falam. Uma FK real permitiria reaproveitar `GET /ambientes/:id/disponibilidade` para alocar turma sem colidir com reservas avulsas do mesmo ambiente.

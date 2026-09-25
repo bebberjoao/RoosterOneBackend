@@ -11,6 +11,7 @@ import { RoosterFinanceModule } from './rooster-finance/rooster-finance.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
+import { PrismaModule } from './roster-hub/shared/prisma.module';
 
 /**
  * Módulo raiz da aplicação Rooster One.
@@ -19,6 +20,7 @@ import { AuthModule } from './auth/auth.module';
 @Module({
   imports: [
     AuthModule,
+    PrismaModule,
     RoosterHubModule,
     RoosterDeskModule,
     RoosterRoomsModule,

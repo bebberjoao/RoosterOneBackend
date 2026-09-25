@@ -1,0 +1,20 @@
+erDiagram
+  USUARIO ||--o{ PERMISSAO_VINCULO : "Hub: acesso"
+  USUARIO ||--o{ TICKET : "Desk: solicita"
+  USUARIO ||--o{ RESERVA : "Rooms: solicita"
+  USUARIO ||--|| PROFESSOR : "Academy: vinculo"
+  USUARIO ||--|| ALUNO : "Academy: vinculo"
+  PROFESSOR ||--o{ TURMA : leciona
+  ALUNO ||--o{ MATRICULA : cursa
+  TURMA ||--o{ MATRICULA : recebe
+  TURMA ||--o{ ATIVIDADE : "Learn"
+  ATIVIDADE ||--o{ ENTREGA : recebe
+  ALUNO ||--o{ ENTREGA : envia
+  ALUNO ||--o{ COBRANCA : "Finance: deve"
+  COBRANCA ||--o| NOTA_FISCAL : documenta
+  PROFESSOR ||--o{ CURSO_BOOST : "Boost: instrui"
+  BOOST_USUARIO ||--o{ MATRICULA_BOOST : "login proprio"
+  CURSO_BOOST ||--o{ MATRICULA_BOOST : recebe
+  MATRICULA_BOOST ||--o| CERTIFICADO : emite
+  AMBIENTE ||--o{ RESERVA : reservado
+  PATRIMONIO ||--o{ MOVIMENTACAO : "Assets"

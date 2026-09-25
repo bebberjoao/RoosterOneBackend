@@ -1,0 +1,22 @@
+stateDiagram-v2
+  direction LR
+  [*] --> Aberto : solicitante cria chamado
+  Aberto --> EmAtendimento : tecnico assume / e atribuido
+  EmAtendimento --> Resolvido : tecnico marca resolucao
+  Resolvido --> Encerrado : encerramento confirmado
+  Encerrado --> Aberto : reabertura
+  Resolvido --> EmAtendimento : reabertura
+  Encerrado --> [*]
+
+  note right of Encerrado
+    encerradoEm e derivado
+    da transicao (RN006),
+    nunca enviado pelo cliente
+  end note
+  note left of EmAtendimento
+    Transicao exige permissao
+    especifica: editar / encerrar
+    / reabrir (RN005).
+    Solicitante nunca muda
+    o proprio status.
+  end note

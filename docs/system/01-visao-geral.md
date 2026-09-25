@@ -6,7 +6,7 @@ Rooster One.
 
 ## Objetivo
 
-Sistema de gestão institucional para instituições de ensino, cobrindo tanto operações administrativas internas (atendimento, reserva de ambientes, controle de patrimônio, controle de acesso) quanto atividades acadêmicas com backend real (cursos, turmas, matrícula, frequência, notas, atividades/entregas do Learn) — a única parte do desenho de produto ainda sem implementação de backend é a financeira do aluno (Rooster Finance).
+Sistema de gestão institucional para instituições de ensino, cobrindo operações administrativas internas (atendimento, reserva de ambientes, controle de patrimônio, controle de acesso), atividades acadêmicas (cursos, turmas, matrícula, frequência, notas, atividades/entregas do Learn), financeiro do aluno (cobranças, boleto/PIX e nota fiscal internos) e uma plataforma pública de cursos extracurriculares (Boost, com login próprio para alunos externos). Todos os 9 módulos do frontend têm backend real hoje — ver `docs/system/02-escopo.md` para o detalhamento por módulo.
 
 ## Problema que resolve
 
@@ -38,19 +38,19 @@ Cada usuário recebe permissões diretamente (não existe conceito de "Perfil" o
 
 ## Módulos
 
-O frontend declara 9 módulos de navegação. **6 têm backend implementado**; os demais são telas de interface sem API própria.
+O frontend declara 9 módulos de navegação. **Todos os 9 têm backend implementado.**
 
 | Módulo | Backend implementado | Função |
 |---|---|---|
 | Rooster Hub | ✅ Sim | Usuários, setores, módulos, permissões, notificações, sessões, log de auditoria |
 | Rooster Desk | ✅ Sim | Chamados de suporte (tickets), categorias, atendentes |
-| Rooster Rooms | ✅ Sim | Campus, blocos, ambientes, reservas |
+| Rooster Rooms | ✅ Sim | Campus, blocos, ambientes, reservas (com limite/horizonte de antecedência e reserva recorrente reguláveis por permissão) |
 | Rooster Assets | ✅ Sim | Patrimônio, categorias, setores de patrimônio, movimentações e empréstimos |
 | Rooster Academy | ✅ Sim | Gestão acadêmica: cursos, disciplinas, turmas, matrícula, frequência, notas, calendário, documentos |
 | Rooster Learn | ✅ Sim | Atividades, entregas, correção, com propagação de nota para o Academy |
-| Rooster Student | ⚠️ Parcialmente implementado | Portal do aluno (disciplinas, notas, frequência, histórico, documentos) servido via `/me/*` pelo `AcademyController`/`LearnController` — sem controller próprio; a parte financeira depende do Rooster Finance, não implementado |
-| Rooster Finance | ❌ Não identificado | Cobranças, mensalidades, boletos, produtos, serviços, notas fiscais (tela existe, sem endpoint no backend) |
-| Rooster Boost | ❌ Não identificado | Cursos complementares (tela existe, sem endpoint no backend) |
+| Rooster Student | ⚠️ Sem controller próprio | Portal do aluno (disciplinas, notas, frequência, histórico, documentos, financeiro) servido via `/me/*` pelo `AcademyController`/`LearnController`/`FinanceController`, sob o módulo de permissão `Rooster Student` |
+| Rooster Finance | ✅ Sim | Cobranças, mensalidades, boletos e PIX (simulados internamente), produtos, serviços, descontos, notas fiscais (PDF + XML internos), relatórios |
+| Rooster Boost | ✅ Sim | Plataforma pública de cursos extracurriculares — login próprio para aluno externo (`BoostUsuario`), instrutor é sempre um Professor já cadastrado no Academy, certificado em PDF automático |
 
 ## Funcionalidades implementadas
 
@@ -65,6 +65,8 @@ Levantadas diretamente dos controllers e services do backend (`src/roster-hub`, 
 - **Patrimônio (Assets)**: cadastro, categorização, movimentação entre setor/sala/manutenção, empréstimo com prazo de devolução e listagem de empréstimos em atraso, baixa de item.
 - **Gestão acadêmica (Academy)**: cursos, disciplinas (catálogo), turmas (oferta real por período/professor), matrícula, frequência em lote, itens avaliativos e notas com média ponderada, calendário acadêmico, documentos acadêmicos (upload real), e o portal do aluno (`/me/*`). Professor/aluno são vínculos a um `Usuario` do Hub já existente, nunca usuários novos. Escopo de turma checado por posse (professor só acessa a própria turma), não só por permissão — ver `docs/security/03-rbac.md`.
 - **Atividades e entregas (Learn)**: criação/publicação de atividade numa turma do Academy, envio/reenvio de entrega pelo aluno, correção com nota/feedback pelo professor, com propagação automática da nota para o item avaliativo do Academy. Sem banco de questões/correção automática (decisão de escopo).
+- **Cursos extracurriculares (Boost)**: cadastro/login público independente do Hub para alunos externos; instrutor cria curso → módulo → aula → material de apoio; matrícula, progresso por aula e certificado em PDF gerado automaticamente ao concluir; chat em tempo real aluno↔instrutor.
+- **Financeiro do aluno (Finance)**: produtos, serviços e descontos; cobrança única (`Cobranca`) para mensalidade/produto/serviço/taxa; geração de mensalidade em lote com desconto aplicado automaticamente; boleto e nota fiscal simulados internamente (sem gateway/SEFAZ real); relatórios e dashboard calculados a partir da `Cobranca`.
 
 ## Integrações externas
 
@@ -73,7 +75,7 @@ Levantadas diretamente dos controllers e services do backend (`src/roster-hub`, 
 
 ## Limitações atuais
 
-- 2 dos 9 módulos do frontend (Finance, Boost) não têm backend — são apenas interface. Rooster Student é parcialmente implementado (sem controller próprio; parte financeira depende do Finance).
+- Rooster Student não tem controller/módulo NestJS próprio — suas rotas (`/me/*`) são servidas por `AcademyController`/`LearnController`/`FinanceController`.
 - Sem testes automatizados no frontend (nenhum framework de teste no `package.json`).
 - Backend tem apenas testes end-to-end (não há testes unitários isolados por serviço).
 - Sem Docker, `docker-compose` ou pipeline de CI/CD em nenhum dos dois repositórios.

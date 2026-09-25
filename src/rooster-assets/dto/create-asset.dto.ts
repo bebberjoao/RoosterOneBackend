@@ -1,6 +1,5 @@
-import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Length, Min } from 'class-validator';
+import { IsDateString, IsIn, IsNumber, IsOptional, IsString, IsUUID, Length, Min } from 'class-validator';
 
 export class CreateAssetDto {
   @ApiProperty({ example: 'Notebook Dell Latitude 5420', description: 'Nome/descrição do patrimônio' })

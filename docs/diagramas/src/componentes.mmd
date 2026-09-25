@@ -1,0 +1,51 @@
+graph LR
+  APP[AppModule]
+
+  subgraph Transversais
+    AUTH[AuthModule<br/>JwtAuthGuard<br/>PermissionGuard]
+    MAIL[MailModule<br/>nodemailer]
+    PRIS[PrismaModule<br/>PrismaService]
+    AUD[AuditoriaModule]
+  end
+
+  subgraph Negocio["Modulos de dominio"]
+    HUB[RoosterHubModule]
+    DESK[RoosterDeskModule]
+    ROOMS[RoosterRoomsModule]
+    ASSETS[RoosterAssetsModule]
+    ACAD[RoosterAcademyModule]
+    LEARN[RoosterLearnModule]
+    BOOST[RoosterBoostModule]
+    BPORT[RoosterBoostPortalModule]
+    FIN[RoosterFinanceModule]
+  end
+
+  APP --> AUTH
+  APP --> HUB
+  APP --> DESK
+  APP --> ROOMS
+  APP --> ASSETS
+  APP --> ACAD
+  APP --> LEARN
+  APP --> BOOST
+  APP --> BPORT
+  APP --> FIN
+
+  HUB --> PRIS
+  HUB --> MAIL
+  HUB --> AUD
+  DESK --> PRIS
+  ROOMS --> PRIS
+  ASSETS --> PRIS
+  ACAD --> PRIS
+  LEARN --> PRIS
+  BOOST --> PRIS
+  BPORT --> PRIS
+  FIN --> PRIS
+
+  LEARN -.->|injeta| ACAD
+  BOOST -.->|injeta| ACAD
+  BPORT -.->|injeta| ACAD
+  FIN -.->|injeta| ACAD
+  DESK -.->|injeta| HUB
+  ACAD -.->|injeta| HUB

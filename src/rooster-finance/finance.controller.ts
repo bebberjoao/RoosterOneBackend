@@ -4,6 +4,7 @@ import {
 import type { Request, Response } from 'express';
 import { join } from 'path';
 import { ApiTags } from '@nestjs/swagger';
+import { FindCobrancasQueryDto } from './dto/find-cobrancas-query.dto';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
@@ -139,7 +140,7 @@ export class FinanceController {
   atribuirDesconto(@Param('id') id: string, @Body() dto: AtribuirDescontoDto) { return this.financeService.atribuirDesconto(id, dto); }
   @Delete('descontos/:id/atribuir/:alunoId')
   @RequirePermission(MODULO, TELA_DISCOUNTS, 'editar')
-  removerDesconto(@Param('id') id: string, @Param('alunoId') alunoId: string) { return this.financeService.removerDesconto(id, alunoId); }
+  desvincularDesconto(@Param('id') id: string, @Param('alunoId') alunoId: string) { return this.financeService.desvincularDescontoDoAluno(id, alunoId); }
 
   // ===================== Cobranças =====================
   @Post('cobrancas')
@@ -147,14 +148,9 @@ export class FinanceController {
   createCobranca(@Body() dto: CreateCobrancaDto) { return this.financeService.createCobranca(dto); }
 
   @Get('cobrancas')
-  async findAllCobrancas(
-    @Req() request: Request,
-    @Query('status') status?: string,
-    @Query('alunoId') alunoId?: string,
-    @Query('tipo') tipo?: string,
-  ) {
+  async findAllCobrancas(@Req() request: Request, @Query() query: FindCobrancasQueryDto) {
     await this.exigirLeituraCobrancas((request.user as AuthedUser).id);
-    return this.financeService.findAllCobrancas({ status, alunoId, tipo });
+    return this.financeService.findAllCobrancas({ status: query.status, alunoId: query.alunoId, tipo: query.tipo }, query);
   }
 
   @Get('cobrancas/exportar')

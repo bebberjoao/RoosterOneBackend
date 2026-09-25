@@ -1,0 +1,29 @@
+graph TB
+  subgraph HubAuth["Login do Hub - Usuario"]
+    H1[POST /auth/login] --> H2[JWT 8h - sem claim tipo]
+    H2 --> H3[JwtAuthGuard global]
+    H3 --> H4[PermissionGuard<br/>RBAC completo]
+    H4 --> H5[Todas as rotas internas<br/>Hub, Desk, Rooms, Assets,<br/>Academy, Learn, Student,<br/>Finance, Boost-instrutor]
+  end
+
+  subgraph BoostAuth["Login do Boost - BoostUsuario"]
+    B1[POST /boost/login] --> B2["JWT 8h - claim tipo='boost'"]
+    B2 --> B3[BoostJwtAuthGuard<br/>verifica contra boost_usuarios]
+    B3 --> B4[Autorizacao so por matricula<br/>sem RBAC, sem permissao]
+    B4 --> B5[Rotas do portal publico<br/>marcadas @Public]
+  end
+
+  X{{"Token de um sistema NUNCA<br/>e aceito no outro - 401<br/>(confirmado por teste e2e<br/>nos dois sentidos)"}}
+  H2 -.-> X
+  B2 -.-> X
+
+  CHAT[BoostChatGateway<br/>unico ponto que autentica<br/>os dois tipos de token]
+  H2 -.-> CHAT
+  B2 -.-> CHAT
+
+  classDef hub fill:#E8EEF7,stroke:#2E5395,color:#1F3864
+  classDef boost fill:#E8F4EE,stroke:#2E7D57,color:#14532D
+  classDef alerta fill:#FDE8E8,stroke:#9B2C2C,color:#6B1F1F
+  class H1,H2,H3,H4,H5 hub
+  class B1,B2,B3,B4,B5 boost
+  class X alerta

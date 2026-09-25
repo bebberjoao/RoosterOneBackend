@@ -1,0 +1,15 @@
+stateDiagram-v2
+  [*] --> Pendente : atividade publicada
+  Pendente --> Enviada : aluno envia texto + anexo
+  Pendente --> Atrasada : prazo venceu sem envio
+  Atrasada --> EnviadaComAtraso : envio apos o prazo
+  Enviada --> Enviada : reenvio antes do prazo
+  Enviada --> Corrigida : professor lanca nota + feedback
+  EnviadaComAtraso --> Corrigida : professor lanca nota + feedback
+  Corrigida --> [*]
+
+  note right of Corrigida
+    A nota e propagada para o
+    ItemAvaliativo do Academy
+    na mesma transacao
+  end note

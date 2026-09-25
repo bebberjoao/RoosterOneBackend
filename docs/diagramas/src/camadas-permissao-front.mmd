@@ -1,0 +1,22 @@
+flowchart TD
+  SES[Sessao real autenticada<br/>session.permissoes do backend]
+  SES --> PC[PermissionProvider<br/>usePermissions / useCan / useCanAccess]
+  PC --> RA[RequireAccess no AppShell<br/>decide se a ROTA abre]
+  PC --> BTN[useCan por acao<br/>decide se o BOTAO aparece]
+
+  VIS[Visao de demonstracao<br/>role-context / useRole]
+  VIS --> ADD[Camada ADITIVA de preview<br/>E logico com a permissao real]
+  ADD --> BTN
+
+  MOD[permissions.ts por modulo<br/>gating de botao dentro da tela]
+  MOD --> BTN
+
+  AVISO{{"A Visao NUNCA e fronteira de seguranca<br/>e NUNCA decide o que buscar da API -<br/>so o que mostrar. O backend revalida tudo."}}
+  VIS -.-> AVISO
+
+  classDef real fill:#E8EEF7,stroke:#2E5395,color:#1F3864
+  classDef demo fill:#FDF2E0,stroke:#B4741A,color:#6B4410
+  classDef alerta fill:#FDE8E8,stroke:#9B2C2C,color:#6B1F1F
+  class SES,PC,RA real
+  class VIS,ADD,MOD demo
+  class AVISO alerta

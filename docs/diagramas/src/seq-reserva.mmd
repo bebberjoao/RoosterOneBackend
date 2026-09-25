@@ -1,0 +1,29 @@
+sequenceDiagram
+  actor U as Solicitante
+  participant FE as Frontend
+  participant CTRL as RoomsController
+  participant SVC as RoomsService
+  participant DB as PostgreSQL
+
+  U->>FE: escolhe ambiente, data e horario
+  FE->>CTRL: POST /reservas
+  CTRL->>CTRL: assertDentroDoPrazo()
+  alt data alem do horizonte permitido
+    CTRL-->>FE: 403 - limite de 15 dias (RN017)
+  else dentro do prazo
+    CTRL->>SVC: createReserva(dto)
+    SVC->>SVC: assertReservaDisponivel()
+    SVC->>DB: busca Ambiente
+    SVC->>SVC: valida capacidade
+    SVC->>SVC: valida diasFuncionamento
+    SVC->>SVC: valida janela de horario
+    SVC->>DB: busca reservas conflitantes
+    alt conflito encontrado
+      SVC-->>FE: 409 - horario indisponivel (RN010)
+    else livre
+      SVC->>DB: cria Reserva status=analise
+      SVC-->>CTRL: reserva criada
+      CTRL-->>FE: 201
+      FE-->>U: solicitacao enviada para analise
+    end
+  end

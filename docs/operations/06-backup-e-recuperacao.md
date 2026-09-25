@@ -1,39 +1,77 @@
 # Backup e Recuperação
 
-## Estado atual: não identificado no código analisado
+Status: setembro/2026. Existem **scripts de backup e restauração**; não existe **agendamento automático**, porque agendar depende de um ambiente que rode continuamente — e não há produção ainda.
 
-Não há nenhuma rotina de backup automatizada em nenhum dos dois repositórios: nenhum script de backup no `package.json` do backend ou do frontend, nenhum job agendado (cron, task agendada, workflow de CI), nenhuma configuração de backup gerenciado do PostgreSQL, e nenhum script de restauração/recuperação de desastre.
+## O que precisa ser salvo: duas metades
 
-Os únicos artefatos relacionados a dados versionados no repositório são:
-- As migrations do Prisma (`RoosterOneBackend-main/prisma/migrations/`), que descrevem a evolução do **schema** do banco — não são backup de dados.
-- O script de seed (`prisma/seed-dev.ts`), que popula dados de **exemplo** para desenvolvimento — não é backup nem deve ser usado como tal.
+O estado do Rooster One não cabe só no banco. Anexo de chamado, documento acadêmico, material do Boost, certificado e nota fiscal são **arquivos em `uploads/`**, e o banco guarda apenas o caminho até eles.
 
-**Hoje, a persistência dos dados de produção depende inteiramente de como/onde o PostgreSQL é hospedado** (backup gerenciado pelo provedor, se houver, já que nada no código do repositório cobre isso).
+Restaurar uma metade sem a outra produz um sistema que parece íntegro e não é: registro apontando para arquivo inexistente (download quebrado) ou arquivo órfão que ninguém alcança. Por isso os scripts tratam as duas juntas, sempre.
 
-## Recomendação futura
+## Scripts
 
-Nada do que segue existe hoje no repositório — são sugestões de baixo esforço, compatíveis com o fato de o banco ser PostgreSQL puro (`prisma/schema.prisma`, `provider = "postgresql"`), caso a equipe decida implementar backup:
+Há **duas versões equivalentes**, porque o servidor de implantação é Windows e o script bash exigiria Git Bash ou WSL instalados só para isso:
 
-### Backup manual/agendado com `pg_dump`
+| Script | Ambiente | O que faz |
+|---|---|---|
+| `scripts/backup.ps1` | **Windows (oficial)** | `pg_dump` custom + `uploads.zip` + manifesto, em pasta carimbada |
+| `scripts/restore.ps1` | **Windows (oficial)** | `pg_restore` + restauração de `uploads/`, com confirmação |
+| `scripts/backup.sh` | Linux/macOS | Mesmo conteúdo, com `tar.gz` no lugar do zip |
+| `scripts/restore.sh` | Linux/macOS | Idem |
 
-```bash
-pg_dump --format=custom --file=backup_$(date +%Y%m%d_%H%M%S).dump "$DATABASE_URL"
+Todos leem `DATABASE_URL` do ambiente ou do `.env`, e falham de forma clara se ela não existir. As versões Windows também verificam se `pg_dump`/`pg_restore` estão no `PATH` — a pasta `bin` do PostgreSQL (tipicamente `C:\Program Files\PostgreSQL\16\bin`) precisa estar lá.
+
+```powershell
+# Windows
+.\scripts\backup.ps1                          # grava em .\backups\AAAAMMDD-HHMMSS
+.\scripts\backup.ps1 -Destino D:\backups-rooster
+
+.\scripts\restore.ps1 -Pasta .\backups\20260924-084500
+.\scripts\restore.ps1 -Pasta .\backups\20260924-084500 -Confirmar   # sem prompt
 ```
 
-- Pode ser agendado via cron (Linux) ou Agendador de Tarefas (Windows) rodando esse comando periodicamente contra a `DATABASE_URL` de produção.
-- Recomenda-se reter os dumps fora do próprio servidor do banco (armazenamento separado) e testar a restauração periodicamente — um backup nunca testado não deve ser considerado confiável.
-
-### Restauração a partir de um dump
-
 ```bash
-pg_restore --clean --if-exists --dbname="$DATABASE_URL" backup_20260101_000000.dump
+# Linux/macOS
+./scripts/backup.sh
+./scripts/restore.sh ./backups/20260923-140000
+CONFIRMAR=sim ./scripts/restore.sh ./backups/20260923-140000
 ```
 
-### Itens em aberto para uma estratégia real de backup
+Decisões embutidas nos scripts, que importam na hora de restaurar em outra máquina:
 
-- Definir frequência (ex.: diário) e política de retenção (quantas cópias manter, por quanto tempo).
-- Definir onde os dumps ficam armazenados (fora do mesmo host do banco).
-- Definir e testar o procedimento de restauração (RTO/RPO) — hoje nenhum dos dois existe documentado ou automatizado.
-- Considerar backup gerenciado, se o PostgreSQL de produção vier a ser hospedado em um provedor que já ofereça essa capacidade nativamente.
+- **`--no-owner --no-acl`** no dump: permite restaurar num banco cujo usuário tem outro nome — o caso normal entre ambientes.
+- **`--clean --if-exists`** na restauração: derruba os objetos antes de recriar, para funcionar num banco que já tem schema.
+- **Confirmação explícita** na restauração: ela sobrescreve banco e arquivos. É uma das poucas operações genuinamente irreversíveis do sistema, e restaurar no banco errado é um erro fácil de cometer e impossível de desfazer.
+- **Manifesto** em cada backup, registrando data, host, banco (com a senha mascarada) e a última migration aplicada — para a restauração não depender de memória sobre qual dump corresponde a qual ambiente.
 
-Reforçando: tudo nesta seção é sugestão, não descreve nenhuma automação existente no código dos repositórios.
+Com o `docker-compose.yml`, o dump também pode sair direto do container:
+
+```bash
+docker compose exec -T db pg_dump -U rooster rooster_one | gzip > banco.sql.gz
+```
+
+## O que ainda falta
+
+- **Agendamento**: nenhum. No servidor Windows, isto seria uma tarefa diária no Agendador de Tarefas chamando `backup.ps1`, enviando o resultado para armazenamento externo:
+
+  ```powershell
+  schtasks /create /tn "RoosterOne-Backup" /sc daily /st 03:00 ^
+    /tr "powershell -NoProfile -ExecutionPolicy Bypass -File C:\rooster\backend\scripts\backup.ps1 -Destino D:\backups-rooster"
+  ```
+- **Armazenamento externo**: os scripts gravam em disco local. Backup que vive na mesma máquina que o banco não protege contra a perda da máquina.
+- **Retenção**: não há expurgo de backup antigo; hoje a pasta cresce indefinidamente.
+- **Teste de restauração periódico**: o procedimento existe e é executável, mas não roda de forma programada contra um banco descartável.
+
+Os quatro dependem de um ambiente que rode continuamente, e estão registrados no Índice de Pendências.
+
+## Verificação pós-restauração
+
+Um `pg_restore` sem erro não significa sistema íntegro. Conferir:
+
+1. `GET /health` responde `200` — o banco está alcançável pela aplicação (e não só pelo `psql`).
+2. Login funciona e uma listagem qualquer traz dados.
+3. **Um anexo ou certificado antigo abre** — é o que prova que banco e `uploads/` foram restaurados em sincronia, a falha mais provável e menos visível.
+
+## Recuperação de desastre
+
+Não há plano formal de DR (RTO/RPO definidos, ambiente de contingência, procedimento ensaiado), porque não há produção. O que existe é o material para construí-lo: os scripts acima, o procedimento de mudança de schema em `docs/engineering/13-governanca.md` e o registro de riscos R-02/R-03, que tratam justamente da ausência de backup e de volume persistente.

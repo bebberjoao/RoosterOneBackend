@@ -31,7 +31,9 @@ Uma `Permissao` tem, além de `id` e `descricao`, quatro campos relevantes para 
 - `nome` — string livre, usada no catálogo/seed como um identificador legível em formato `modulo.recurso.acao` (ex.: `hub.acessos.gerenciar-permissoes`, ver `prisma/seed-dev.ts:115`). **Esse campo não é o que o código usa para checar autorização** — é um rótulo de conveniência para humanos lerem o catálogo de permissões.
 - `moduloId` — FK opcional para `Modulo`.
 - `recurso` — string (ex.: `/hub/acessos`, `/desk/tickets`) — na prática, a **rota/tela** do frontend a que a permissão se refere.
-- `acao` — string (ex.: `acessar`, `criar`, `editar`, `excluir`, `gerenciar-permissoes`, `conceder`, `revogar`, `transferir`, `anexar`, `nota-interna`) — a ação específica dentro daquela tela.
+- `acao` — string (ex.: `acessar`, `criar`, `editar`, `excluir`, `gerenciar-permissoes`, `conceder`, `revogar`, `transferir`, `anexar`, `nota-interna`, `ver-sla`) — a ação específica dentro daquela tela.
+
+**`ver-sla` (Rooster Desk / `/desk/tickets`)**: controla se o usuário enxerga o SLA dos chamados — coluna na lista, campo no detalhe, cartão "SLA médio", barras no painel e a aba "Relatório de SLA". Sem ela nada disso é exibido, e o painel também deixa de usar "SLA em risco" para filtrar os chamados críticos (senão a informação vazaria por inferência). É uma permissão de **exibição**: o SLA é calculado no frontend a partir de dados que a API já devolve, então ela não protege o dado em si. A migration `20260925180000_desk_permissao_ver_sla` cria a permissão e a concede a quem já tinha `desk.tickets.acessar`, para ninguém perder o campo de repente; no seed, só atendentes e coordenadores a recebem (solicitante e visualizador não). Quem já estava logado precisa entrar de novo para a permissão valer.
 
 **A checagem de autorização real usa a tripla `(modulo.nome, recurso, acao)`**, não o campo `nome` da permissão. Em `UsuariosService.hasPermission()`:
 
@@ -169,17 +171,58 @@ Implementado em helpers privados replicados (não compartilhados) em cada contro
 
 A diferença mais importante: no Academy/Learn, a posse de recurso (ser o professor da turma) é **sempre uma condição obrigatória adicional** à permissão, nunca uma via alternativa de acesso amplo — o modelo é deliberadamente mais restritivo que o do Rooms (onde posse + permissão de solicitante já bastam) e mais uniforme que o do Desk (onde o efeito de posse varia por endpoint). Isso é consistente com a regra de negócio de que dado acadêmico de uma turma (frequência, nota) é sensível e não deve vazar entre professores.
 
+## Rooster Rooms — permissão como regulador de regra de negócio, não só like/dislike de ação
+
+Todo o resto deste documento trata permissão como binária: ou o usuário pode executar a ação, ou não. `/rooms/book` tem duas permissões que fogem desse padrão — elas não liberam uma ação nova, **ajustam o parâmetro de uma regra de negócio** que já vale para todo mundo:
+
+- **`prazo-estendido`**: toda reserva (única ou série) é checada contra um horizonte de antecedência — 15 dias sem a permissão, 365 dias com ela (`RoomsController.assertDentroDoPrazo`). Não é "pode reservar" vs. "não pode" — é "até quando pode".
+- **`solicitar-recorrente`**: essa sim é binária (pode ou não criar série via `POST /reservas/serie`), mas é **independente** de `solicitar` — ter uma não implica a outra. O catálogo trata as duas como concessões separadas de propósito, para dar liberdade de conceder só uma (ex.: alguém que pode reservar longe no tempo, mas sempre reserva único, sem recorrência).
+
+As duas ficam no grupo `roomsManagementKeys` do seed (não em `roomsSelfServiceKeys`), então por padrão só quem já tem perfil de coordenação as recebe — um solicitante comum (`roomsSelfServiceKeys`) fica com o comportamento restrito (15 dias, sem recorrência) mesmo tendo `solicitar`. Ver RN017/RN018 em `docs/system/04-regras-de-negocio.md`.
+
 ## Rooster Boost — dois sistemas de login coexistindo
 
 O Rooster Boost é o único módulo do sistema com **dois logins completamente independentes**: o login do Hub de sempre (`Usuario`, usado por Academy/Desk/Rooms/Assets/Learn/Student — inclusive o instrutor de um curso Boost) e um **login público novo**, `BoostUsuario`, para pessoas de fora da instituição se cadastrarem e fazerem cursos sem precisar de conta no Hub. Isso foi uma decisão de produto explícita (Boost como plataforma de cursos aberta), não uma inconsistência.
 
 **Por que não estender o `JwtAuthGuard`/`PermissionGuard` globais**: ambos são a base de autenticação/autorização de todo o resto do sistema — qualquer mudança ali teria raio de explosão sobre módulos que não têm nada a ver com Boost. Em vez disso, isolamento total:
 
-- **Instrutor** (sempre um `Professor` do Academy — não existe cadastro de instrutor separado): rotas em `BoostController`, autenticadas pelo `JwtAuthGuard` global de sempre, autorizadas pelo `PermissionGuard` (`Rooster Boost` / `/boost/manage`), com o mesmo modelo de posse-de-recurso de três camadas do Academy/Learn (ver seção acima) — professor só gerencia o próprio curso, coordenação/admin (`boost.manage.acessar`) gerencia qualquer um.
+- **Lado Hub** (gestor e orientador — ver "Gestão por permissão" abaixo): rotas em `BoostController`, autenticadas pelo `JwtAuthGuard` global de sempre e autorizadas pelo `PermissionGuard`/`hasPermission` (`Rooster Boost` / `/boost/manage` e `/boost/conversas`). O `Professor` do Academy só entra como **orientador vinculado** a um curso.
 - **Aluno Boost**: rotas em `BoostPortalController`, marcado `@Public()` na classe inteira (o `JwtAuthGuard` global **não roda** nessas rotas) e protegido rota a rota por um guard próprio, `BoostJwtAuthGuard` — verifica o token contra `boost_usuarios` (nunca `usuarios`) e exige o claim `tipo: 'boost'` no payload JWT. Um token do Hub é rejeitado aqui (`401`, `payload.sub` não existe em `boost_usuarios`); um token do Boost é rejeitado em qualquer rota do Hub, pelo mesmo motivo invertido (`payload.sub` não existe em `usuarios`). Confirmado por teste e2e nos dois sentidos.
-- **Chat do curso** é o único ponto do sistema onde os dois lados se encontram na mesma conexão: `BoostChatGateway` autentica os dois tipos de token (decodifica e escolhe a tabela pelo claim `tipo`), mas os endpoints REST de mensagem continuam **separados por caminho** (`/cursos-boost/:id/mensagens` para o instrutor, `/boost/cursos/:id/mensagens` para o aluno) — as duas rotas têm guards diferentes e não podem compartilhar o mesmo path no Nest.
+- **A conversa aluno ↔ orientador** é o único ponto do sistema onde os dois lados se encontram na mesma conexão: `BoostChatGateway` autentica os dois tipos de token (decodifica e escolhe a tabela pelo claim `tipo`), mas os endpoints REST continuam **separados por caminho** (`/boost-conversas/*` para o orientador, `/boost/cursos/:id/conversa/*` para o aluno) porque têm guards diferentes (Hub vs. Boost).
 
 O aluno Boost nunca aparece em `getAccess()`/`hasPermission()` — não tem `Permissao`, não tem `UsuarioPermissao`, não é admin nem pode ser. Autorização do lado aluno é 100% por posse (matrícula), verificada diretamente no `BoostPortalService` a cada chamada (`exigirMatriculaDoCurso`/`exigirMatriculaDaAula`), sem nenhuma relação com o RBAC descrito no resto deste documento.
+
+### Gestão por permissão, sem "dono" do curso (setembro/2026)
+
+Antes, o professor que criou um curso era o **dono** dele (`CursoBoost.professorId`) e só ele — ou a coordenação — o editava (`exigirDonoOuGestor`). Isso foi **removido**: a mesma permissão que antes valia "para o meu curso" passa a valer **para todos os cursos**.
+
+| Tela | Ação | O que libera |
+|---|---|---|
+| `/boost/manage` | `acessar` | Ver a lista de cursos e o detalhe |
+| | `gerenciar-cursos` | Criar, editar, publicar, **tirar do ar** e excluir |
+| | `gerenciar-conteudo` | Módulos, aulas, materiais e vídeos |
+| | `ver-progresso` | Alunos matriculados e progresso |
+| | `certificado` | Ligar/desligar o certificado e editar o texto |
+| | `vincular-orientadores` | Escolher os professores orientadores do curso |
+| `/boost/conversas` | `acessar` / `responder` | Ler e responder as conversas **dos cursos em que está vinculado** |
+
+O **orientador** é um professor com `/boost/conversas` **e** um vínculo `CursoOrientadorBoost` com o curso. As duas condições valem juntas: a permissão sem o vínculo dá caixa de entrada vazia e `404` em conversa alheia (não revela que existe); o vínculo sem a permissão dá `403`. O orientador **não** tem nenhuma ação de gestão nem vê progresso — no seed, o professor recebe só `boost.conversas.*`, e a coordenação/admin recebem o conjunto de gestão.
+
+**Risco a conhecer:** como não há mais "dono", a permissão é a **única** barreira de gestão — conceder `gerenciar-cursos` a alguém dá poder sobre todos os cursos. A migration `20260926120000_boost_gestao_orientadores_conversas` existe justamente por isso: converte quem era "professor dono" em orientador (perde as chaves de gestão) em vez de promovê-lo a gestor de tudo.
+
+**Portal:** tirar um curso do ar (`status: 'arquivado'`) o esconde do catálogo e bloqueia nova matrícula, mas **quem já está matriculado mantém o acesso ao conteúdo e à conversa** — a autorização do aluno é por matrícula, não por status do curso.
+
+### Tela `/boost/students` — gestão de contas externas (setembro/2026)
+
+O único ponto do módulo Boost onde o Hub **administra** contas do outro sistema de login. Ações `acessar` (listar) e `gerenciar` (ativar/desativar e redefinir senha), sobre `BoostUsuario`.
+
+Gestão de conta externa é **entre cursos** e não pertence a nenhum curso, por isso tem tela própria, com `@RequirePermission` estático.
+
+### Streaming de vídeo — a única exceção à regra "toda rota autenticada por cabeçalho"
+
+`GET /aulas-boost/:id/video` e `GET /boost/aulas/:id/video` são `@Public()` e não usam `Authorization`. É deliberado, e é a única exceção do sistema: a tag `<video>` não anexa cabeçalho customizado. A proteção é um **token de 5 minutos**, com claim `finalidade: 'stream-boost-video'` e `aulaId`, validado manualmente na rota (`common/stream-token.util.ts`). O token só é emitido por um endpoint autenticado normalmente e, no lado aluno, exige matrícula.
+
+Por que não afrouxar o guard global: aceitar token por query string em toda rota espalharia um token de sessão de 8h por logs de acesso, histórico de navegador e cabeçalho `Referer` do sistema inteiro. O token de stream tem raio de dano mínimo — expira em 5 minutos e só serve para uma aula. Consequência conhecida: a URL do vídeo, enquanto válida, funciona para quem a tiver; é o mesmo trade-off de qualquer URL assinada.
 
 ## Permissões do Rooster Finance
 

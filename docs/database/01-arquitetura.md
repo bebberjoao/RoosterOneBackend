@@ -63,7 +63,7 @@ model Usuario {
 }
 ```
 
-Regras observadas de forma consistente em todos os 27 models do schema:
+Regras observadas de forma consistente em todos os 62 models do schema:
 
 - **Nome do model**: `PascalCase` (singular), ex.: `Usuario`, `CategoriaTicket`, `PatrimonioMovimento`.
 - **Nome da tabela** (`@@map`): `snake_case`, geralmente plural, ex.: `usuarios`, `categorias_tickets`, `patrimonio_movimentacoes`. Exceções pontuais ao plural: `patrimonio` (singular, tabela do model `Patrimonio`) e `campus` (invariável em português).
@@ -95,7 +95,8 @@ Existe um segundo schema, `prisma/schema.test.prisma`, usado exclusivamente pela
 - `datasource` usa `provider = "sqlite"` com `url = "file:./dev-test.db"` (fixo no arquivo, não via `env()`).
 - Nenhum atributo `@map`/`@@map`/`@db.*` é usado — os nomes de tabela/coluna no SQLite de teste são os mesmos identificadores camelCase do Prisma.
 - Campos `String[]` do Postgres (ex.: `Ticket.tags`, `Ambiente.galeria`, `Ambiente.recursos`, `Ambiente.diasFuncionamento`) não existem nativamente em SQLite; no schema de teste eles viram `String?` simples, guardando JSON serializado (documentado no próprio arquivo: `// JSON — SQLite não suporta String[] nativo`), com a serialização/deserialização feita em `prisma-test.service.ts`.
-- O model `AtendimentoSubcategoria` (vínculo atendente↔subcategoria) **não existe** no schema de testes — ele foi adicionado ao schema de produção sem réplica no espelho SQLite.
 - Índices `@@index` explícitos (`mensagens_tickets`, `reservas_mensagens`, `reservas` por `serieId`) não estão presentes no schema de teste na mesma extensão (SQLite/Prisma cria os índices únicos automaticamente, mas os `@@index` de performance não foram replicados em todos os casos).
 
-Em resumo: o schema de testes é um **espelho funcional, não uma cópia fiel** — ele existe para permitir testes e2e rápidos e isolados (arquivo SQLite local, sem depender de um Postgres real), mas a fonte de verdade estrutural do banco é sempre `prisma/schema.prisma`.
+Em resumo: o schema de testes é um **espelho funcional, não uma cópia fiel** — ele existe para permitir testes e2e rápidos e isolados (arquivo SQLite local, sem depender de um Postgres real), mas a fonte de verdade estrutural do banco é sempre `prisma/schema.prisma`. Não existe diffing automático entre os dois arquivos — a sincronia é 100% manual, e desalinhamentos só aparecem quando algo os exercita.
+
+> **Drift real encontrado e corrigido (setembro/2026).** O model `AtendimentoSubcategoria` (vínculo atendente↔subcategoria) existia em `schema.prisma` mas **não** em `schema.test.prisma` havia algum tempo. Como `RoosterDeskService.findCategoriesForUser` inclui esse relacionamento (`include: { subcategorias: { include: { atendentes: {...} } } }`), qualquer chamada a `GET /chamados-categorias` sob o schema de teste (SQLite) sempre retornaria `500` — e como nenhum teste e2e chamava esse endpoint até então, o bug ficou invisível. Corrigido adicionando o model completo (mesmos campos/relações do schema de produção: `id`, `subcategoriaId`, `usuarioId`, `criadoEm`, `@@unique([subcategoriaId, usuarioId])`) e os campos que faltavam em `SubcategoriaTicket` (`slaHoras`, `atendentes`) e `Usuario` (`subcategoriasAtendidas`) ao schema de teste, e cobrindo o endpoint com um teste novo em `test/app.e2e-spec.ts` (ver `docs/operations/03-execucao.md`). Acionado ao investigar o bug relatado pelo usuário de dropdowns de categoria vazios no formulário de novo chamado — ver `docs/api/02-endpoints.md`, seção 2.1.

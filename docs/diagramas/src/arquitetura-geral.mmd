@@ -1,0 +1,35 @@
+graph TB
+  subgraph FE["FRONTEND - RoosterOneFrontEnd-main"]
+    R[TanStack Router<br/>rotas file-based]
+    AS[AppShell<br/>sessao + navegacao + RequireAccess]
+    CTX[Contexts<br/>auth / permission / role / theme]
+    SVC[Servicos por modulo<br/>services/mock-api/*.service.ts]
+    HTTP[Cliente HTTP central<br/>services/hub/client.ts]
+    R --> AS --> CTX
+    R --> SVC --> HTTP
+  end
+
+  subgraph BE["BACKEND - RoosterOneBackend-main"]
+    GUARD[JwtAuthGuard + PermissionGuard<br/>globais]
+    CTRL[Controllers<br/>9 modulos de dominio]
+    SERV[Services<br/>regra de negocio + transacao]
+    PRISMA[PrismaService<br/>Prisma Client]
+    WS[Gateways WebSocket<br/>chat Desk / chat Boost]
+    GUARD --> CTRL --> SERV --> PRISMA
+    CTRL -.-> WS
+  end
+
+  DB[("PostgreSQL")]
+  UP[["uploads/<br/>anexos, PDFs, materiais"]]
+
+  HTTP -->|"REST / JSON<br/>Bearer JWT"| GUARD
+  HTTP -.->|"Socket.IO"| WS
+  PRISMA --> DB
+  SERV --> UP
+
+  classDef front fill:#E8F4EE,stroke:#2E7D57,color:#14532D
+  classDef back fill:#E8EEF7,stroke:#2E5395,color:#1F3864
+  classDef infra fill:#FDF2E0,stroke:#B4741A,color:#6B4410
+  class R,AS,CTX,SVC,HTTP front
+  class GUARD,CTRL,SERV,PRISMA,WS back
+  class DB,UP infra

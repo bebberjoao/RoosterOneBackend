@@ -1,0 +1,20 @@
+flowchart LR
+  COORD((Coordenacao))
+  PROF((Professor))
+  SEC((Secretaria))
+
+  A1([Gerenciar cursos, disciplinas e periodos])
+  A2([Criar turma e vincular professor])
+  A3([Gerenciar calendario academico])
+  A4([Matricular aluno])
+  A5([Publicar documento academico])
+  A6([Registrar frequencia em lote])
+  A7([Lancar notas e configurar pesos])
+
+  COORD --> A1
+  COORD --> A2
+  COORD --> A3
+  SEC --> A4
+  SEC --> A5
+  PROF --> A6
+  PROF --> A7

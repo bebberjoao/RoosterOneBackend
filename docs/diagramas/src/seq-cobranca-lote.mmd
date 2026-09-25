@@ -1,0 +1,27 @@
+sequenceDiagram
+  actor F as Equipe financeira
+  participant FE as Frontend
+  participant CTRL as FinanceController
+  participant FS as FinanceService
+  participant AS as AcademyService
+  participant DB as PostgreSQL
+
+  F->>FE: escolhe competencia e turma
+  FE->>CTRL: POST /cobrancas/gerar-lote
+  CTRL->>FS: gerarLote(competencia, turmaId, servicoId)
+  FS->>AS: alunos matriculados na turma
+  AS->>DB: busca Matriculas ativas
+  AS-->>FS: lista de Alunos
+  loop para cada aluno
+    FS->>DB: ja existe Cobranca dessa competencia?
+    alt ja existe
+      FS->>FS: pula (idempotente)
+    else nao existe
+      FS->>DB: busca DescontoAluno vigente
+      FS->>FS: calcula valorDesconto
+      FS->>DB: cria Cobranca status=aberto
+    end
+  end
+  FS-->>CTRL: resumo (criadas / puladas)
+  CTRL-->>FE: 201
+  FE-->>F: N mensalidades geradas

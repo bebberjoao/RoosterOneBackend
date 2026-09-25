@@ -1,6 +1,6 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
 import {
-  IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Min,
+  ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Max, Min,
 } from 'class-validator';
 
 // ===================== Curso =====================
@@ -37,7 +37,27 @@ export class CreateCursoBoostDto {
   @ApiPropertyOptional({ example: true, description: 'Indica se o curso emite certificado ao ser concluído pelo aluno' })
   @IsOptional() @IsBoolean() emiteCertificado?: boolean;
 }
-export class UpdateCursoBoostDto extends PartialType(CreateCursoBoostDto) {}
+// Certificado tem permissão própria (`certificado`): não pode ser alterado pelo PATCH genérico do curso.
+export class UpdateCursoBoostDto extends PartialType(OmitType(CreateCursoBoostDto, ['emiteCertificado'] as const)) {}
+
+export class ConfigurarCertificadoDto {
+  @ApiPropertyOptional({ example: false, description: 'Liga/desliga a emissão de certificado. Desligado, o curso funciona como material de apoio.' })
+  @IsOptional() @IsBoolean() emiteCertificado?: boolean;
+
+  @ApiPropertyOptional({
+    example: 'Certificamos que {aluno} concluiu o curso {curso}, com carga horária de {cargaHoraria} horas.',
+    description: 'Texto do certificado. Aceita {aluno}, {curso}, {cargaHoraria} e {data}. Vazio volta ao texto padrão.',
+  })
+  @IsOptional() @IsString() @Length(0, 1000) certificadoTexto?: string;
+
+  @ApiPropertyOptional({ example: 20, description: 'Carga horária impressa no certificado, em horas' })
+  @IsOptional() @IsInt() @Min(1) cargaHoraria?: number;
+}
+
+export class DefinirOrientadoresDto {
+  @ApiProperty({ example: ['11111111-1111-4111-8111-111111111111'], description: 'Ids dos professores (Academy) que orientam o curso. Substitui a lista atual.' })
+  @IsArray() @ArrayUnique() @IsString({ each: true }) professorIds: string[];
+}
 
 // ===================== Módulo =====================
 export class CreateModuloBoostDto {
@@ -75,8 +95,23 @@ export class CreateAulaBoostDto {
 }
 export class UpdateAulaBoostDto extends PartialType(CreateAulaBoostDto) {}
 
-// ===================== Mensagem (chat) =====================
+// ===================== Mensagem (conversa aluno ↔ orientador) =====================
 export class CreateMensagemBoostDto {
-  @ApiProperty({ example: 'Professor, qual a diferença entre pilha e fila?', description: 'Texto da mensagem enviada no chat do curso' })
+  @ApiProperty({ example: 'Professor, qual a diferença entre pilha e fila?', description: 'Texto da mensagem enviada na conversa' })
   @IsString() @Length(1, 4000) mensagem: string;
+}
+
+// ===================== Progresso de vídeo (aluno) =====================
+export class AtualizarProgressoVideoDto {
+  @ApiProperty({ example: 245, description: 'Posição atual do vídeo em segundos, para retomar de onde parou' })
+  @IsInt() @Min(0) posicaoSeg: number;
+
+  @ApiProperty({ example: 92, description: 'Maior percentual já assistido do vídeo (0-100) — completa a aula automaticamente a partir de 90%' })
+  @IsInt() @Min(0) @Max(100) percentualAssistido: number;
+}
+
+// ===================== Contas externas (painel admin) =====================
+export class ToggleAtivoBoostUsuarioDto {
+  @ApiProperty({ example: false, description: 'Novo estado de ativação da conta externa' })
+  @IsBoolean() ativo: boolean;
 }

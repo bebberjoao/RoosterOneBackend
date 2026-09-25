@@ -16,6 +16,7 @@ import { CreateAssetCategoryDto } from './dto/create-asset-category.dto';
 import { CreateAssetMovementDto } from './dto/create-asset-movement.dto';
 import { CreateAssetSectorDto } from './dto/create-asset-sector.dto';
 import { CreateAssetDto } from './dto/create-asset.dto';
+import { FindAssetMovementsQueryDto, FindAssetsQueryDto } from './dto/find-assets-query.dto';
 import { UpdateAssetCategoryDto } from './dto/update-asset-category.dto';
 import { UpdateAssetMovementDto } from './dto/update-asset-movement.dto';
 import { UpdateAssetSectorDto } from './dto/update-asset-sector.dto';
@@ -108,8 +109,8 @@ export class AssetsController {
 
   @Get('patrimonio')
   @RequirePermission(MODULO, '/assets', 'acessar')
-  findAllAssets(@Query('categoriaId') categoriaId?: string, @Query('setorId') setorId?: string, @Query('status') status?: string) {
-    return this.service.findAllAssets(categoriaId, setorId, status);
+  findAllAssets(@Query() query: FindAssetsQueryDto) {
+    return this.service.findAllAssets(query.categoriaId, query.setorId, query.status, query);
   }
 
   @Get('patrimonio/:id')
@@ -149,8 +150,8 @@ export class AssetsController {
 
   @Get('patrimonio-movimentacoes')
   @RequirePermission(MODULO, '/assets', 'acessar')
-  findAllMovements(@Query('patrimonioId') patrimonioId?: string) {
-    return this.service.findAllMovements(patrimonioId);
+  findAllMovements(@Query() query: FindAssetMovementsQueryDto) {
+    return this.service.findAllMovements(query.patrimonioId, query);
   }
 
   @Get('patrimonio-emprestimos-atrasados')

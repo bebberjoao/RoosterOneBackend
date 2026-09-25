@@ -3,12 +3,14 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { AuditoriaService } from '../shared/auditoria.service';
 import { CreateUsuarioPermissaoDto } from './dto/create-usuario-permissao.dto';
+import { AdministradoresService } from '../shared/administradores.service';
 
 @Injectable()
 export class UsuariosPermissoesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditoria: AuditoriaService,
+    private readonly administradores: AdministradoresService,
   ) {}
 
   // =====================================================
@@ -51,6 +53,15 @@ export class UsuariosPermissoesService {
     const existing = await this.prisma.usuarioPermissao.findUnique({ where: { id } });
     if (!existing) {
       return null;
+    }
+
+    // Revogar a permissão de administrador do último que a tem é irreversível
+    // pela interface: não sobra ninguém que possa concedê-la de volta.
+    if (await this.administradores.permissaoEhDeAdmin(existing.permissaoId)) {
+      await this.administradores.assertNaoEhUltimoAdministrador(
+        existing.usuarioId,
+        'revogar a permissão de administrador deste usuário',
+      );
     }
 
     try {

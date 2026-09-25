@@ -1,0 +1,36 @@
+erDiagram
+  Curso ||--o{ Disciplina : oferece
+  PeriodoLetivo ||--o{ Turma : vigente_em
+  Disciplina ||--o{ Turma : ofertada_como
+  Professor ||--o{ Turma : leciona
+  Usuario ||--|| Professor : vinculo
+  Usuario ||--|| Aluno : vinculo
+  Turma ||--o{ Matricula : recebe
+  Aluno ||--o{ Matricula : matriculado_em
+  Turma ||--o{ RegistroFrequencia : chamada
+  Aluno ||--o{ RegistroFrequencia : presenca
+  Turma ||--o{ ItemAvaliativo : avalia
+  ItemAvaliativo ||--o{ Nota : lancada
+  Aluno ||--o{ Nota : recebe
+  Curso ||--o{ EventoCalendarioAcademico : calendario
+  Disciplina ||--o{ DocumentoAcademico : documenta
+
+  Turma {
+    uuid id PK
+    string codigo
+    uuid disciplinaId FK
+    uuid professorId FK
+    uuid periodoId FK
+    string turno
+    int capacidade
+  }
+  ItemAvaliativo {
+    uuid id PK
+    string nome
+    decimal peso
+    string origem
+  }
+  Nota {
+    uuid id PK
+    decimal valor
+  }

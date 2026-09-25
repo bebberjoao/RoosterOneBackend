@@ -1,0 +1,14 @@
+stateDiagram-v2
+  [*] --> Ativa : aluno externo se matricula
+  Ativa --> Ativa : conclui aula (progressoPct sobe)
+  Ativa --> Concluida : progressoPct chega a 100
+  Ativa --> Cancelada : cancelamento
+  Concluida --> [*]
+  Cancelada --> [*]
+
+  note right of Concluida
+    Se o curso tem emiteCertificado,
+    o CertificadoBoost em PDF e gerado
+    automaticamente na mesma transacao
+    que fecha a matricula
+  end note

@@ -1,10 +1,9 @@
 import 'dotenv/config';
-import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { PrismaExceptionFilter } from './common/prisma-exception.filter';
+import { configurarApp } from './app-config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -18,20 +17,12 @@ async function bootstrap() {
     }),
   );
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
-
-  // Rede de segurança: cada service já mapeia P2002/P2025 com mensagem contextual
-  // antes disso — ver `src/common/prisma-exception.filter.ts`.
-  app.useGlobalFilters(new PrismaExceptionFilter());
+  // Versionamento, ValidationPipe e filtro de exceção ficam em app-config.ts,
+  // compartilhados com a suíte e2e — ver o comentário naquele arquivo.
+  configurarApp(app);
 
   const config = new DocumentBuilder()
-    .setTitle('Roster One API')
+    .setTitle('Rooster One API')
     .setDescription('Documentação da API do backend do Rooster One')
     .setVersion('1.0')
     .build();

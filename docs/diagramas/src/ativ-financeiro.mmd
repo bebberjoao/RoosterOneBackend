@@ -1,0 +1,9 @@
+%%{init: {'flowchart': {'wrappingWidth': 420}}}%%
+flowchart TD
+  A([Inicio da competencia]) --> B["Cadastro base: servico de mensalidade e descontos atribuidos aos alunos"]
+  B --> C["Geracao em lote por turma - idempotente, desconto vigente aplicado automaticamente"]
+  C --> D["Cobranca criada com status aberto"]
+  D --> E{"Emitir boleto?"}
+  E -->|Sim| F["Gera nosso numero, linha digitavel e PIX - internos, sem PSP real"]
+  E -->|Nao| G([Aluno consulta no portal Student])
+  F --> G

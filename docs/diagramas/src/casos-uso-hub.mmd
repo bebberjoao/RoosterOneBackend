@@ -1,0 +1,27 @@
+flowchart LR
+  ADM((Administrador))
+  USR((Usuario autenticado))
+
+  subgraph Hub[Rooster Hub]
+    C1([Fazer login])
+    C2([Redefinir senha esquecida])
+    C3([Cadastrar usuario])
+    C4([Editar / desativar usuario])
+    C5([Vincular usuario a setor])
+    C6([Conceder permissao])
+    C7([Revogar permissao])
+    C8([Gerenciar catalogo de permissoes])
+    C9([Consultar log de auditoria])
+    C10([Consultar meu acesso efetivo])
+  end
+
+  USR --> C1
+  USR --> C2
+  USR --> C10
+  ADM --> C3
+  ADM --> C4
+  ADM --> C5
+  ADM --> C6
+  ADM --> C7
+  ADM --> C8
+  ADM --> C9

@@ -6,9 +6,8 @@ import type { Request, Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { randomUUID } from 'crypto';
-import { existsSync, mkdirSync } from 'fs';
 import { extname, join } from 'path';
-import { ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
@@ -21,14 +20,15 @@ import {
   UpdateItemAvaliativoDto, UpdateMatriculaDto, UpdatePeriodoLetivoDto, UpdateProfessorDto,
   UpdateTurmaDto,
 } from './dto/academy.dto';
+import { FindAlunosQueryDto, FindTurmasQueryDto } from './dto/find-academy-query.dto';
+import { PASTAS } from '../common/storage.config';
 
 const MODULO = 'Rooster Academy';
 const TELA_MANAGE = '/academy/manage';
 const TELA_ATTENDANCE = '/academy/attendance';
 const TELA_GRADES = '/academy/grades';
 
-const UPLOADS_DIR = join(process.cwd(), 'uploads', 'documentos-academicos');
-if (!existsSync(UPLOADS_DIR)) mkdirSync(UPLOADS_DIR, { recursive: true });
+const UPLOADS_DIR = PASTAS.documentosAcademicos();
 const MAX_DOC_BYTES = 15 * 1024 * 1024; // 15MB
 
 type AuthedUser = { id: string };
@@ -117,7 +117,7 @@ export class AcademyController {
   createAluno(@Body() dto: CreateAlunoDto) { return this.academyService.createAluno(dto); }
   @Get('alunos')
   @RequirePermission(MODULO, TELA_MANAGE, 'acessar')
-  findAllAlunos(@Query('cursoId') cursoId?: string) { return this.academyService.findAllAlunos(cursoId); }
+  findAllAlunos(@Query() query: FindAlunosQueryDto) { return this.academyService.findAllAlunos(query.cursoId, query); }
   @Get('alunos/:id')
   @RequirePermission(MODULO, TELA_MANAGE, 'acessar')
   findOneAluno(@Param('id') id: string) { return this.academyService.findOneAluno(id); }
@@ -134,20 +134,18 @@ export class AcademyController {
   createTurma(@Body() dto: CreateTurmaDto) { return this.academyService.createTurma(dto); }
 
   @Get('turmas')
-  async findAllTurmas(
-    @Req() request: Request,
-    @Query('disciplinaId') disciplinaId?: string,
-    @Query('periodoLetivoId') periodoLetivoId?: string,
-    @Query('minhas') minhas?: string,
-  ) {
+  async findAllTurmas(@Req() request: Request, @Query() query: FindTurmasQueryDto) {
     const usuarioId = (request.user as AuthedUser).id;
     let professorId: string | undefined;
-    if (minhas === 'true') {
+    if (query.minhas === 'true') {
       professorId = (await this.exigirProfessor(usuarioId)).id;
     } else {
       await this.exigirAcessoGestao(usuarioId);
     }
-    return this.academyService.findAllTurmas({ disciplinaId, periodoLetivoId, professorId });
+    return this.academyService.findAllTurmas(
+      { disciplinaId: query.disciplinaId, periodoLetivoId: query.periodoLetivoId, professorId },
+      query,
+    );
   }
 
   @Get('turmas/:id')

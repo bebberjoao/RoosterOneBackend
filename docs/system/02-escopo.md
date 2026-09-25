@@ -12,7 +12,7 @@ Controle de identidade e acesso da própria plataforma.
 - CRUD de usuários, setores, módulos e permissões.
 - Vínculo usuário↔setor e usuário↔permissão (concessão/revogação direta, sem Perfil).
 - Consulta de acesso efetivo de um usuário (`GET /usuarios/:id/acesso`, `GET /usuarios/:id/acesso/verificar`).
-- Notificações internas (CRUD).
+- Notificações internas: caixa pessoal por usuário (lida/não lida), geradas por Desk, Rooms e Finance, mais CRUD administrativo.
 - Sessões (CRUD — ver ressalva em "Parcialmente no escopo").
 - Log de auditoria: leitura via CRUD, escrita automática pelos próprios services do Hub (não exige chamada manual).
 

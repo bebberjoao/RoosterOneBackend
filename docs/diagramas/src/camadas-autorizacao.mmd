@@ -1,0 +1,16 @@
+flowchart TD
+  REQ([Requisicao autenticada]) --> L1[Camada 1 - PermissionGuard<br/>tripla modulo/recurso/acao]
+  L1 --> ADM{E administrador?}
+  ADM -->|Sim| OK([Acesso liberado])
+  ADM -->|Nao| PERM{Tem a permissao?}
+  PERM -->|Nao| NEG([403 Forbidden])
+  PERM -->|Sim| L2{Recurso tem escopo proprio?}
+  L2 -->|Nao| OK
+  L2 -->|Desk| S1[Escopo por Setor<br/>so ve chamado do proprio setor<br/>404 se fora]
+  L2 -->|Rooms| S2[Posse do responsavel<br/>dono acessa a propria reserva]
+  L2 -->|Academy / Learn / Boost| S3[Posse de turma/curso<br/>permissao E posse, juntas]
+  S1 --> OK
+  S2 --> OK
+  S3 --> D{E dono ou gestor?}
+  D -->|Sim| OK
+  D -->|Nao| NEG

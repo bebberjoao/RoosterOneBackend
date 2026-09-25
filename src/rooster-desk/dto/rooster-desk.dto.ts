@@ -103,11 +103,13 @@ export class CreateTicketDto {
   @IsOptional() @IsString() @Length(36, 36) subcategoriaId?: string;
 
   @ApiPropertyOptional({
-    example: '2',
-    description: 'Id da Prioridade do chamado (1=baixa, 2=media, 3=alta, 4=urgente)',
-    enum: ['1', '2', '3', '4'],
+    example: '3',
+    description: 'Id da Prioridade do chamado (PrioridadeTicket.id — os 4 do seed são "1"-"4"; prioridades criadas depois têm id gerado, não restrito a esse conjunto)',
   })
-  @IsOptional() @IsIn(['1', '2', '3', '4']) prioridadeId?: string;
+  // Era @IsIn(['1','2','3','4']) — bug real: rejeitava qualquer PrioridadeTicket
+  // criada depois do seed (id gerado, nunca um desses quatro literais), o que
+  // travava a criação de chamado com 400 pra qualquer prioridade nova.
+  @IsOptional() @IsString() @Length(1, 36) prioridadeId?: string;
 
   @ApiPropertyOptional({ example: '33333333-3333-4333-8333-333333333333', description: 'Id do Status atual do chamado' })
   @IsOptional() @IsString() @Length(36, 36) statusId?: string;

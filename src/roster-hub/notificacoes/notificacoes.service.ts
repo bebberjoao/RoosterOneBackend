@@ -63,7 +63,54 @@ export class NotificacoesService {
   // Regras de Negócio
   // =====================================================
 
-  // Seção preparada para futuras regras.
+  private static readonly LIMITE_MINHAS = 50;
+
+  /** Caixa de entrada do próprio usuário: as mais recentes primeiro e o total de não lidas (independente do limite). */
+  async minhas(usuarioId: string) {
+    const [itens, naoLidas] = await Promise.all([
+      this.prisma.notificacao.findMany({
+        where: { usuarioId },
+        orderBy: { criadoEm: 'desc' },
+        take: NotificacoesService.LIMITE_MINHAS,
+      }),
+      this.prisma.notificacao.count({ where: { usuarioId, lida: false } }),
+    ]);
+    return { itens, naoLidas };
+  }
+
+  /** Filtra por dono no próprio where: notificação alheia responde 404, sem revelar que existe. */
+  async marcarLida(id: string, usuarioId: string) {
+    const resultado = await this.prisma.notificacao.updateMany({
+      where: { id, usuarioId },
+      data: { lida: true },
+    });
+    if (resultado.count === 0) return null;
+    return this.prisma.notificacao.findUnique({ where: { id } });
+  }
+
+  async marcarTodasLidas(usuarioId: string) {
+    const resultado = await this.prisma.notificacao.updateMany({
+      where: { usuarioId, lida: false },
+      data: { lida: true },
+    });
+    return { atualizadas: resultado.count };
+  }
+
+  /**
+   * Ponto único de emissão para os demais módulos. Nunca lança: uma notificação
+   * perdida não pode derrubar a operação de negócio que a originou (aprovar
+   * reserva, gerar cobrança). Sem destinatário, simplesmente não faz nada.
+   */
+  async notificar(usuarioId: string | null | undefined, titulo: string, mensagem: string) {
+    if (!usuarioId) return;
+    try {
+      await this.prisma.notificacao.create({
+        data: { usuarioId, titulo: titulo.slice(0, 150), mensagem, criadoEm: new Date() },
+      });
+    } catch {
+      // ver comentário acima
+    }
+  }
 
   // =====================================================
   // Métodos Auxiliares privados

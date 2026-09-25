@@ -1,0 +1,13 @@
+stateDiagram-v2
+  [*] --> Ativo : cadastro pelo administrador
+  Ativo --> Ativo : recebe / perde permissao
+  Ativo --> Inativo : ativo = false
+  Inativo --> Ativo : reativacao
+  Inativo --> [*] : exclusao
+
+  note right of Inativo
+    getAccess() retorna null:
+    o usuario perde TODAS as
+    permissoes instantaneamente,
+    sem revogar uma a uma
+  end note

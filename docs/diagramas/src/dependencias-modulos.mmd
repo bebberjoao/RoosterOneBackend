@@ -1,0 +1,33 @@
+graph TD
+  HUB[Rooster Hub<br/>identidade e permissao]
+  DESK[Rooster Desk]
+  ROOMS[Rooster Rooms]
+  ASSETS[Rooster Assets]
+  ACAD[Rooster Academy]
+  LEARN[Rooster Learn]
+  STUD[Rooster Student<br/>sem controller proprio]
+  FIN[Rooster Finance]
+  BOOSTI[Rooster Boost<br/>lado instrutor]
+  BOOSTA[Rooster Boost<br/>lado aluno externo]
+
+  DESK --> HUB
+  ROOMS --> HUB
+  ASSETS --> HUB
+  ACAD --> HUB
+  LEARN --> HUB
+  FIN --> HUB
+  BOOSTI --> HUB
+
+  LEARN --> ACAD
+  FIN --> ACAD
+  BOOSTI --> ACAD
+  STUD --> ACAD
+  STUD --> LEARN
+  STUD --> FIN
+
+  BOOSTA -.->|"login proprio<br/>NAO depende do Hub"| BOOSTA
+
+  classDef nucleo fill:#1F3864,stroke:#1F3864,color:#fff
+  classDef isolado fill:#FDE8E8,stroke:#9B2C2C,color:#6B1F1F
+  class HUB nucleo
+  class BOOSTA isolado

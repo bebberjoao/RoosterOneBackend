@@ -9,6 +9,15 @@ Todos os controllers de negócio (exceto `AuthController`) aplicam `@UseGuards(P
 
 ---
 
+## 0. Infraestrutura — `AppController` (`src/app.controller.ts`)
+
+Únicas rotas fora do versionamento (`VERSION_NEUTRAL`): respondem na raiz, sem `/v1`, para servirem de alvo estável de monitoramento.
+
+| Método | Rota | Auth | Permissão exigida | Descrição |
+|---|---|---|---|---|
+| GET | `/` | Público | — | Texto fixo; confirma só que o processo está de pé |
+| GET | `/health` | Público | — | Verificação real: `SELECT 1` no banco. `200` se alcançável, `503` (`status: "degradado"`) se não. Ver `01-visao-geral.md` |
+
 ## 1. Rooster Hub
 
 ### 1.1 Autenticação — `AuthController` (`src/roster-hub/usuarios/usuarios.controller.ts`), base `/auth`
@@ -18,6 +27,8 @@ Todos os controllers de negócio (exceto `AuthController`) aplicam `@UseGuards(P
 | POST | `/auth/login` | Público | — | Autentica com e-mail/senha e retorna `accessToken` |
 | POST | `/auth/esqueci-senha` | Público | — | Envia e-mail com link de redefinição de senha (sempre 200) |
 | POST | `/auth/redefinir-senha` | Público | — | Define nova senha a partir do token recebido por e-mail |
+| POST | `/auth/refresh` | Público | — | Troca um refresh token válido por um novo par de tokens (rotação: a sessão antiga é revogada) |
+| POST | `/auth/logout` | Público | — | Revoga a sessão do refresh token informado (idempotente) |
 
 Detalhes completos em `03-autenticacao.md`.
 
@@ -26,7 +37,7 @@ Detalhes completos em `03-autenticacao.md`.
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
 | POST | `/usuarios` | Bearer | Rooster Hub / `/hub/usuarios` / `criar` | Cria usuário |
-| GET | `/usuarios` | Bearer | Rooster Hub / `/hub/usuarios` / `acessar` | Lista todos os usuários |
+| GET | `/usuarios` | Bearer | Rooster Hub / `/hub/usuarios` / `acessar` | Lista todos os usuários; paginação opcional via `pagina`/`limite` (ver `01-visao-geral.md`) |
 | GET | `/usuarios/:id/acesso` | Bearer | Rooster Hub / `/hub/usuarios` / `acessar` | Retorna módulos e permissões concedidos ao usuário |
 | GET | `/usuarios/:id/acesso/verificar` | Bearer | Rooster Hub / `/hub/usuarios` / `acessar` | Verifica se o usuário pode executar `acao` em `moduloId` (query `moduloId`, `acao` opcional) |
 | GET | `/usuarios/:id` | Bearer | Rooster Hub / `/hub/usuarios` / `acessar` | Busca usuário por id |
@@ -88,13 +99,20 @@ Não há `PATCH` neste controller (confirmado — só `POST`/`GET`/`DELETE`).
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
-| POST | `/notificacoes` | Bearer | Rooster Hub / `/hub/acessos` / `gerenciar-permissoes` | Cria notificação |
+| GET | `/notificacoes/minhas` | Bearer | — (qualquer usuário autenticado) | Caixa de entrada **do próprio usuário** (JWT): `{ itens, naoLidas }`, as 50 mais recentes primeiro; `naoLidas` conta todas, independente do limite |
+| PATCH | `/notificacoes/minhas/:id/lida` | Bearer | — | Marca uma notificação **sua** como lida; `404` se for de outro usuário (não revela que existe) |
+| POST | `/notificacoes/minhas/marcar-todas-lidas` | Bearer | — | Marca todas as suas como lidas; devolve `{ atualizadas }` |
+| POST | `/notificacoes` | Bearer | Rooster Hub / `/hub/acessos` / `gerenciar-permissoes` | Cria notificação (administrativo) |
 | GET | `/notificacoes` | Bearer | Rooster Hub / `/hub` / `acessar` | Lista notificações |
 | GET | `/notificacoes/:id` | Bearer | Rooster Hub / `/hub` / `acessar` | Busca notificação por id |
 | PATCH | `/notificacoes/:id` | Bearer | Rooster Hub / `/hub` / `acessar` | Atualiza notificação (ex.: marcar como lida) |
 | DELETE | `/notificacoes/:id` | Bearer | Rooster Hub / `/hub/acessos` / `gerenciar-permissoes` | Remove notificação |
 
-Nota: `PATCH` usa a mesma permissão de leitura (`/hub`, `acessar`) — não exige permissão administrativa, diferente de `POST`/`DELETE`, que exigem `/hub/acessos`/`gerenciar-permissoes`. Confirmado no código, não é inconsistência de leitura.
+As três rotas `/notificacoes/minhas*` não têm `@RequirePermission` de propósito e são declaradas **antes** de `/:id` (senão "minhas" seria lido como id). A notificação é sempre filtrada pelo usuário do JWT dentro do `where` — não existe parâmetro de usuário. As demais rotas são administrativas e enxergam a tabela toda.
+
+**Quem cria notificações automaticamente** (`NotificacoesService.notificar`, que nunca lança: falha ao notificar não derruba a operação de negócio): mensagem em chamado do Desk (já existia), reserva confirmada/cancelada/iniciada/finalizada e resposta da equipe em reserva (Rooms — só quando quem age não é o próprio solicitante), e cobrança criada, mensalidade gerada em lote, pagamento confirmado, cobrança renegociada e cancelada (Finance — para o Usuário do Hub vinculado ao aluno). Não há notificação de nota lançada nem de novo conteúdo do Learn.
+
+Nota: `PATCH /notificacoes/:id` usa a mesma permissão de leitura (`/hub`, `acessar`) — não exige permissão administrativa, diferente de `POST`/`DELETE`, que exigem `/hub/acessos`/`gerenciar-permissoes`. Confirmado no código, não é inconsistência de leitura.
 
 ### 1.9 Sessões — `SessoesController`, base `/sessoes`
 
@@ -111,7 +129,7 @@ Nota: `PATCH` usa a mesma permissão de leitura (`/hub`, `acessar`) — não exi
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
 | POST | `/logs-auditoria` | Bearer | Rooster Hub / `/hub/acessos` / `gerenciar-permissoes` | Cria log manualmente |
-| GET | `/logs-auditoria` | Bearer | Rooster Hub / `/hub/acessos` / `gerenciar-permissoes` | Lista logs de auditoria |
+| GET | `/logs-auditoria` | Bearer | Rooster Hub / `/hub/acessos` / `gerenciar-permissoes` | Lista logs de auditoria; paginação opcional via `pagina`/`limite` (ver `01-visao-geral.md`) |
 | GET | `/logs-auditoria/:id` | Bearer | Rooster Hub / `/hub/acessos` / `gerenciar-permissoes` | Busca log por id |
 | PATCH | `/logs-auditoria/:id` | Bearer | Rooster Hub / `/hub/acessos` / `gerenciar-permissoes` | Atualiza log |
 | DELETE | `/logs-auditoria/:id` | Bearer | Rooster Hub / `/hub/acessos` / `gerenciar-permissoes` | Remove log |
@@ -122,96 +140,70 @@ Nota: `PATCH` usa a mesma permissão de leitura (`/hub`, `acessar`) — não exi
 
 `MODULO = 'Rooster Desk'`. Telas usadas: `TELA_TICKETS = '/desk/tickets'`, `TELA_CATEGORIES = '/desk/categories'`, `TELA_TEAM = '/desk/team'`.
 
-> **Achado importante — aliases EN sem herdar a permissão do endpoint PT.**
-> Vários endpoints têm um alias em inglês implementado como um método separado que apenas chama o método português (`return this.metodoOriginal(...)`). Quando o método original tem checagem **manual** de permissão no corpo (função `requireManagement`/`requireTicketAction`), o alias herda a proteção porque a chamada executa o mesmo código. Mas quando o método original é protegido só pelo decorator `@RequirePermission`, o alias **não** tem o decorator (decorators não se propagam por chamada de método em JS/Nest) e o `PermissionGuard` não encontra metadado nenhum nele — logo **libera a rota para qualquer usuário autenticado**, sem checar a permissão que o endpoint PT exige. Confirmado lendo o arquivo linha a linha; ver coluna "Permissão exigida" abaixo, marcada como **"— (nenhuma; só JWT — ver nota de alias)"** nesses casos:
-> - `GET /categorias-tickets`, `GET /prioridades-tickets`, `GET /prioridades-tickets/:id`, `GET /status-tickets`, `GET /status-tickets/:id`
-> - `POST /status-tickets`, `PATCH /status-tickets/:id`, `DELETE /status-tickets/:id`
-> - `DELETE /tickets/:id`
->
-> Os aliases de `chamados`/`tickets` para criar, listar e consultar (`POST/GET /tickets`, `GET /tickets/:id`) **têm** o decorator duplicado corretamente e não sofrem desse problema.
+> **Aliases EN removidos.** Até a limpeza de código morto de setembro/2026, boa parte destes endpoints tinha um segundo path em inglês (`/tickets`, `/categorias-tickets`, `/status-tickets`, etc.) implementado como método separado que só chamava o método português — o frontend nunca usou esses aliases (consome exclusivamente `/chamados*`), e vários deles tinham um bug real de segurança: o alias não herdava o decorator `@RequirePermission` do método original (decorators não se propagam por chamada de método em JS/Nest), então o `PermissionGuard` liberava a rota para qualquer usuário autenticado sem checar a permissão que o endpoint PT exigia. Os aliases foram removidos por completo (rotas e métodos do controller); só sobrevive o path em português, único usado de fato. Ver `docs/engineering/08-divida-tecnica.md`.
 
 ### 2.1 Categorias de chamado
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
 | POST | `/chamados-categorias` | Bearer | manual — ver nota (1) | Cria categoria de chamado |
-| POST | `/categorias-tickets` | Bearer | manual — ver nota (1) (alias, protegido por delegar ao mesmo código) | Alias EN de criar categoria |
-| GET | `/chamados-categorias` | Bearer | Rooster Desk / `/desk/tickets` / `acessar` | Lista categorias visíveis ao usuário |
-| GET | `/categorias-tickets` | Bearer | **— (nenhuma; só JWT — ver nota de alias)** | Alias EN de listar categorias |
+| GET | `/chamados-categorias` | Bearer | Rooster Desk / `/desk/tickets` / `acessar` **ou** `criar` — ver nota (0) | Lista categorias visíveis ao usuário: administrador vê todas; os demais só as do(s) próprio(s) setor(es). Com `?escopo=abertura` devolve **todas** as categorias e subcategorias (sem atendentes) — é a lista do formulário de novo chamado, onde o solicitante escolhe para qual setor pede. Quem não tem setor (caso comum de solicitante) recebe lista vazia sem esse parâmetro |
 | GET | `/chamados-atendentes` | Bearer | Rooster Desk / `/desk/tickets` / `acessar` | Lista atendentes visíveis ao usuário |
 | GET | `/chamados-setores` | Bearer | Rooster Desk / `/desk/tickets` / `acessar` | Lista nomes de setores dos atendentes visíveis |
 | GET | `/chamados-categorias/:id` | Bearer | manual — ver nota (2) | Busca categoria por id |
-| GET | `/categorias-tickets/:id` | Bearer | manual — ver nota (2) (alias) | Alias EN de buscar categoria |
 | PATCH | `/chamados-categorias/:id` | Bearer | manual — ver nota (2) | Atualiza categoria (+ nota (1) se trocar `setorId`) |
-| PATCH | `/categorias-tickets/:id` | Bearer | manual — ver nota (2) (alias) | Alias EN de atualizar categoria |
 | DELETE | `/chamados-categorias/:id` | Bearer | manual — ver nota (3) | Remove categoria |
-| DELETE | `/categorias-tickets/:id` | Bearer | manual — ver nota (3) (alias) | Alias EN de remover categoria |
 
-Notas de checagem manual (`requireManagement`, `src/rooster-desk/rooster-desk.controller.ts:302-311`): exige `hasPermission(usuário, Rooster Desk, /desk/categories, <ação>)` **e** que o `setorId`/`categoria` referenciado pertença ao setor do gestor (`isReferenceInUserSector`). (1) ação `criar`, recurso `setor`. (2) ação `editar`, recurso `categoria`. (3) ação `excluir`, recurso `categoria`. Sem permissão ou recurso de outro setor → `403 ForbiddenException`.
+Notas de checagem manual (`requireManagement`, `src/rooster-desk/rooster-desk.controller.ts`): exige `hasPermission(usuário, Rooster Desk, /desk/categories, <ação>)` **e** que o `setorId`/`categoria` referenciado pertença ao setor do gestor (`isReferenceInUserSector`). (1) ação `criar`, recurso `setor`. (2) ação `editar`, recurso `categoria`. (3) ação `excluir`, recurso `categoria`. Sem permissão ou recurso de outro setor → `403 ForbiddenException`.
+
+> **Nota (0) — bug corrigido (setembro/2026): dropdowns de categoria/subcategoria/prioridade/status vazios para quem só tinha `criar`.** As quatro rotas de leitura de taxonomia (`GET /chamados-categorias`, `/chamados-subcategorias`, `/chamados-prioridades`, `/chamados-status`) exigiam só `acessar` em `/desk/tickets`. Um usuário com permissão apenas de `criar` (perfil plausível de "só abre chamado", sem acesso à listagem de chamados) recebia `403` ao carregar essas quatro listas — e como o frontend (`ticketService.getCategories().then(setCategories)`) não tinha `.catch()`, o erro era engolido: os dropdowns do formulário de novo chamado simplesmente ficavam vazios, sem nenhuma mensagem, impedindo a criação do chamado. Corrigido com o helper privado `exigirVisualizarTaxonomia` (`rooster-desk.controller.ts`), que aceita `acessar` **ou** `criar` em `/desk/tickets` — faz sentido: quem pode abrir chamado precisa necessariamente conseguir ler a taxonomia usada no formulário. Regressão coberta em `test/app.e2e-spec.ts` (usuário só com `criar` consegue ler as quatro listas; usuário sem nenhuma das duas permissões continua recebendo `403`).
 
 ### 2.2 Subcategorias
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
 | POST | `/chamados-subcategorias` | Bearer | manual: `/desk/categories`/`subcategorias` sobre `categoriaId` | Cria subcategoria |
-| POST | `/subcategorias-tickets` | Bearer | manual (alias) | Alias EN de criar subcategoria |
-| GET | `/chamados-subcategorias` | Bearer | Rooster Desk / `/desk/tickets` / `acessar` | Lista subcategorias visíveis |
-| GET | `/subcategorias-tickets` | Bearer | **— (nenhuma; só JWT — ver nota de alias)** | Alias EN de listar subcategorias |
+| GET | `/chamados-subcategorias` | Bearer | Rooster Desk / `/desk/tickets` / `acessar` **ou** `criar` — ver nota (0) | Lista subcategorias visíveis |
 | GET | `/chamados-subcategorias/:id` | Bearer | manual: `/desk/categories`/`subcategorias` sobre a própria subcategoria | Busca subcategoria por id |
-| GET | `/subcategorias-tickets/:id` | Bearer | manual (alias) | Alias EN |
 | PATCH | `/chamados-subcategorias/:id` | Bearer | manual (+ checagem extra se trocar `categoriaId`) | Atualiza subcategoria |
-| PATCH | `/subcategorias-tickets/:id` | Bearer | manual (alias) | Alias EN |
 | DELETE | `/chamados-subcategorias/:id` | Bearer | manual | Remove subcategoria |
-| DELETE | `/subcategorias-tickets/:id` | Bearer | manual (alias) | Alias EN |
 
 ### 2.3 Prioridades
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
-| POST | `/prioridades-tickets` | Bearer | Rooster Desk / `/desk/categories` / `editar` | Cria prioridade (só existe rota EN, sem alias PT `chamados-prioridades`) |
-| GET | `/chamados-prioridades` | Bearer | Rooster Desk / `/desk/tickets` / `acessar` | Lista prioridades |
-| GET | `/prioridades-tickets` | Bearer | **— (nenhuma; só JWT — ver nota de alias)** | Alias EN de listar prioridades |
+| POST | `/chamados-prioridades` | Bearer | Rooster Desk / `/desk/categories` / `editar` | Cria prioridade |
+| GET | `/chamados-prioridades` | Bearer | Rooster Desk / `/desk/tickets` / `acessar` **ou** `criar` — ver nota (0) | Lista prioridades |
 | GET | `/chamados-prioridades/:id` | Bearer | Rooster Desk / `/desk/tickets` / `acessar` | Busca prioridade por id |
-| GET | `/prioridades-tickets/:id` | Bearer | **— (nenhuma; só JWT — ver nota de alias)** | Alias EN |
-| PATCH | `/prioridades-tickets/:id` | Bearer | Rooster Desk / `/desk/categories` / `editar` | Atualiza prioridade (só rota EN) |
-| DELETE | `/prioridades-tickets/:id` | Bearer | Rooster Desk / `/desk/categories` / `editar` | Remove prioridade (só rota EN) |
+| PATCH | `/chamados-prioridades/:id` | Bearer | Rooster Desk / `/desk/categories` / `editar` | Atualiza prioridade |
+| DELETE | `/chamados-prioridades/:id` | Bearer | Rooster Desk / `/desk/categories` / `editar` | Remove prioridade |
 
 ### 2.4 Status
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
 | POST | `/chamados-status` | Bearer | Rooster Desk / `/desk/categories` / `editar` | Cria status |
-| POST | `/status-tickets` | Bearer | **— (nenhuma; só JWT — ver nota de alias)** | Alias EN de criar status |
-| GET | `/chamados-status` | Bearer | Rooster Desk / `/desk/tickets` / `acessar` | Lista status |
-| GET | `/status-tickets` | Bearer | **— (nenhuma; só JWT — ver nota de alias)** | Alias EN |
+| GET | `/chamados-status` | Bearer | Rooster Desk / `/desk/tickets` / `acessar` **ou** `criar` — ver nota (0) | Lista status |
 | GET | `/chamados-status/:id` | Bearer | Rooster Desk / `/desk/tickets` / `acessar` | Busca status por id |
-| GET | `/status-tickets/:id` | Bearer | **— (nenhuma; só JWT — ver nota de alias)** | Alias EN |
 | PATCH | `/chamados-status/:id` | Bearer | Rooster Desk / `/desk/categories` / `editar` | Atualiza status |
-| PATCH | `/status-tickets/:id` | Bearer | **— (nenhuma; só JWT — ver nota de alias)** | Alias EN |
 | DELETE | `/chamados-status/:id` | Bearer | Rooster Desk / `/desk/categories` / `editar` | Remove status |
-| DELETE | `/status-tickets/:id` | Bearer | **— (nenhuma; só JWT — ver nota de alias)** | Alias EN |
 
-### 2.5 Chamados / Tickets
+### 2.5 Chamados
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
 | POST | `/chamados` | Bearer | Rooster Desk / `/desk/tickets` / `criar` | **Cria um chamado** (detalhado abaixo) |
-| POST | `/tickets` | Bearer | Rooster Desk / `/desk/tickets` / `criar` | Alias EN (decorator duplicado corretamente) |
-| GET | `/chamados` | Bearer | Rooster Desk / `/desk/tickets` / `acessar` | Lista chamados visíveis ao usuário (todos, se admin) |
-| GET | `/tickets` | Bearer | Rooster Desk / `/desk/tickets` / `acessar` | Alias EN |
+| GET | `/chamados` | Bearer | Rooster Desk / `/desk/tickets` / `acessar` | Lista chamados visíveis ao usuário (todos, se admin); paginação opcional via `pagina`/`limite` (ver `01-visao-geral.md`) |
 | GET | `/chamados/:id` | Bearer | Rooster Desk / `/desk/tickets` / `acessar` | Consulta um chamado (404 se não visível ao usuário) |
-| GET | `/tickets/:id` | Bearer | Rooster Desk / `/desk/tickets` / `acessar` | Alias EN |
 | PATCH | `/chamados/:id` | Bearer | manual — ver nota (4) | Atualiza um chamado |
-| PATCH | `/tickets/:id` | Bearer | manual — ver nota (4) (alias) | Alias EN |
 | DELETE | `/chamados/:id` | Bearer | Rooster Desk / `/desk/categories` / `excluir` | Remove um chamado |
-| DELETE | `/tickets/:id` | Bearer | **— (nenhuma; só JWT — ver nota de alias)** | Alias EN — não herda o `@RequirePermission` do endpoint PT |
 | PATCH | `/chamados/:id/status` | Bearer | manual — ver nota (4) | Atualiza somente o status do chamado |
 | PATCH | `/chamados/:id/atribuir` | Bearer | Rooster Desk / `/desk/tickets` / `transferir` | Atribui um técnico ao chamado (+ checagem manual: técnico precisa pertencer ao setor do chamado) |
 | PATCH | `/chamados-subcategorias/:id/atendentes` | Bearer | manual: `/desk/team`/`vincular-categoria` sobre a subcategoria | Define os atendentes de uma subcategoria |
 
 Nota (4): sem decorator estático — `requireTicketAction` calcula a ação necessária (`editar`, `encerrar` ou `reabrir`) a partir da transição de status e chama `hasPermission(usuário, Rooster Desk, /desk/tickets, <ação calculada>)`; falha → `403`. Além disso, se a alteração for "sensível" (`statusId`, `categoriaId`, `subcategoriaId` ou `encerradoEm`) e quem chama for o próprio solicitante (e não admin), a API responde `403` com `"O solicitante não pode alterar status, categoria ou encerrar o próprio chamado."` antes mesmo de chegar em `requireTicketAction`.
 
-### 2.6 Mensagens e anexos do chamado (sem aliases)
+### 2.6 Mensagens e anexos do chamado
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
@@ -221,7 +213,7 @@ Nota (4): sem decorator estático — `requireTicketAction` calcula a ação nec
 | POST | `/chamados/:id/anexos` | Bearer | Rooster Desk / `/desk/tickets` / `anexar` | **Upload de anexo** (multipart, detalhado abaixo) |
 | GET | `/chamados/:id/anexos/:anexoId/arquivo` | Bearer | Rooster Desk / `/desk/tickets` / `acessar` | Baixa o arquivo binário do anexo |
 
-### 2.7 Anexos — CRUD genérico (sem aliases)
+### 2.7 Anexos — CRUD genérico
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
@@ -231,7 +223,7 @@ Nota (4): sem decorator estático — `requireTicketAction` calcula a ação nec
 | PATCH | `/anexos-tickets/:id` | Bearer | Rooster Desk / `/desk/tickets` / `anexar` | Atualiza metadados de anexo |
 | DELETE | `/anexos-tickets/:id` | Bearer | Rooster Desk / `/desk/tickets` / `anexar` | Remove anexo |
 
-### 2.8 Histórico de chamado (sem aliases)
+### 2.8 Histórico de chamado
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
@@ -241,7 +233,7 @@ Nota (4): sem decorator estático — `requireTicketAction` calcula a ação nec
 | PATCH | `/historico-tickets/:id` | Bearer | Rooster Desk / `/desk/categories` / `editar` | Atualiza entrada |
 | DELETE | `/historico-tickets/:id` | Bearer | Rooster Desk / `/desk/categories` / `editar` | Remove entrada |
 
-### 2.9 Avaliações de chamado (sem aliases)
+### 2.9 Avaliações de chamado
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
@@ -297,9 +289,9 @@ Atenção à ordem de rotas: `GET /ambientes/estrutura` está declarada **antes*
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
-| POST | `/reservas` | Bearer | Rooster Rooms / `/rooms/book` / `solicitar` | **Cria uma reserva** (detalhado abaixo) |
-| GET | `/reservas` | Bearer | Rooster Rooms / `/rooms` / `acessar` | Lista reservas (query `ambienteId`, `data`, `status` opcionais) |
-| POST | `/reservas/serie` | Bearer | Rooster Rooms / `/rooms/book` / `solicitar` | **Cria série de reservas recorrentes** (detalhado abaixo) |
+| POST | `/reservas` | Bearer | Rooster Rooms / `/rooms/book` / `solicitar` + ver nota (7) | **Cria uma reserva** (detalhado abaixo) |
+| GET | `/reservas` | Bearer | Rooster Rooms / `/rooms` / `acessar` | Lista reservas (query `ambienteId`, `data`, `dataInicio`/`dataFim`, `status`, `pagina`/`limite` opcionais — ver nota (8)) |
+| POST | `/reservas/serie` | Bearer | Rooster Rooms / `/rooms/book` / `solicitar` **+** `solicitar-recorrente`, ver nota (7) | **Cria série de reservas recorrentes** (detalhado abaixo) |
 | GET | `/reservas/serie/:serieId` | Bearer | Rooster Rooms / `/rooms` / `acessar` | Lista todas as ocorrências de uma série |
 | PATCH | `/reservas/serie/:serieId/cancelar` | Bearer | manual — ver nota (5) | Cancela ocorrências pendentes/futuras da série (body `motivo` opcional) |
 | GET | `/reservas/:id` | Bearer | Rooster Rooms / `/rooms` / `acessar` | Busca reserva por id |
@@ -310,8 +302,10 @@ Atenção à ordem de rotas: `GET /ambientes/estrutura` está declarada **antes*
 | POST | `/reservas/:id/mensagens` | Bearer | manual — ver nota (6), ação `mensagem`/`responder` | Envia mensagem na conversa da reserva |
 
 Notas:
+- (7) **Limite de antecedência e recorrência** (`RoomsController.assertDentroDoPrazo`, `createReservaSerie`): toda reserva (única ou série) é checada contra um horizonte máximo de antecedência — **15 dias** por padrão, ou **365 dias** para quem tem `Rooster Rooms`/`/rooms/book`/`prazo-estendido`. Pra `POST /reservas`, a data checada é `data`; pra `POST /reservas/serie`, é `repetirAte` (a ocorrência mais distante da série, não a primeira). Estourar o limite → `403 ForbiddenException` com a mensagem indicando quantos dias foram pedidos e o limite do usuário. Além disso, `POST /reservas/serie` exige `Rooster Rooms`/`/rooms/book`/`solicitar-recorrente` — sem essa permissão, `403` mesmo tendo `solicitar` (que só cobre reserva única). Por padrão, no seed, só coordenação/admin têm as duas permissões (`roomsManagementKeys`) — um solicitante comum fica limitado a 15 dias e sem recorrência.
 - (5) `PATCH /reservas/serie/:serieId/cancelar`: libera se o usuário tem `Rooster Rooms`/`/rooms/manage`/`cancelar`; senão, só libera se ele for o responsável pela primeira ocorrência da série **e** tiver `Rooster Rooms`/`/rooms/reservations`/`cancelar`. Sem nenhuma das duas → `403 ForbiddenException('Sem permissão para cancelar esta série.')`.
 - (6) `requireReservaAccess` (`src/rooster-rooms/rooms.controller.ts:270-283`): libera se o usuário tem a ação de gestão em `/rooms/manage`; senão, só libera se ele for o `responsavelId` da reserva **e** tiver a ação correspondente em `/rooms/reservations`. Sem nenhuma das duas → `403 ForbiddenException('Sem permissão para alterar esta reserva.')`. Para mensagens, a ação do gestor é `responder` e a do solicitante é `mensagem` (nomes diferentes no catálogo, mesmo endpoint).
+- (8) **Filtro por período e paginação** (`FindReservasQueryDto`, `src/rooster-rooms/dto/find-reservas-query.dto.ts`) — adicionado em setembro/2026 pra dar suporte a um filtro de data na tela "Gerenciar reservas" do frontend. `dataInicio`/`dataFim` (yyyy-mm-dd, inclusivos nos dois extremos) filtram por um **intervalo** e têm prioridade sobre `data`; `data` sozinho continua filtrando um **dia específico**, como antes. `pagina`/`limite` seguem a paginação genérica opcional descrita em `01-visao-geral.md` — sem eles, a resposta continua sendo o array completo. Os quatro filtros (`ambienteId`, `data`/`dataInicio`/`dataFim`, `status`) e a paginação precisaram virar um único DTO (em vez de `@Query() paginacao` + `@Query('status')` soltos) porque, com `forbidNonWhitelisted: true`, o Nest valida a query inteira contra cada `@Query()` tipado — um `PaginacaoQueryDto` isolado rejeitaria a requisição assim que visse `status`/`ambienteId`/`data` no mesmo objeto.
 
 ---
 
@@ -344,7 +338,7 @@ Notas:
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
 | POST | `/patrimonio` | Bearer | Rooster Assets / `/assets/inventory` / `criar` | Cadastra um patrimônio |
-| GET | `/patrimonio` | Bearer | Rooster Assets / `/assets` / `acessar` | Lista patrimônios (query `categoriaId`, `setorId`, `status` opcionais) |
+| GET | `/patrimonio` | Bearer | Rooster Assets / `/assets` / `acessar` | Lista patrimônios (query `categoriaId`, `setorId`, `status`, `pagina`/`limite` opcionais) |
 | GET | `/patrimonio/:id` | Bearer | Rooster Assets / `/assets` / `acessar` | Busca patrimônio por id |
 | PATCH | `/patrimonio/:id` | Bearer | Rooster Assets / `/assets/inventory` / `editar` | Atualiza patrimônio |
 | DELETE | `/patrimonio/:id` | Bearer | Rooster Assets / `/assets/inventory` / `excluir` | Remove patrimônio |
@@ -355,7 +349,7 @@ Notas:
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
 | POST | `/patrimonio-movimentacoes` | Bearer | Rooster Assets / `/assets/inventory` / `movimentar` | **Registra movimentação de patrimônio** (detalhado abaixo) |
-| GET | `/patrimonio-movimentacoes` | Bearer | Rooster Assets / `/assets` / `acessar` | Lista movimentações (query `patrimonioId` opcional) |
+| GET | `/patrimonio-movimentacoes` | Bearer | Rooster Assets / `/assets` / `acessar` | Lista movimentações (query `patrimonioId`, `pagina`/`limite` opcionais) |
 | GET | `/patrimonio-emprestimos-atrasados` | Bearer | Rooster Assets / `/assets` / `acessar` | Lista empréstimos com devolução vencida e não devolvidos |
 | PATCH | `/patrimonio-movimentacoes/:id/devolver` | Bearer | Rooster Assets / `/assets/inventory` / `movimentar` | Marca empréstimo como devolvido (body `usuario`) |
 | GET | `/patrimonio-movimentacoes/:id` | Bearer | Rooster Assets / `/assets` / `acessar` | Busca movimentação por id |
@@ -417,7 +411,7 @@ Atenção à ordem: `GET /patrimonio-emprestimos-atrasados` e `PATCH /patrimonio
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
 | POST | `/alunos` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-alunos` | Cria vínculo de aluno para um `usuarioId` do Hub já existente (nunca cria `Usuario` novo) |
-| GET | `/alunos` | Bearer | Rooster Academy / `/academy/manage` / `acessar` | Lista alunos (query `cursoId` opcional) |
+| GET | `/alunos` | Bearer | Rooster Academy / `/academy/manage` / `acessar` | Lista alunos (query `cursoId`, `pagina`/`limite` opcionais) |
 | GET | `/alunos/:id` | Bearer | Rooster Academy / `/academy/manage` / `acessar` | Busca aluno por id |
 | PATCH | `/alunos/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-alunos` | Atualiza aluno (`usuarioId` nunca é reatribuído) |
 | DELETE | `/alunos/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-alunos` | Remove aluno |
@@ -427,7 +421,7 @@ Atenção à ordem: `GET /patrimonio-emprestimos-atrasados` e `PATCH /patrimonio
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
 | POST | `/turmas` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-turmas` | Cria turma (oferta real: disciplina + período + professor + turno/sala/horário) |
-| GET | `/turmas` | Bearer | manual — ver nota (1) | Lista turmas (query `disciplinaId`, `periodoLetivoId`, `minhas=true` opcionais) |
+| GET | `/turmas` | Bearer | manual — ver nota (1) | Lista turmas (query `disciplinaId`, `periodoLetivoId`, `minhas=true`, `pagina`/`limite` opcionais) |
 | GET | `/turmas/:id` | Bearer | manual — ver nota (2) | Busca turma por id (com disciplina, período, professor e matrículas) |
 | PATCH | `/turmas/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-turmas` | Atualiza turma |
 | DELETE | `/turmas/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-turmas` | Remove turma |
@@ -565,29 +559,72 @@ Diferente de todos os módulos anteriores, o Rooster Boost tem **dois logins ind
 | GET | `/cursos-boost-publicos` | Público | Lista só cursos `status: 'publicado'` |
 | GET | `/cursos-boost-publicos/:slug` | Público | Detalhe do curso publicado (módulos e títulos de aula, sem conteúdo — conteúdo completo só após matrícula) |
 
-### 7.3 Curso, módulo, aula, material (instrutor)
+### 7.3 Curso, módulo, aula, material (gestão por permissão)
+
+**Sem "dono" do curso (setembro/2026).** Antes, o professor que criou o curso era o dono e só ele (ou a coordenação) editava. Agora **quem tem a ação em `/boost/manage` age sobre qualquer curso** — a checagem é só de permissão (`exigirPermissao`, nota (11)). Professores entram como **orientadores** (§7.3.3) e só conversam com os alunos.
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
-| POST | `/cursos-boost` | Bearer (Hub) | `Rooster Boost` / `/boost/manage` / `gerenciar-cursos` | Cria curso; dono = professor autenticado (resolvido via `AcademyService.findProfessorByUsuarioId`, nunca por id no corpo). Slug gerado automaticamente a partir do título, com desambiguação (`-2`, `-3`...) |
-| GET | `/cursos-boost?minhas=true` | Bearer (Hub) | manual — professor autenticado | Cursos do professor autenticado |
-| GET | `/cursos-boost` (sem `minhas`) | Bearer (Hub) | `Rooster Boost` / `/boost/manage` / `acessar` | Todos os cursos (coordenação/admin) |
-| GET/PATCH/DELETE | `/cursos-boost/:id` | Bearer (Hub) | manual — ver nota (11) | Detalhe (com módulos/aulas/materiais aninhados) / atualiza / remove |
-| POST | `/cursos-boost/:id/modulos` | Bearer (Hub) | manual — ver nota (11), ação `gerenciar-conteudo` | Cria módulo |
-| PATCH/DELETE | `/modulos-boost/:id` | Bearer (Hub) | manual — ver nota (11), ação `gerenciar-conteudo` | Atualiza/remove módulo |
-| POST | `/modulos-boost/:id/aulas` | Bearer (Hub) | manual — ver nota (11), ação `gerenciar-conteudo` | Cria aula |
-| PATCH/DELETE | `/aulas-boost/:id` | Bearer (Hub) | manual — ver nota (11), ação `gerenciar-conteudo` | Atualiza/remove aula |
-| POST | `/aulas-boost/:id/materiais` | Bearer (Hub) | manual — ver nota (11), ação `gerenciar-conteudo` | **Material de apoio** — multipart, até 25MB |
-| DELETE | `/materiais-boost/:id` | Bearer (Hub) | manual — ver nota (11), ação `gerenciar-conteudo` | Remove material |
-| GET | `/materiais-boost/:id/arquivo` | Bearer (Hub) | manual — ver nota (11), ação `gerenciar-conteudo` | Baixa o material (visão do instrutor) |
-| GET | `/cursos-boost/:id/alunos` | Bearer (Hub) | manual — ver nota (11), ação `ver-progresso` | **Progresso dos alunos matriculados** — `progressoPct`, status, certificado emitido ou não |
+| POST | `/cursos-boost` | Bearer (Hub) | `Rooster Boost` / `/boost/manage` / `gerenciar-cursos` | Cria curso (sem professor: não há dono). Slug gerado automaticamente a partir do título, com desambiguação (`-2`, `-3`...) |
+| GET | `/cursos-boost` | Bearer (Hub) | `/boost/manage` / `acessar` | **Todos** os cursos, com os orientadores e as contagens |
+| GET | `/cursos-boost/:id` | Bearer (Hub) | `/boost/manage` / `acessar` | Detalhe (com módulos/aulas/materiais e orientadores aninhados) |
+| PATCH | `/cursos-boost/:id` | Bearer (Hub) | `/boost/manage` / `gerenciar-cursos` | Atualiza. É por aqui que se **tira do ar** (`status: 'arquivado'`) e se republica (`'publicado'`). **Não aceita `emiteCertificado`** (tem rota e permissão próprias — abaixo) |
+| DELETE | `/cursos-boost/:id` | Bearer (Hub) | `/boost/manage` / `gerenciar-cursos` | Remove o curso |
+| PATCH | `/cursos-boost/:id/certificado` | Bearer (Hub) | `/boost/manage` / `certificado` | Corpo `{ emiteCertificado?, certificadoTexto?, cargaHoraria? }`. Desligado, o curso vira **material de apoio**: a matrícula conclui em 100% normalmente, sem emitir certificado. `certificadoTexto` aceita `{aluno}`, `{curso}`, `{cargaHoraria}` e `{data}`; vazio volta ao texto padrão. Vale para quem concluir depois — certificados já emitidos não mudam |
+| POST | `/cursos-boost/:id/modulos` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Cria módulo |
+| PATCH/DELETE | `/modulos-boost/:id` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Atualiza/remove módulo |
+| POST | `/modulos-boost/:id/aulas` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Cria aula |
+| PATCH/DELETE | `/aulas-boost/:id` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Atualiza/remove aula |
+| POST | `/aulas-boost/:id/materiais` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | **Material de apoio** — multipart, até 25MB |
+| DELETE | `/materiais-boost/:id` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Remove material |
+| GET | `/materiais-boost/:id/arquivo` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Baixa o material (visão do instrutor) |
+| GET | `/cursos-boost/:id/alunos` | Bearer (Hub) | `/boost/manage` / `ver-progresso` | **Progresso dos alunos matriculados** — `progressoPct`, status, certificado emitido ou não |
 
-### 7.4 Chat do curso — instrutor
+### 7.3.3 Orientadores (setembro/2026)
+
+Professor do Academy vinculado a um curso para **conversar com os alunos dele**. O vínculo **não dá poder de edição** nem de ver progresso: a gestão é só por permissão.
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
-| GET | `/cursos-boost/:id/mensagens` | Bearer (Hub) | manual — ver nota (11), ação `mensagem` | Lista a conversa do curso |
-| POST | `/cursos-boost/:id/mensagens` | Bearer (Hub) | manual — ver nota (11), ação `mensagem` | Envia mensagem como instrutor |
+| GET | `/cursos-boost/:id/orientadores` | Bearer (Hub) | `/boost/manage` / `acessar` | Orientadores vinculados (com nome e e-mail) |
+| PUT | `/cursos-boost/:id/orientadores` | Bearer (Hub) | `/boost/manage` / `vincular-orientadores` | Corpo `{ professorIds: string[] }` — **substitui** a lista (só cria/remove o que mudou). `400` se algum professor não existir |
+| GET | `/boost-professores` | Bearer (Hub) | `/boost/manage` / `vincular-orientadores` | Professores que podem ser vinculados (`{id, nome, email}`) — evita exigir permissão do Academy de quem só gere o Boost |
+
+### 7.3.1 Vídeo hospedado (setembro/2026)
+
+Além do link externo (`conteudoUrl`, YouTube/Vimeo — comportamento original, inalterado), a aula pode ter um **vídeo em arquivo**, gravado em disco no servidor (nunca S3/nuvem — ver `docs/operations/01-configuracao.md`, `BOOST_VIDEOS_DIR`). Presença de `videoArquivo` no registro da aula é o que distingue "vídeo hospedado" de "link externo"; os dois campos podem coexistir no banco (o upload não apaga `conteudoUrl`), mas o frontend sempre prioriza o vídeo hospedado quando ele existe.
+
+| Método | Rota | Auth | Permissão exigida | Descrição |
+|---|---|---|---|---|
+| POST | `/aulas-boost/:id/video` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Envia o vídeo — multipart, até **2GB**, só `video/mp4`/`video/webm`/`video/quicktime`. Substituir um vídeo existente apaga o arquivo antigo do disco antes de gravar o novo (evita órfão de até 2GB a cada reenvio) |
+| DELETE | `/aulas-boost/:id/video` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Remove o vídeo — limpa os três campos e apaga o arquivo do disco |
+| GET | `/aulas-boost/:id/stream-token` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Token de **5 minutos**, escopado a esta aula, para a prévia do instrutor tocar o vídeo — ver nota (12) |
+| GET | `/aulas-boost/:id/video?token=...` | **Público** (token na query) | — | Serve o vídeo com suporte a `Range` (`206 Partial Content` — é o que permite ao player arrastar a barra sem baixar o arquivo inteiro). `403` sem token válido para esta aula específica |
+
+Nota (12) — **por que a autenticação aqui não é o header normal**: a tag `<video src="...">` não anexa o cabeçalho `Authorization`, então a rota de streaming não pode depender dele como o resto do sistema. Em vez de enfraquecer o guard global para aceitar token por query string em toda rota (raio de explosão desnecessário) ou baixar o vídeo inteiro como Blob autenticado antes de tocar (inviável para 2GB — perde a capacidade de arrastar a barra e carrega tudo em memória), a rota de streaming fica `@Public()` e valida manualmente um **token de vida curta** (5 min, `finalidade: 'stream-boost-video'` + `aulaId`, ver `src/common/stream-token.util.ts`). Se esse token vazar (ex.: log de acesso), expira em 5 minutos e só serve para uma aula — raio de dano mínimo, ao contrário do token de sessão completo. O streaming em si é `src/common/video-stream.util.ts::enviarVideoComRange`, novo — nenhum outro download do sistema usa `Range` (todos os demais usam `response.download()`, que sempre manda o arquivo inteiro).
+
+### 7.3.2 Progresso real de vídeo — lado aluno (setembro/2026)
+
+Além do botão manual `PATCH /boost/aulas/:id/concluir` (que continua existindo e vale para qualquer tipo de aula), vídeo hospedado tem progresso de verdade:
+
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| GET | `/boost/aulas/:id/stream-token` | Bearer (Boost) | Token de 5 min — exige matrícula no curso da aula (`403` sem ela) |
+| GET | `/boost/aulas/:id/video?token=...` | **Público** (token na query) | Mesmo streaming com `Range` do lado instrutor |
+| PATCH | `/boost/aulas/:id/progresso` | Bearer (Boost) | Corpo `{ posicaoSeg, percentualAssistido }`. Guarda a posição (para retomar de onde parou) e o **maior** percentual já assistido (nunca regride, mesmo que o aluno volte o vídeo). Ao cruzar **90%**, completa a aula sozinho — mesmo caminho de `concluirAula` (recalcula `progressoPct` da matrícula, emite certificado se chegou a 100%) |
+
+Detalhe de correção: a contagem de "aulas concluídas" (para calcular `progressoPct`) passou a filtrar `concluidoEm: { not: null }` explicitamente. Antes da existência de progresso parcial, a mera existência de uma linha em `ProgressoAula` já significava "concluída" (só `concluirAula` criava linhas, sempre com `concluidoEm` preenchido); agora que `PATCH /progresso` também cria linhas para registrar posição sem necessariamente concluir, contar por existência de linha inflaria o progresso incorretamente.
+
+### 7.4 Conversas com alunos — orientador
+
+O chat único do curso (todo mundo via tudo) foi **substituído por uma conversa contínua por aluno**: uma `ConversaBoost` por (curso, aluno), atendida por qualquer orientador do curso. Sem título nem status — é para tirar dúvidas.
+
+| Método | Rota | Auth | Permissão exigida | Descrição |
+|---|---|---|---|---|
+| GET | `/boost-conversas` | Bearer (Hub) | `/boost/conversas` / `acessar` | Caixa de entrada: **só** as conversas dos cursos em que o professor logado é orientador — aluno, curso, última mensagem e `naoLidas` (mensagens do aluno ainda não lidas por um orientador). `403` se o usuário não tem vínculo de professor |
+| GET | `/boost-conversas/:id/mensagens` | Bearer (Hub) | `/boost/conversas` / `acessar` | Mensagens da conversa. `404` se o professor não orienta o curso dela (não revela que existe) |
+| POST | `/boost-conversas/:id/mensagens` | Bearer (Hub) | `/boost/conversas` / `responder` | Responde ao aluno (mesmo vínculo exigido); avisa o aluno em tempo real |
+| PATCH | `/boost-conversas/:id/lida` | Bearer (Hub) | `/boost/conversas` / `acessar` | Marca as mensagens do aluno como lidas |
 
 ### 7.5 Matrícula, progresso e certificado (aluno — portal público)
 
@@ -598,12 +635,13 @@ Diferente de todos os módulos anteriores, o Rooster Boost tem **dois logins ind
 | GET | `/boost/me/matriculas/:id` | Bearer (Boost) | Matrícula completa (curso com módulos/aulas/materiais, progresso aula a aula, certificado) — `404` se não for do dono |
 | PATCH | `/boost/aulas/:id/concluir` | Bearer (Boost) | **Marca a aula como concluída**, recalcula `progressoPct` e, ao chegar a 100%, **gera o certificado em PDF automaticamente** (sem etapa manual — ver `CertificadoBoostService`) |
 
-### 7.6 Chat do curso — aluno
+### 7.6 Conversa com o orientador — aluno
 
 | Método | Rota | Auth | Descrição |
 |---|---|---|---|
-| GET | `/boost/cursos/:id/mensagens` | Bearer (Boost) | Lista a conversa — nota: caminho diferente do lado instrutor (`/cursos-boost/:id/mensagens`) de propósito, pra não colidir na mesma rota com guards diferentes |
-| POST | `/boost/cursos/:id/mensagens` | Bearer (Boost) | Envia mensagem como aluno — `403` se não estiver matriculado no curso |
+| GET | `/boost/cursos/:id/conversa` | Bearer (Boost) | A conversa do aluno no curso — **criada na primeira consulta** — com `{ conversaId, orientadores: [{id, nome}], mensagens }`. `403` se não estiver matriculado. Vale para curso **tirado do ar**: quem já está matriculado mantém a conversa |
+| POST | `/boost/cursos/:id/conversa/mensagens` | Bearer (Boost) | Envia a dúvida. `400` com mensagem clara se o curso **não tem orientador** (em vez de mandar a mensagem para o vazio) |
+| PATCH | `/boost/cursos/:id/conversa/lida` | Bearer (Boost) | Marca as respostas dos orientadores como lidas |
 
 ### 7.7 Certificado
 
@@ -611,13 +649,29 @@ Diferente de todos os módulos anteriores, o Rooster Boost tem **dois logins ind
 |---|---|---|---|
 | GET | `/boost/certificados/:id/arquivo` | Bearer (Boost) | Baixa o PDF do certificado — só o dono da matrícula (`404` para qualquer outro) |
 
+### 7.7.1 Contas externas — painel administrativo (setembro/2026)
+
+O cadastro público (`POST /boost/cadastro`) continua **livre e sem aprovação** — decisão mantida. Até então, porém, essas contas (`BoostUsuario`) eram invisíveis para o Hub: nenhuma tela ou endpoint listava, desativava ou redefinia a senha de uma delas. Estes endpoints dão essa visibilidade, sem alterar a regra de cadastro nem de matrícula.
+
+São gestão **entre cursos** e usam `@RequirePermission` estático numa tela própria, `/boost/students`, só com o perfil admin (orientador ou gestor de cursos sem essa permissão recebe `403`).
+
+| Método | Rota | Auth | Permissão exigida | Descrição |
+|---|---|---|---|---|
+| GET | `/boost-alunos-externos` | Bearer (Hub) | `Rooster Boost` / `/boost/students` / `acessar` | Lista as contas com contagem de matrículas; paginação opcional (`pagina`/`limite`, ver `01-visao-geral.md`) |
+| PATCH | `/boost-alunos-externos/:id` | Bearer (Hub) | `Rooster Boost` / `/boost/students` / `gerenciar` | Corpo `{ ativo: boolean }`. Conta desativada não consegue mais logar (`401`) |
+| POST | `/boost-alunos-externos/:id/redefinir-senha` | Bearer (Hub) | `Rooster Boost` / `/boost/students` / `gerenciar` | Gera uma **senha temporária aleatória**, salva só o hash e devolve o valor em texto plano **uma única vez** na resposta |
+
+**Simplificação deliberada na redefinição de senha**: `BoostUsuario` não tem uma tabela de token de redefinição por e-mail (equivalente à `RedefinicaoSenha` do Hub). Construir esse fluxo inteiro só para a conta externa não se pagava neste momento — a senha temporária é repassada pelo admin por um canal seguro, no mesmo espírito informal de `PATCH /usuarios/:id` com `senhaHash` no Hub. Um fluxo por e-mail fica como evolução possível.
+
 ### 7.8 WebSocket (chat em tempo real)
 
-`BoostChatGateway` (`src/rooster-boost/boost-chat.gateway.ts`), namespace `/boost` — mesmo padrão do `MensagensGateway` do Desk (REST é a fonte da verdade, o gateway só empurra `mensagem:nova` pra quem está com a sala aberta). Aceita os dois tipos de token no handshake (`auth.token`): decodifica o JWT e, pelo claim `tipo`, consulta `usuarios` (instrutor) ou `boost_usuarios` (aluno). Eventos: `curso:entrar` `{cursoId}` (só entra na sala se for o instrutor dono ou um aluno matriculado), `curso:sair` `{cursoId}`, recebe `mensagem:nova`.
+`BoostChatGateway` (`src/rooster-boost/boost-chat.gateway.ts`), namespace `/boost` — mesmo padrão do `MensagensGateway` do Desk: o REST é a fonte da verdade e o gateway só empurra o que chegou. Aceita os **dois tipos de token** no handshake (`auth.token`): decodifica o JWT e, pelo claim `tipo`, consulta `boost_usuarios` (aluno) ou `usuarios` (orientador).
+
+Eventos do cliente: `conversa:entrar { conversaId }` (só o aluno dono da conversa, ou um orientador com `/boost/conversas acessar` **e** vinculado ao curso; senão `{ ok:false }`), `conversa:sair` e `caixa:entrar` (orientador: passa a receber o aviso dos cursos que orienta). Eventos do servidor: `mensagem:nova { conversaId, mensagem }` para a sala da conversa e `caixa:atualizar { conversaId, cursoId }` para os orientadores do curso quando **um aluno** escreve.
 
 Nota de checagem manual:
 
-- **(11)** `exigirDonoOuGestor` (`boost.controller.ts`): libera incondicionalmente para quem tem `Rooster Boost / /boost/manage / acessar` (coordenação/admin); senão, só libera se o usuário for professor **e** dono do curso (`BoostService.isCursoDoProfessor`) **e** tiver a ação específica em `/boost/manage` — mesmo modelo de três camadas do Academy/Learn (ver seção 5, nota 1, e `docs/security/03-rbac.md`).
+- **(11)** `exigirPermissao` (`boost.controller.ts`): `hasPermission(usuário, 'Rooster Boost', '/boost/manage', ação)` — só isso. **Não existe mais dono do curso** (antes: `exigirDonoOuGestor`, que liberava o professor dono do curso). O único vínculo por curso que resta é o de orientador, usado apenas nas conversas (`boost-conversas`) e no gateway.
 
 ---
 
@@ -650,7 +704,7 @@ Todas as rotas de staff usam o `JwtAuthGuard` global de sempre (login do Hub) + 
 | Método | Rota | Permissão exigida | Descrição |
 |---|---|---|---|
 | POST | `/cobrancas` | `Rooster Finance` / `/finance/charges` / `criar` | Cria uma cobrança avulsa (mensalidade/produto/serviço/taxa) |
-| GET | `/cobrancas?status=&alunoId=&tipo=` | manual — ver nota (12) | Lista; `status=vencido` é filtrado em memória (é sempre derivado, nunca uma coluna igual a esse valor) |
+| GET | `/cobrancas?status=&alunoId=&tipo=&pagina=&limite=` | manual — ver nota (12) | Lista, com paginação opcional (ver `01-visao-geral.md`); `status=vencido` é traduzido para uma cláusula real no banco (`whereStatusCobranca`, `finance.service.ts`) mesmo sendo um status derivado (não existe coluna igual a esse valor) — corrigido em setembro/2026: antes era filtrado em memória **depois** da paginação, o que quebrava a contagem/paginação de fato (uma página podia voltar com menos itens que `limite`, e `total` não batia com o filtrado) |
 | GET | `/cobrancas/:id` | manual — ver nota (12) | Detalhe, com `aluno`/`produto`/`servico`/`desconto`/`notaFiscal` |
 | PATCH | `/cobrancas/:id` | `Rooster Finance` / `/finance/tuitions` / `editar` | Edita descrição/valor/vencimento/forma de pagamento |
 | POST | `/cobrancas/:id/marcar-pago` | `Rooster Finance` / `/finance/charges` / `marcar-pago` | `400` se já paga ou cancelada |
@@ -696,7 +750,7 @@ Nota de checagem manual:
 
 Ver `03-autenticacao.md` (corpo, resposta, erros).
 
-### POST /chamados (alias `POST /tickets`) — criar um chamado
+### POST /chamados — criar um chamado
 
 **Permissão:** Rooster Desk / `/desk/tickets` / `criar`.
 
@@ -711,7 +765,7 @@ Ver `03-autenticacao.md` (corpo, resposta, erros).
 | `tecnicoId` | string (uuid) | não | `Length(36, 36)` |
 | `categoriaId` | string (uuid) | não | `Length(36, 36)` — validado contra `subcategoriaId` via `validateTicketClassification` |
 | `subcategoriaId` | string (uuid) | não | `Length(36, 36)` |
-| `prioridadeId` | string | não | `IsIn(['1','2','3','4'])` |
+| `prioridadeId` | string | não | `Length(1, 36)` — id de `PrioridadeTicket` (qualquer prioridade existente, não só as 4 do seed; ver nota) |
 | `statusId` | string (uuid) | não | `Length(36, 36)` |
 | `encerradoEm` | string (data ISO) | não | `IsDateString()` |
 | `tags` | string[] | não | array de strings |
@@ -719,11 +773,13 @@ Ver `03-autenticacao.md` (corpo, resposta, erros).
 
 **Resposta:** o registro do `ticket` criado (shape determinado pelo schema Prisma `Ticket`; não documentado campo a campo aqui — não identificado um DTO de resposta explícito no código, o service simplesmente repassa o retorno do Prisma).
 
+> **Bug corrigido (setembro/2026) — `prioridadeId` travava a criação de chamado com qualquer prioridade nova.** `CreatePrioridadeTicketDto.prioridadeId` era validado com `@IsIn(['1','2','3','4'])`, os 4 ids literais do seed. Qualquer `PrioridadeTicket` criada depois (id gerado por `@default(uuid())`) era rejeitada com `400`, mesmo aparecendo normalmente no dropdown do formulário — sintoma relatado por um usuário testando a criação de chamado. Trocado para `@Length(1, 36)` (aceita qualquer id de prioridade existente; a integridade referencial de fato é responsabilidade do banco/FK, não do DTO). Achado junto: `PrioridadeTicket.id` em `prisma/schema.prisma` estava **sem** `@default(uuid())` (só `schema.test.prisma`, o schema de teste, tinha o default) — uma prioridade nova criada via API real (PostgreSQL) teria falhado com violação de `NOT NULL` na coluna `id`. Corrigido restaurando o `@default(uuid())` em `schema.prisma`; como esse default é gerado pelo Prisma Client (não uma `DEFAULT` do Postgres — confirmado por auditoria do histórico de migrations, nenhuma tinha gerado SQL para esse default), a correção não exigiu nenhuma migration, só `prisma generate`.
+
 **Erros possíveis:**
 
 | Status | Exceção | Causa |
 |---|---|---|
-| 400 | `ValidationPipe` | Body inválido (ex.: `titulo` vazio, `prioridadeId` fora de `['1','2','3','4']`) |
+| 400 | `ValidationPipe` | Body inválido (ex.: `titulo` vazio, `prioridadeId` com mais de 36 caracteres) |
 | 400 | `BadRequestException` | `validateTicketClassification` — combinação `categoriaId`/`subcategoriaId` inconsistente (subcategoria não pertence à categoria informada) |
 | 401 | `UnauthorizedException` | Token ausente/inválido |
 | 403 | `ForbiddenException` | Usuário sem a permissão `criar` em `/desk/tickets` |

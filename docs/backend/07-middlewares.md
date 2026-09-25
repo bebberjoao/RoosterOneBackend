@@ -50,8 +50,11 @@ Ver `10-autorizacao-rbac.md` para o detalhe de como `hasPermission`/`isAdmin` re
 
 ## Exception filters
 
-**Não identificado no código analisado.** Busca por `@Catch`/`ExceptionFilter` em `src/` não retornou nenhum arquivo. O tratamento de erro é feito manualmente dentro de cada service (método `handleError`, ver `11-tratamento-erros.md`), confiando nas exceções nativas do `@nestjs/common` para o filtro de exceção padrão do Nest formatar a resposta HTTP.
+Um filtro global: `PrismaExceptionFilter` (`src/common/prisma-exception.filter.ts`), registrado em `configurarApp()` (`src/app-config.ts`). É rede de segurança, não a via principal — o tratamento de erro continua sendo feito manualmente dentro de cada service (método `handleError`, ver `11-tratamento-erros.md`), com mensagem contextual; o filtro só pega o que escapar dessa camada e responde de forma genérica (`409` para `P2002`, `404` para `P2025`, `500` para o resto). Ver `docs/api/01-visao-geral.md`.
 
 ## Middlewares clássicos (`app.use`/`configure(consumer)`)
 
-**Não identificado no código analisado.** Nenhum módulo implementa `NestModule`/`MiddlewareConsumer`. Não há middleware de log de requisição, rate limiting, helmet, etc. configurado.
+Nenhum módulo implementa `NestModule`/`MiddlewareConsumer`, e não há middleware de log de requisição. Mas há dois mecanismos equivalentes aplicados no bootstrap, que este documento antes afirmava não existirem:
+
+- **`helmet`** — `app.use(helmet())` em `src/main.ts`, com os cabeçalhos de segurança HTTP padrão da biblioteca.
+- **Rate limiting** — não como middleware clássico, e sim como guard global: `ThrottlerGuard` do `@nestjs/throttler`, registrado via `APP_GUARD` em `src/auth/auth.module.ts` (120 req/min por IP), com `@Throttle()` mais rígido nas rotas de autenticação. Ver `docs/security/04-seguranca-aplicacao.md`.

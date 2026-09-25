@@ -45,7 +45,7 @@ Agrega 9 submódulos, todos com CRUD REST completo (Post/Get/Get:id/Patch:id/Del
 | `permissoes` | `PermissoesController` | CRUD de `/permissoes` (catálogo de permissões: nome, recurso, ação, módulo). |
 | `usuarios-permissoes` | `UsuariosPermissoesController` | `POST /usuarios-permissoes` (conceder), `GET`, `GET :id`, `DELETE :id` (revogar). É o vínculo direto usuário↔permissão — não existe entidade Perfil/Role. |
 | `usuarios-setores` | `UsuariosSetoresController` | CRUD de `/usuarios-setores` (vínculo usuário↔setor, usado por Desk/Rooms para escopo por setor). |
-| `notificacoes` | `NotificacoesController` | CRUD de `/notificacoes`. |
+| `notificacoes` | `NotificacoesController` | CRUD de `/notificacoes` e caixa de entrada `/notificacoes/minhas*`. **Exporta `NotificacoesService`**, importado por Rooms e Finance para emitir notificações. |
 | `sessoes` | `SessoesController` | CRUD de `/sessoes` (tabela `sessoes`, campo `refreshToken` incluso) — **não é usada pelo fluxo de login atual** (ver `09-autenticacao.md`). |
 | `logs-auditoria` | `LogsAuditoriaController` | CRUD de `/logs-auditoria`. Não há escrita automática de eventos de segurança por outros services — é gravação manual via API (ver `12-logs.md`). |
 

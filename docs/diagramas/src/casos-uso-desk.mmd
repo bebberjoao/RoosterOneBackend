@@ -1,0 +1,23 @@
+flowchart LR
+  SOL((Solicitante))
+  TEC((Tecnico))
+  GES((Gestor do setor))
+
+  D1([Abrir e acompanhar chamado])
+  D2([Conversar e anexar arquivo])
+  D3([Avaliar atendimento])
+  D4([Assumir e atender chamado])
+  D5([Registrar nota interna])
+  D6([Alterar status do chamado])
+  D7([Transferir para outro tecnico])
+  D8([Gerenciar categorias e atendentes])
+
+  SOL --> D1
+  SOL --> D2
+  SOL --> D3
+  TEC --> D2
+  TEC --> D4
+  TEC --> D5
+  TEC --> D6
+  GES --> D7
+  GES --> D8

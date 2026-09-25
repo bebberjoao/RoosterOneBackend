@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
@@ -15,6 +16,7 @@ import { UpdateLogAuditoriaDto } from './dto/update-log-auditoria.dto';
 import { LogsAuditoriaService } from './logs-auditoria.service';
 import { PermissionGuard } from '../../auth/permission.guard';
 import { RequirePermission } from '../../auth/require-permission.decorator';
+import { PaginacaoQueryDto } from '../../common/pagination';
 
 const MODULO = 'Rooster Hub';
 
@@ -32,8 +34,8 @@ export class LogsAuditoriaController {
 
   @Get()
   @RequirePermission(MODULO, '/hub/acessos', 'gerenciar-permissoes')
-  findAll() {
-    return this.logsAuditoriaService.findAll();
+  findAll(@Query() paginacao: PaginacaoQueryDto) {
+    return this.logsAuditoriaService.findAll(paginacao);
   }
 
   @Get(':id')

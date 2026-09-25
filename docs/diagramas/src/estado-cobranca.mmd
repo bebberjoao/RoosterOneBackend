@@ -1,0 +1,17 @@
+stateDiagram-v2
+  [*] --> Aberto : cobranca gerada
+  Aberto --> Pago : baixa manual do financeiro
+  Aberto --> Vencido : vencimento < hoje
+  Vencido --> Pago : baixa manual com multa/juros
+  Vencido --> Negociado : renegociacao
+  Negociado --> Pago : quitacao do acordo
+  Aberto --> Cancelado : cancelamento com motivo
+  Vencido --> Cancelado : cancelamento com motivo
+  Pago --> [*]
+  Cancelado --> [*]
+
+  note right of Vencido
+    "Vencido" e sempre derivado
+    na leitura (vencimento < hoje),
+    nunca persistido como status
+  end note

@@ -63,10 +63,33 @@ O `JwtAuthGuard` (global, via `APP_GUARD`):
 
 ## 3. Expiração e renovação
 
-- O JWT é emitido com `expiresIn: '8h'` (`src/auth/jwt-config.ts:18`, `signOptions`).
-- **Não há endpoint de refresh token** no código analisado (nenhum controller expõe `/auth/refresh` ou equivalente).
-- Quando o token expira, todas as chamadas autenticadas passam a retornar `401 Unauthorized` com mensagem `"Token JWT inválido ou expirado."`. O cliente deve refazer `POST /auth/login` para obter um novo `accessToken`.
-- Não há mecanismo de logout/revogação de token no lado servidor identificado no código (o token permanece válido até expirar naturalmente, mesmo que o usuário "saia" no cliente).
+O access token é emitido com `expiresIn: '8h'` (`src/auth/jwt-config.ts`). Desde setembro/2026, `POST /auth/login` devolve **também** um `refreshToken`, que permite renovar sem pedir a senha de novo.
+
+### `POST /auth/refresh` — rota pública
+
+| Campo | Tipo | Regras |
+|---|---|---|
+| `refreshToken` | string | `@Length(64, 64)` — o valor devolvido no login |
+
+Resposta: o mesmo formato do login (`usuario`, `acesso`, `accessToken`, `refreshToken`).
+
+Pontos de projeto:
+
+- **Rotação a cada uso.** A sessão usada é sempre revogada e uma nova é criada. Se um refresh token vazar e for usado, o uso seguinte do token legítimo encontra a sessão revogada e falha — o problema aparece, em vez de os dois conviverem silenciosamente.
+- **Armazenamento como hash.** A tabela `sessoes` guarda apenas o SHA-256 do token, mesmo padrão do token de redefinição de senha: acesso de leitura ao banco não permite se passar por ninguém.
+- **Revalidação de `usuario.ativo`.** Desativar alguém encerra o acesso na próxima renovação, em vez de esperar as 8h do access token.
+- **Validade de 30 dias**, contada na criação da sessão (`expiraEm`). Sessão expirada é revogada na tentativa de uso e responde `401`.
+- Falha de qualquer natureza responde sempre `401 "Sessão inválida ou expirada."`, sem distinguir token inexistente de revogado ou expirado.
+
+### `POST /auth/logout` — rota pública
+
+Recebe o mesmo `refreshToken` e revoga a sessão. É **idempotente**: encerrar uma sessão que já não existe responde igual, porque responder diferente permitiria descobrir se um token é válido.
+
+O access token em si continua sem revogação — é um JWT sem estado, e permanece válido até expirar naturalmente. O que o logout encerra é a capacidade de **renovar**, que é o que dá longevidade à sessão.
+
+### Comportamento do cliente
+
+O frontend renova sozinho: ao receber `401` em qualquer chamada, tenta uma renovação e repete a requisição original, de forma transparente. Chamadas simultâneas compartilham a mesma renovação (senão a primeira rotacionaria o token e as demais tentariam renovar com um token já revogado). Se a renovação for **recusada**, a sessão é limpa e o app volta ao login; se falhar por **rede**, a sessão é preservada — oscilação de conexão não é o mesmo que sessão inválida. Ver `docs/frontend/06-integracao-api.md` no repo do frontend.
 
 ## 4. Esqueci minha senha
 

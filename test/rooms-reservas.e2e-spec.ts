@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 const request = require('supertest');
 import { AppModule } from '../src/app.module';
+import { configurarApp } from '../src/app-config';
 import { PrismaService } from '../src/roster-hub/shared/prisma.service';
 import { PrismaTestService } from '../src/roster-hub/shared/prisma-test.service';
 
@@ -43,7 +44,7 @@ describe('Rooster Rooms — reservas (e2e)', () => {
   });
 
   const criarReserva = (over: Record<string, unknown> = {}) =>
-    request(app.getHttpServer()).post('/reservas').set(auth()).send(novaReserva(over));
+    request(app.getHttpServer()).post('/v1/reservas').set(auth()).send(novaReserva(over));
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
@@ -52,12 +53,14 @@ describe('Rooster Rooms — reservas (e2e)', () => {
       .compile();
 
     app = moduleRef.createNestApplication();
+    configurarApp(app);
     await app.init();
 
     prisma = moduleRef.get(PrismaService) as PrismaTestService;
 
-    // Usuário com perfil Administrador: o PermissionGuard libera todas as
-    // permissões de Rooms sem precisar semear permissao/perfil_permissao.
+    // RBAC é achatado (usuário -> permissão direta, sem Perfil intermediário — ver
+    // docs/security/03-rbac.md) — concede aqui exatamente as chaves que os endpoints
+    // exercitados neste arquivo exigem, igual ao padrão de test/app.e2e-spec.ts.
     const usuario = await prisma.usuario.create({
       data: {
         nome: 'E2E Admin',
@@ -66,12 +69,29 @@ describe('Rooster Rooms — reservas (e2e)', () => {
         ativo: true,
       },
     });
-    const perfil = await prisma.perfil.create({
-      data: { nome: 'Administrador', descricao: 'Perfil de teste', ativo: true },
-    });
-    await prisma.usuarioPerfil.create({
-      data: { usuarioId: usuario.id, perfilId: perfil.id },
-    });
+    // findFirst ?? create: a ordem em que o Jest executa os arquivos *.e2e-spec.ts
+    // não é garantida (não é alfabética por padrão), e app.e2e-spec.ts também
+    // semeia um Modulo 'Rooster Rooms' sem limpá-lo no afterAll (de propósito —
+    // ver o comentário lá, a limpeza fica só no globalTeardown). Um `create`
+    // incondicional aqui falha por unicidade sempre que este arquivo roda depois
+    // do outro. Mesmo padrão já usado em app.e2e-spec.ts:178.
+    const modulo =
+      (await prisma.modulo.findFirst({ where: { nome: 'Rooster Rooms' } })) ??
+      (await prisma.modulo.create({ data: { nome: 'Rooster Rooms', ativo: true } }));
+    const chaves: Array<[recurso: string, acao: string]> = [
+      ['/rooms', 'acessar'],
+      ['/rooms/structure', 'criar'],
+      ['/rooms/book', 'solicitar'],
+      ['/rooms/book', 'solicitar-recorrente'],
+      ['/rooms/book', 'prazo-estendido'],
+      ['/rooms/manage', 'aprovar'],
+    ];
+    for (const [recurso, acao] of chaves) {
+      const permissao = await prisma.permissao.create({
+        data: { moduloId: modulo.id, nome: `Rooster Rooms:${recurso}:${acao}`, recurso, acao },
+      });
+      await prisma.usuarioPermissao.create({ data: { usuarioId: usuario.id, permissaoId: permissao.id } });
+    }
 
     token = moduleRef.get(JwtService).sign({ sub: usuario.id });
   });
@@ -131,20 +151,20 @@ describe('Rooster Rooms — reservas (e2e)', () => {
 
   describe('autenticação', () => {
     it('recusa a listagem de reservas sem token', async () => {
-      await request(app.getHttpServer()).get('/reservas').expect(401);
+      await request(app.getHttpServer()).get('/v1/reservas').expect(401);
     });
 
     it('recusa a criação de reserva sem token', async () => {
-      await request(app.getHttpServer()).post('/reservas').send(novaReserva()).expect(401);
+      await request(app.getHttpServer()).post('/v1/reservas').send(novaReserva()).expect(401);
     });
   });
 
   describe('carga da tela', () => {
     it('lista campus, ambientes e reservas', async () => {
       const [campi, ambientes, reservas] = await Promise.all([
-        request(app.getHttpServer()).get('/campus').set(auth()).expect(200),
-        request(app.getHttpServer()).get('/ambientes').set(auth()).expect(200),
-        request(app.getHttpServer()).get('/reservas').set(auth()).expect(200),
+        request(app.getHttpServer()).get('/v1/campus').set(auth()).expect(200),
+        request(app.getHttpServer()).get('/v1/ambientes').set(auth()).expect(200),
+        request(app.getHttpServer()).get('/v1/reservas').set(auth()).expect(200),
       ]);
 
       expect(campi.body.some((c: any) => c.id === campusId)).toBe(true);
@@ -155,7 +175,7 @@ describe('Rooster Rooms — reservas (e2e)', () => {
     it('traz o ambiente embutido em cada reserva', async () => {
       await criarReserva().expect(201);
 
-      const res = await request(app.getHttpServer()).get('/reservas').set(auth()).expect(200);
+      const res = await request(app.getHttpServer()).get('/v1/reservas').set(auth()).expect(200);
       expect(res.body[0].ambiente).toBeDefined();
       expect(res.body[0].ambiente.id).toBe(ambienteId);
     });
@@ -163,14 +183,14 @@ describe('Rooster Rooms — reservas (e2e)', () => {
     it('filtra reservas por status', async () => {
       const criada = await criarReserva().expect(201);
       await request(app.getHttpServer())
-        .patch(`/reservas/${criada.body.id}/status`)
+        .patch(`/v1/reservas/${criada.body.id}/status`)
         .set(auth())
         .send({ status: 'confirmada' })
         .expect(200);
       await criarReserva({ horarioInicio: '14:00', horarioFim: '15:00' }).expect(201);
 
       const res = await request(app.getHttpServer())
-        .get('/reservas?status=analise')
+        .get('/v1/reservas?status=analise')
         .set(auth())
         .expect(200);
       expect(res.body).toHaveLength(1);
@@ -228,7 +248,7 @@ describe('Rooster Rooms — reservas (e2e)', () => {
     it('libera o horário de uma reserva cancelada', async () => {
       const criada = await criarReserva().expect(201);
       await request(app.getHttpServer())
-        .patch(`/reservas/${criada.body.id}/status`)
+        .patch(`/v1/reservas/${criada.body.id}/status`)
         .set(auth())
         .send({ status: 'cancelada' })
         .expect(200);
@@ -242,7 +262,7 @@ describe('Rooster Rooms — reservas (e2e)', () => {
       const criada = await criarReserva().expect(201);
 
       const res = await request(app.getHttpServer())
-        .patch(`/reservas/${criada.body.id}/status`)
+        .patch(`/v1/reservas/${criada.body.id}/status`)
         .set(auth())
         .send({ status: 'confirmada' })
         .expect(200);
@@ -256,7 +276,7 @@ describe('Rooster Rooms — reservas (e2e)', () => {
       const criada = await criarReserva().expect(201);
 
       const res = await request(app.getHttpServer())
-        .patch(`/reservas/${criada.body.id}/status`)
+        .patch(`/v1/reservas/${criada.body.id}/status`)
         .set(auth())
         .send({ status: 'cancelada' })
         .expect(200);
@@ -269,7 +289,7 @@ describe('Rooster Rooms — reservas (e2e)', () => {
       const criada = await criarReserva().expect(201);
 
       const res = await request(app.getHttpServer())
-        .patch(`/reservas/${criada.body.id}/status`)
+        .patch(`/v1/reservas/${criada.body.id}/status`)
         .set(auth())
         .send({ status: 'aprovadissima' })
         .expect(400);
@@ -278,7 +298,7 @@ describe('Rooster Rooms — reservas (e2e)', () => {
 
     it('responde 404 para reserva inexistente', async () => {
       await request(app.getHttpServer())
-        .patch('/reservas/00000000-0000-0000-0000-000000000000/status')
+        .patch('/v1/reservas/00000000-0000-0000-0000-000000000000/status')
         .set(auth())
         .send({ status: 'confirmada' })
         .expect(404);
@@ -291,7 +311,7 @@ describe('Rooster Rooms — reservas (e2e)', () => {
       const segunda = await criarReserva({ horarioInicio: '11:00', horarioFim: '13:00' }).expect(201);
 
       await request(app.getHttpServer())
-        .patch(`/reservas/${primeira.body.id}/status`)
+        .patch(`/v1/reservas/${primeira.body.id}/status`)
         .set(auth())
         .send({ status: 'confirmada' })
         .expect(200);
@@ -303,7 +323,7 @@ describe('Rooster Rooms — reservas (e2e)', () => {
       });
 
       const res = await request(app.getHttpServer())
-        .patch(`/reservas/${segunda.body.id}/status`)
+        .patch(`/v1/reservas/${segunda.body.id}/status`)
         .set(auth())
         .send({ status: 'confirmada' })
         .expect(409);

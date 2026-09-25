@@ -1,10 +1,10 @@
 # Configuração — Variáveis de Ambiente
 
-## Gap conhecido: não há `.env.example`
+## `.env.example` (setembro/2026)
 
-Nenhum dos dois repositórios (`RoosterOneBackend-main`, `RoosterOneFrontEnd-main`) contém um arquivo `.env.example` versionado. O `.gitignore` do backend inclusive prevê a exceção `!.env.example` (ou seja, o projeto foi desenhado para ter um arquivo de exemplo versionado), mas o arquivo não existe no repositório atual. Isso é um gap real: hoje a única forma de saber quais variáveis existem é ler o código-fonte (como foi feito para montar as tabelas abaixo) ou este documento.
+Os dois repositórios têm um `.env.example` versionado, com placeholders e nenhum valor real de segredo — ele é a referência prática; as tabelas abaixo continuam sendo a explicação detalhada de cada variável.
 
-**Recomendação futura**: criar `.env.example` em ambos os repositórios com as chaves abaixo e valores vazios/placeholder, para eliminar essa dependência de leitura de código.
+Antes disso, a única forma de descobrir quais variáveis existiam era ler o código-fonte (foi assim que as tabelas abaixo foram montadas). O `.gitignore` do backend já previa a exceção `!.env.example`, mas o arquivo nunca tinha sido criado. Na mesma correção, o `.gitignore` do **frontend** passou a ignorar `.env` — antes não ignorava nada de ambiente, então um `.env` criado ali seria versionado junto com o código.
 
 ---
 
@@ -25,16 +25,37 @@ Lido via `dotenv/config`, importado no topo de `src/main.ts` — sem esse import
 | `SMTP_PASS` | Não | Senha de autenticação SMTP. Só é usada se `SMTP_USER` estiver definido. | `SMTP_PASS=<SMTP_PASS>` |
 | `MAIL_FROM` | Não (default `Rooster One <no-reply@rooster.local>`) | Remetente usado nos e-mails enviados via SMTP. | `MAIL_FROM=Rooster One <no-reply@rooster.local>` |
 
+### Pastas de arquivos enviados (`src/common/storage.config.ts`)
+
+Todas opcionais. O padrão é `<pasta do projeto>/uploads/<tipo>`; as variáveis existem para levar os arquivos para outro disco (o vídeo é o caso típico: um arquivo de até 2 GB por aula ocupa espaço de verdade). A pasta é criada se não existir e caminho relativo é resolvido a partir da pasta de trabalho do processo — num serviço Windows sem diretório de trabalho definido, prefira **caminho absoluto**.
+
+| Variável | Padrão | Guarda |
+|---|---|---|
+| `UPLOADS_DIR` | `<projeto>/uploads` | Raiz de todas as pastas abaixo que não forem sobrescritas. |
+| `BOOST_VIDEOS_DIR` | `<UPLOADS_DIR>/videos-boost` | Vídeos das aulas do Boost (RN036). |
+| `BOOST_MATERIAIS_DIR` | `<UPLOADS_DIR>/materiais-boost` | Material de apoio das aulas. |
+| `BOOST_CERTIFICADOS_DIR` | `<UPLOADS_DIR>/certificados-boost` | PDFs de certificado. |
+| `DESK_ANEXOS_DIR` | `<UPLOADS_DIR>/anexos-tickets` | Anexos de chamado. |
+| `LEARN_ANEXOS_DIR` | `<UPLOADS_DIR>/anexos-entregas` | Anexos de entrega do Learn. |
+| `ACADEMY_DOCUMENTOS_DIR` | `<UPLOADS_DIR>/documentos-academicos` | Documentos acadêmicos. |
+| `FINANCE_NOTAS_DIR` | `<UPLOADS_DIR>/notas-fiscais` | PDFs de nota fiscal. |
+
+**Atenção ao backup:** `scripts/backup.*` arquiva apenas `<projeto>/uploads`. Qualquer pasta redirecionada por variável para fora dele (inclusive `UPLOADS_DIR` e `BOOST_VIDEOS_DIR`) **não entra no backup** e precisa de rotina própria até o script passar a ler essas variáveis.
+
 Notas:
 - Sem `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER` e `SMTP_PASS` não fazem nada — são todos subordinados a `SMTP_HOST` estar definido.
 - O comando `test:e2e` do `package.json` sobrescreve `DATABASE_URL` (para um arquivo SQLite local, `file:./prisma/dev-test.db`) e `JWT_SECRET` (`rooster-e2e-test-secret`) via `cross-env`, isolando os testes end-to-end do `.env` de desenvolvimento. Isso é específico do schema de teste (`prisma/schema.test.prisma`) e não deve ser confundido com a configuração de desenvolvimento/produção documentada acima.
 
 ## Frontend (`RoosterOneFrontEnd-main`)
 
-Não há arquivo `.env` no repositório do frontend (também sem `.env.example`). A única variável de ambiente consumida pelo código é lida via `import.meta.env` (padrão Vite).
+A única variável de ambiente consumida pelo código é lida via `import.meta.env` (padrão Vite).
 
 | Variável | Obrigatória | Controla | Valor de exemplo |
 |---|---|---|---|
 | `VITE_API_URL` | Não (default `http://localhost:3000`) | URL base da API do backend, usada por todo o cliente HTTP (`src/services/hub/client.ts`, `export const API_URL = import.meta.env["VITE_API_URL"] ?? "http://localhost:3000"`). Quando a API não está acessível nesse endereço, partes da interface caem em um modo offline com armazenamento em memória (ver comentário no próprio arquivo). | `VITE_API_URL=http://localhost:3000` |
+
+> **Informe apenas o host, sem `/v1`.** A API é versionada por URI, mas o prefixo é acrescentado pelo próprio cliente HTTP (`API_VERSION_PREFIX`), e **não** faz parte de `API_URL` — porque a mesma base é usada para abrir os gateways WebSocket (`io(\`${API_URL}/desk\`)`), que não são versionados. Colocar `/v1` em `VITE_API_URL` quebraria o chat e geraria caminhos `/v1/v1/...` no REST.
+
+> **Tudo que começa com `VITE_` vai para o bundle** e é visível para qualquer pessoa que abrir o site. Só cabe aí valor que pode ser público; segredo de verdade pertence ao backend.
 
 Para definir `VITE_API_URL`, crie um arquivo `.env` (ou `.env.local`) na raiz do frontend — por convenção do Vite, qualquer variável prefixada com `VITE_` nesse arquivo é injetada em `import.meta.env` automaticamente no build/dev server.

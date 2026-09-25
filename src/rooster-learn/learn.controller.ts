@@ -6,7 +6,6 @@ import type { Request, Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { randomUUID } from 'crypto';
-import { existsSync, mkdirSync } from 'fs';
 import { extname, join } from 'path';
 import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PermissionGuard } from '../auth/permission.guard';
@@ -15,13 +14,13 @@ import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
 import { AcademyService } from '../rooster-academy/academy.service';
 import { LearnService } from './learn.service';
 import { CorrigirEntregaDto, CreateAtividadeDto, EnviarEntregaDto, UpdateAtividadeDto } from './dto/learn.dto';
+import { PASTAS } from '../common/storage.config';
 
 const MODULO = 'Rooster Learn';
 const TELA_CLASSES = '/learn/classes';
 const TELA_STUDENT = '/learn/student';
 
-const UPLOADS_DIR = join(process.cwd(), 'uploads', 'anexos-entregas');
-if (!existsSync(UPLOADS_DIR)) mkdirSync(UPLOADS_DIR, { recursive: true });
+const UPLOADS_DIR = PASTAS.anexosEntregas();
 const MAX_ANEXO_BYTES = 15 * 1024 * 1024; // 15MB
 
 type AuthedUser = { id: string };

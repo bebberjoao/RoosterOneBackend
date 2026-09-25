@@ -1,0 +1,14 @@
+stateDiagram-v2
+  [*] --> Rascunho : professor cria
+  Rascunho --> Publicada : publicar
+  Publicada --> Encerrada : prazo encerrado
+  Encerrada --> Arquivada : arquivamento
+  Rascunho --> Arquivada : descartar
+  Arquivada --> [*]
+
+  note right of Publicada
+    Ao publicar com peso,
+    cria automaticamente um
+    ItemAvaliativo no Academy
+    com origem = 'learn'
+  end note

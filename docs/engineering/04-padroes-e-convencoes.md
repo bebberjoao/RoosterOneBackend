@@ -4,7 +4,7 @@ Convenções observadas de forma consistente no código, não regras escritas em
 
 ## Backend
 
-- **Idioma das rotas**: recursos de negócio em português (`/chamados`, `/reservas`, `/patrimonio`, `/usuarios`). O módulo Desk mantém aliases em inglês para parte das rotas (`/tickets` ao lado de `/chamados`, `/categorias-tickets` ao lado de `/chamados-categorias`) — Rooms e Assets não têm esse padrão de alias duplo.
+- **Idioma das rotas**: recursos de negócio em português (`/chamados`, `/reservas`, `/patrimonio`, `/usuarios`), sem alias em inglês em nenhum módulo — o Desk chegou a ter um alias EN por recurso (`/tickets` ao lado de `/chamados`, etc.), nunca usado pelo frontend real, removido na limpeza de código morto (ver `docs/engineering/08-divida-tecnica.md`).
 - **DTOs**: um `Create*Dto` por entidade com decorators de `class-validator`; `Update*Dto` sempre `extends PartialType(Create*Dto)` (torna todo campo opcional na atualização sem redeclarar validação).
 - **Camelcase no código, snake_case no banco**: todo model Prisma usa `@map`/`@@map` para o nome de coluna/tabela real — ex.: `Ticket.criadoEm` mapeia para `criado_em`.
 - **Erro de Prisma tratado de forma central por service**: método privado `handleError(error, ação)` em cada service, mapeando código do Prisma para exceção HTTP (`P2002` → conflito, `P2025` → não encontrado).

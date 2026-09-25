@@ -8,6 +8,8 @@ import {
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
+import { PaginacaoQueryDto, montarPagina, pediuPaginacao, prismaSkipTake } from '../common/pagination';
+import { NotificacoesService } from '../roster-hub/notificacoes/notificacoes.service';
 import { CreateAmbienteDto } from './dto/create-ambiente.dto';
 import { CreateBlocoDto } from './dto/create-bloco.dto';
 import { CreateCampusDto } from './dto/create-campus.dto';
@@ -20,7 +22,10 @@ import { UpdateReservaDto } from './dto/update-reserva.dto';
 
 @Injectable()
 export class RoomsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificacoes: NotificacoesService,
+  ) {}
 
   // Campus
   async createCampus(dto: CreateCampusDto) {
@@ -393,16 +398,50 @@ export class RoomsService {
     return { serieId, canceladas: reservas.length };
   }
 
-  async findAllReservas(ambienteId?: string, data?: string, status?: string) {
-    return this.prisma.reserva.findMany({
-      where: {
-        ...(ambienteId ? { ambienteId } : {}),
-        ...(status ? { status } : {}),
-        ...(data ? { data: new Date(data) } : {}),
-      },
-      orderBy: { criadoEm: 'desc' },
-      include: { ambiente: true },
-    });
+  /**
+   * Sem `pagina`/`limite`, devolve a lista completa (contrato histórico).
+   * Com qualquer um dos dois, devolve o envelope paginado — ver
+   * `src/common/pagination.ts`.
+   *
+   * Filtro de data: `dataInicio`/`dataFim` (período, ambos inclusive) tem
+   * prioridade sobre `data` (dia único) quando os dois vierem informados —
+   * é a tela de gerenciar reservas escolhendo entre "um dia" e "um período".
+   */
+  async findAllReservas(
+    ambienteId?: string,
+    data?: string,
+    status?: string,
+    paginacao: PaginacaoQueryDto = {},
+    periodo?: { dataInicio?: string; dataFim?: string },
+  ) {
+    const filtroData = periodo?.dataInicio || periodo?.dataFim
+      ? {
+          data: {
+            ...(periodo.dataInicio ? { gte: new Date(periodo.dataInicio) } : {}),
+            ...(periodo.dataFim ? { lte: new Date(periodo.dataFim) } : {}),
+          },
+        }
+      : data
+        ? { data: new Date(data) }
+        : {};
+
+    const where = {
+      ...(ambienteId ? { ambienteId } : {}),
+      ...(status ? { status } : {}),
+      ...filtroData,
+    };
+    const orderBy = { criadoEm: 'desc' } as const;
+    const include = { ambiente: true };
+
+    if (!pediuPaginacao(paginacao)) {
+      return this.prisma.reserva.findMany({ where, orderBy, include });
+    }
+    const { skip, take } = prismaSkipTake(paginacao);
+    const [dados, total] = await this.prisma.$transaction([
+      this.prisma.reserva.findMany({ where, orderBy, include, skip, take }),
+      this.prisma.reserva.count({ where }),
+    ]);
+    return montarPagina(dados, total, paginacao);
   }
 
   async findOneReserva(id: string) {
@@ -530,6 +569,17 @@ export class RoomsService {
       });
     }
 
+    if (statusAnterior !== status && reserva.responsavelId && reserva.responsavelId !== decididoPor) {
+      const rotulo = RoomsService.ROTULO_STATUS_NOTIFICACAO[status];
+      if (rotulo) {
+        await this.notificacoes.notificar(
+          reserva.responsavelId,
+          `Reserva ${rotulo}`,
+          `${reserva.codigo} — ${atualizada.ambiente?.nome ?? 'ambiente'}, ${reserva.data.toISOString().slice(0, 10)} ${reserva.horarioInicio}-${reserva.horarioFim}.${status === 'cancelada' && motivo ? ` Motivo: ${motivo}` : ''}`,
+        );
+      }
+    }
+
     return atualizada;
   }
 
@@ -609,11 +659,20 @@ export class RoomsService {
   }
 
   async createMensagemReserva(reservaId: string, usuarioId: string, dto: CreateMensagemReservaDto) {
-    await this.findOneReserva(reservaId);
-    return this.prisma.reservaMensagem.create({
+    const reserva = await this.findOneReserva(reservaId);
+    const criada = await this.prisma.reservaMensagem.create({
       data: { reservaId, usuarioId, mensagem: dto.mensagem },
       include: { usuario: { select: { id: true, nome: true } } },
     });
+    // Só avisa o solicitante quando quem escreve é outra pessoa (a equipe respondendo).
+    if (reserva.responsavelId && reserva.responsavelId !== usuarioId) {
+      await this.notificacoes.notificar(
+        reserva.responsavelId,
+        'Nova resposta na sua reserva',
+        `${reserva.codigo}: ${dto.mensagem.slice(0, 140)}`,
+      );
+    }
+    return criada;
   }
 
   // =====================================================
@@ -622,6 +681,12 @@ export class RoomsService {
 
   /** Status que ocupam a agenda do ambiente e bloqueiam novas reservas no mesmo horário. */
   private static readonly RESERVA_STATUS_BLOQUEIA = ['analise', 'confirmada', 'andamento'];
+  private static readonly ROTULO_STATUS_NOTIFICACAO: Record<string, string> = {
+    confirmada: 'confirmada',
+    cancelada: 'cancelada',
+    andamento: 'em andamento',
+    finalizada: 'finalizada',
+  };
   private static readonly RESERVA_STATUS_VALIDOS = [
     'analise',
     'confirmada',

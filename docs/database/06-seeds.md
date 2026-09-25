@@ -6,13 +6,13 @@ Script: `prisma/seed-dev.ts`, executado com `npm run db:seed:dev`. **Apaga tudo*
 
 ### Módulos e permissões
 
-9 `Modulo` (Rooster Hub, Rooster Desk, Rooster Rooms, Rooster Assets, Rooster Academy, Rooster Learn, Rooster Student, Rooster Boost, Rooster Finance) e **130 permissões** (`Permissao`), cada uma com a chave `módulo + recurso (rota de tela) + ação` usada por `@RequirePermission` no backend e por `permission-catalog.ts` no frontend. `Rooster Student` é só um módulo de permissão (sem controller/tabela próprios) para as rotas `/me/*` servidas pelo `AcademyController`/`LearnController`/`FinanceController` — ver `docs/security/03-rbac.md`. `Rooster Boost` só cobre o lado **instrutor** (login do Hub) — o aluno Boost usa `BoostUsuario`, uma tabela de login própria sem nenhuma relação com este catálogo de permissões (ver seção Boost abaixo e `docs/security/03-rbac.md`).
+9 `Modulo` (Rooster Hub, Rooster Desk, Rooster Rooms, Rooster Assets, Rooster Academy, Rooster Learn, Rooster Student, Rooster Boost, Rooster Finance) e **132 permissões** (`Permissao`), cada uma com a chave `módulo + recurso (rota de tela) + ação` usada por `@RequirePermission` no backend e por `permission-catalog.ts` no frontend. `Rooster Student` é só um módulo de permissão (sem controller/tabela próprios) para as rotas `/me/*` servidas pelo `AcademyController`/`LearnController`/`FinanceController` — ver `docs/security/03-rbac.md`. `Rooster Boost` só cobre o lado **instrutor** (login do Hub) — o aluno Boost usa `BoostUsuario`, uma tabela de login própria sem nenhuma relação com este catálogo de permissões (ver seção Boost abaixo e `docs/security/03-rbac.md`).
 
 ### Usuários e permissões concedidas
 
 | Usuário | E-mail | Senha | Perfil de permissão |
 |---|---|---|---|
-| Administrador Rooster | `admin@rooster.local` | `Admin123!` | Todas as 130 permissões |
+| Administrador Rooster | `admin@rooster.local` | `Admin123!` | Todas as 132 permissões |
 | Atendente Secretaria | `atendente.secretaria@rooster.local` | `Atendente123!` | Perfil "atendente" (operacional em Desk + leitura em Rooms/Assets), setor Secretaria Acadêmica |
 | Atendente Suporte | `atendente.suporte@rooster.local` | `Atendente123!` | Idem, setor Suporte de TI |
 | Atendente Coordenação | `atendente.coordenacao@rooster.local` | `Atendente123!` | Idem, setor Coordenação |
@@ -38,14 +38,15 @@ Os "perfis" acima (atendente/coordenador/solicitante/visualizador) **não são u
 
 Esses cinco usuários (`Usuario`) são criados **antes** dos vínculos `Professor`/`Aluno` correspondentes — a ordem no script reforça a regra "vínculo, não usuário novo": primeiro o `Usuario` do Hub, depois `prisma.professor.create`/`prisma.aluno.create` apontando `usuarioId` para ele.
 
-### Rooster Boost — instrutor (Hub) + aluno externo (login próprio)
+### Rooster Boost — gestor e orientador (Hub) + aluno externo (login próprio)
 
 | Usuário | E-mail | Senha | Observação |
 |---|---|---|---|
-| Prof. Ricardo Lima | `ricardo.lima@rooster.local` | `Professor123!` | Reaproveitado do Academy — instrutor do curso Boost de exemplo. Permissões `boost.*` adicionadas ao mesmo `academyProfessorKeys` |
+| Prof. Ricardo Lima | `ricardo.lima@rooster.local` | `Professor123!` | Reaproveitado do Academy — **orientador** (`CursoOrientadorBoost`) do curso de exemplo. Só recebe `boost.conversas.acessar/responder` (em `academyProfessorKeys`): conversa com os alunos, não gere curso |
+| Coordenação acadêmica | `coordenacao.academica@rooster.local` | `Coordenador123!` | **Gestora do Boost**: recebe `boostGestaoKeys` (gerenciar cursos e conteúdo, ver progresso, certificado, vincular orientadores) — vale para todos os cursos. O administrador também gere |
 | Camila Nogueira | `camila.externa@example.com` | `Boost123!` | **`BoostUsuario`, não `Usuario`** — cadastro público, sem login no Hub, sem nenhuma permissão do catálogo acima |
 
-Curso de exemplo: "Fundamentos de Lógica de Programação" (publicado, 20h, certificado habilitado), 2 módulos, 4 aulas (uma com material de apoio anexado), 1 matrícula da Camila com 2 das 4 aulas concluídas (`progressoPct: 50`, ainda sem certificado — o script de seed não simula a conclusão via `CertificadoBoostService` porque é um `ts-node` standalone, fora do container de DI do Nest; o fluxo de 100% → certificado automático é validado ao vivo via e2e/curl, não pré-populado) e uma troca de mensagem no chat do curso.
+Curso de exemplo: "Fundamentos de Lógica de Programação" (publicado, 20h, certificado habilitado), 2 módulos, 4 aulas (uma com material de apoio anexado), 1 orientador vinculado (Ricardo Lima), 1 matrícula da Camila com 2 das 4 aulas concluídas (`progressoPct: 50`, ainda sem certificado — o script de seed não simula a conclusão via `CertificadoBoostService` porque é um `ts-node` standalone, fora do container de DI do Nest; o fluxo de 100% → certificado automático é validado ao vivo via e2e/curl, não pré-populado) e uma troca de mensagem no chat do curso.
 
 ### Rooster Finance — cobranças ligadas a alunos reais do Academy
 

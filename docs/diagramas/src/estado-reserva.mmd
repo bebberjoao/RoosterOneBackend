@@ -1,0 +1,17 @@
+stateDiagram-v2
+  [*] --> Analise : solicitacao enviada
+  Analise --> Confirmada : gestor aprova
+  Analise --> Cancelada : gestor recusa com motivo
+  Confirmada --> EmAndamento : chegou o horario
+  Confirmada --> Cancelada : cancelamento com motivo
+  EmAndamento --> Finalizada : horario encerrado
+  Cancelada --> [*]
+  Finalizada --> [*]
+
+  note right of Analise
+    Criacao valida capacidade,
+    dia de funcionamento, janela
+    de horario e conflito (RN010)
+    e o horizonte de antecedencia
+    de 15/365 dias (RN017)
+  end note

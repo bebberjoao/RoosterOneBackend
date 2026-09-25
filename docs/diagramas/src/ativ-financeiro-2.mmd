@@ -1,0 +1,13 @@
+%%{init: {'flowchart': {'wrappingWidth': 420}}}%%
+flowchart TD
+  A([Cobranca em aberto]) --> B{"Pagou ate o vencimento?"}
+  B -->|Sim| C["Baixa manual pelo financeiro - status pago"]
+  B -->|Nao| D["Vencido - derivado na leitura, nunca persistido"]
+  D --> E{"Negociar?"}
+  E -->|Sim| C
+  E -->|Nao| F["Inadimplente - entra nos relatorios"]
+  C --> G{"Emitir nota fiscal?"}
+  G -->|Sim| H["Gera PDF e XML internos - documento sem validade fiscal"]
+  G -->|Nao| I([Fim])
+  H --> I
+  F --> I

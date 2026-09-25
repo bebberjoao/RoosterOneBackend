@@ -74,6 +74,9 @@ Documentação completa no repositório do frontend: [`RoosterOneFrontEnd-main/d
 - [Performance](engineering/09-performance.md)
 - [Melhorias Futuras](engineering/10-melhorias-futuras.md)
 - [Auditoria da Documentação](engineering/11-auditoria-documentacao.md)
+- [Processo de Desenvolvimento](engineering/12-processo-de-desenvolvimento.md) — commits, branches, PR e revisão de código
+- [Governança](engineering/13-governanca.md) — incidentes, problemas, mudanças e registro de riscos
+- [Estratégia de Testes](engineering/14-estrategia-de-testes.md) — camadas, o que não é testado e a matriz teste ↔ requisito
 
 ## Operações
 
@@ -85,7 +88,15 @@ Documentação completa no repositório do frontend: [`RoosterOneFrontEnd-main/d
 - [Backup e Recuperação](operations/06-backup-e-recuperacao.md)
 - [Troubleshooting](operations/07-troubleshooting.md)
 
+## Diagramas
+
+- [Catálogo de diagramas](diagramas/README.md) — 52 diagramas (contexto, arquitetura, componentes, ERDs por módulo, RBAC, casos de uso, sequência, atividade e estados), com a fonte Mermaid em [`diagramas/src/`](diagramas/src/) e a renderização em [`diagramas/png/`](diagramas/png/).
+
 ## Guias
 
 - [Guia do Usuário](user-guides/01-guia-do-usuario.md)
 - [Guia do Administrador](user-guides/02-guia-do-administrador.md)
+
+## Documento consolidado
+
+O documento `Rooster-One-Documentacao-Geral.docx`, na raiz da pasta do TCC, consolida toda esta árvore em 751 itens numerados, com as 52 figuras embutidas. Esta árvore `docs/` continua sendo a fonte de verdade técnica, mantida junto ao código; o documento é a visão consolidada para entrega acadêmica.

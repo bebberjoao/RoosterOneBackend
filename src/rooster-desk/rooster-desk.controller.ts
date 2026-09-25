@@ -6,16 +6,16 @@ import type { Request, Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { randomUUID } from 'crypto';
-import { existsSync, mkdirSync } from 'fs';
 import { extname, join } from 'path';
 import { ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { PaginacaoQueryDto } from '../common/pagination';
 import {
   CreateAnexoTicketDto, CreateAvaliacaoTicketDto, CreateCategoriaTicketDto,
-  CreateHistoricoTicketDto, CreateMensagemChamadoDto,
+  CreateHistoricoTicketDto, CreateMensagemChamadoDto, CreatePrioridadeTicketDto,
   CreateStatusTicketDto, CreateSubcategoriaTicketDto, CreateTicketDto,
   AssignTicketDto, AssignSubcategoryAgentsDto,
   UpdateAnexoTicketDto, UpdateAvaliacaoTicketDto, UpdateCategoriaTicketDto,
-  UpdateHistoricoTicketDto,
+  UpdateHistoricoTicketDto, UpdatePrioridadeTicketDto,
   UpdateStatusTicketDto, UpdateSubcategoriaTicketDto, UpdateTicketDto,
 } from './dto/rooster-desk.dto';
 import { RoosterDeskService } from './rooster-desk.service';
@@ -23,14 +23,14 @@ import { MensagensGateway } from './mensagens.gateway';
 import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
+import { PASTAS } from '../common/storage.config';
 
 const MODULO = 'Rooster Desk';
 const TELA_TICKETS = '/desk/tickets';
 const TELA_CATEGORIES = '/desk/categories';
 const TELA_TEAM = '/desk/team';
 
-const UPLOADS_DIR = join(process.cwd(), 'uploads', 'anexos-tickets');
-if (!existsSync(UPLOADS_DIR)) mkdirSync(UPLOADS_DIR, { recursive: true });
+const UPLOADS_DIR = PASTAS.anexosTickets();
 const MAX_ANEXO_BYTES = 10 * 1024 * 1024; // 10MB
 
 @ApiTags('Rooster Desk')
@@ -49,13 +49,15 @@ export class RoosterDeskController {
     await this.requireManagement(usuarioId, 'criar', 'setor', dto.setorId);
     return this.service.create('categoriaTicket', dto);
   }
-  @Post('categorias-tickets')
-  createCategoriaAlias(@Req() request: Request, @Body() dto: CreateCategoriaTicketDto) { return this.createCategoria(request, dto); }
   @Get('chamados-categorias')
-  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
-  async findCategorias(@Req() request: Request) { return this.service.findCategoriesForUser((request.user as { id: string }).id); }
-  @Get('categorias-tickets')
-  findCategoriasAlias(@Req() request: Request) { return this.findCategorias(request); }
+  async findCategorias(@Req() request: Request, @Query('escopo') escopo?: string) {
+    const usuarioId = (request.user as { id: string }).id;
+    await this.exigirVisualizarTaxonomia(usuarioId);
+    // 'abertura': lista para o formulário de novo chamado — todas as categorias, de qualquer setor,
+    // porque o solicitante escolhe PARA QUAL setor está pedindo. A gestão (padrão) continua restrita ao setor.
+    if (escopo === 'abertura') return this.service.findCategoriesForTicketOpening();
+    return this.service.findCategoriesForUser(usuarioId);
+  }
   @Get('chamados-atendentes')
   @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
   findAgents(@Req() request: Request) { return this.service.findAgentsForUser((request.user as { id: string }).id); }
@@ -70,22 +72,16 @@ export class RoosterDeskController {
     await this.requireManagement((request.user as { id: string }).id, 'editar', 'categoria', id);
     return this.service.findOne('categoriaTicket', id);
   }
-  @Get('categorias-tickets/:id')
-  findCategoriaAlias(@Req() request: Request, @Param('id') id: string) { return this.findCategoria(request, id); }
   @Patch('chamados-categorias/:id') async updateCategoria(@Req() request: Request, @Param('id') id: string, @Body() dto: UpdateCategoriaTicketDto) {
     const usuarioId = (request.user as { id: string }).id;
     await this.requireManagement(usuarioId, 'editar', 'categoria', id);
     if (dto.setorId) await this.requireManagement(usuarioId, 'editar', 'setor', dto.setorId);
     return this.service.update('categoriaTicket', id, dto);
   }
-  @Patch('categorias-tickets/:id')
-  updateCategoriaAlias(@Req() request: Request, @Param('id') id: string, @Body() dto: UpdateCategoriaTicketDto) { return this.updateCategoria(request, id, dto); }
   @Delete('chamados-categorias/:id') async removeCategoria(@Req() request: Request, @Param('id') id: string) {
     await this.requireManagement((request.user as { id: string }).id, 'excluir', 'categoria', id);
     return this.service.remove('categoriaTicket', id);
   }
-  @Delete('categorias-tickets/:id')
-  removeCategoriaAlias(@Req() request: Request, @Param('id') id: string) { return this.removeCategoria(request, id); }
 
   @Post('chamados-subcategorias')
   async createSubcategoria(@Req() request: Request, @Body() dto: CreateSubcategoriaTicketDto) {
@@ -93,20 +89,17 @@ export class RoosterDeskController {
     await this.requireManagement(usuarioId, 'subcategorias', 'subcategoria', dto.categoriaId);
     return this.service.create('subcategoriaTicket', dto);
   }
-  @Post('subcategorias-tickets')
-  createSubcategoriaAlias(@Req() request: Request, @Body() dto: CreateSubcategoriaTicketDto) { return this.createSubcategoria(request, dto); }
   @Get('chamados-subcategorias')
-  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
-  findSubcategorias(@Req() request: Request) { return this.service.findSubcategoriesForUser((request.user as { id: string }).id); }
-  @Get('subcategorias-tickets')
-  findSubcategoriasAlias(@Req() request: Request) { return this.findSubcategorias(request); }
+  async findSubcategorias(@Req() request: Request) {
+    const usuarioId = (request.user as { id: string }).id;
+    await this.exigirVisualizarTaxonomia(usuarioId);
+    return this.service.findSubcategoriesForUser(usuarioId);
+  }
   @Get('chamados-subcategorias/:id')
   async findSubcategoria(@Req() request: Request, @Param('id') id: string) {
     await this.requireManagement((request.user as { id: string }).id, 'subcategorias', 'subcategoria', id);
     return this.service.findOne('subcategoriaTicket', id);
   }
-  @Get('subcategorias-tickets/:id')
-  findSubcategoriaAlias(@Req() request: Request, @Param('id') id: string) { return this.findSubcategoria(request, id); }
   @Patch('chamados-subcategorias/:id')
   async updateSubcategoria(@Req() request: Request, @Param('id') id: string, @Body() dto: UpdateSubcategoriaTicketDto) {
     const usuarioId = (request.user as { id: string }).id;
@@ -114,62 +107,48 @@ export class RoosterDeskController {
     if (dto.categoriaId) await this.requireManagement(usuarioId, 'subcategorias', 'categoria', dto.categoriaId);
     return this.service.update('subcategoriaTicket', id, dto);
   }
-  @Patch('subcategorias-tickets/:id')
-  updateSubcategoriaAlias(@Req() request: Request, @Param('id') id: string, @Body() dto: UpdateSubcategoriaTicketDto) { return this.updateSubcategoria(request, id, dto); }
   @Delete('chamados-subcategorias/:id') async removeSubcategoria(@Req() request: Request, @Param('id') id: string) {
     await this.requireManagement((request.user as { id: string }).id, 'subcategorias', 'subcategoria', id);
     return this.service.remove('subcategoriaTicket', id);
   }
-  @Delete('subcategorias-tickets/:id')
-  removeSubcategoriaAlias(@Req() request: Request, @Param('id') id: string) { return this.removeSubcategoria(request, id); }
 
   // Prioridades e status são taxonomia global (não pertencem a um setor específico);
   // não há tela própria no catálogo, então ficam sob a mesma permissão de categorias.
-  @Post('prioridades-tickets')
+  @Post('chamados-prioridades')
   @RequirePermission(MODULO, TELA_CATEGORIES, 'editar')
-  createPrioridade(@Body() dto: CreateCategoriaTicketDto) { return this.service.create('prioridadeTicket', dto as any); }
+  createPrioridade(@Body() dto: CreatePrioridadeTicketDto) { return this.service.create('prioridadeTicket', dto); }
   @Get('chamados-prioridades')
-  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
-  findPrioridades() { return this.service.findAll('prioridadeTicket'); }
-  @Get('prioridades-tickets')
-  findPrioridadesAlias() { return this.findPrioridades(); }
+  async findPrioridades(@Req() request: Request) {
+    await this.exigirVisualizarTaxonomia((request.user as { id: string }).id);
+    return this.service.findAll('prioridadeTicket');
+  }
   @Get('chamados-prioridades/:id')
   @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
   findPrioridade(@Param('id') id: string) { return this.service.findOne('prioridadeTicket', id); }
-  @Get('prioridades-tickets/:id')
-  findPrioridadeAlias(@Param('id') id: string) { return this.findPrioridade(id); }
-  @Patch('prioridades-tickets/:id')
+  @Patch('chamados-prioridades/:id')
   @RequirePermission(MODULO, TELA_CATEGORIES, 'editar')
-  updatePrioridade(@Param('id') id: string, @Body() dto: UpdateCategoriaTicketDto) { return this.service.update('prioridadeTicket', id, dto as any); }
-  @Delete('prioridades-tickets/:id')
+  updatePrioridade(@Param('id') id: string, @Body() dto: UpdatePrioridadeTicketDto) { return this.service.update('prioridadeTicket', id, dto); }
+  @Delete('chamados-prioridades/:id')
   @RequirePermission(MODULO, TELA_CATEGORIES, 'editar')
   removePrioridade(@Param('id') id: string) { return this.service.remove('prioridadeTicket', id); }
 
   @Post('chamados-status')
   @RequirePermission(MODULO, TELA_CATEGORIES, 'editar')
   createStatus(@Body() dto: CreateStatusTicketDto) { return this.service.create('statusTicket', dto); }
-  @Post('status-tickets')
-  createStatusAlias(@Body() dto: CreateStatusTicketDto) { return this.createStatus(dto); }
   @Get('chamados-status')
-  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
-  findStatus() { return this.service.findAll('statusTicket'); }
-  @Get('status-tickets')
-  findStatusAlias() { return this.findStatus(); }
+  async findStatus(@Req() request: Request) {
+    await this.exigirVisualizarTaxonomia((request.user as { id: string }).id);
+    return this.service.findAll('statusTicket');
+  }
   @Get('chamados-status/:id')
   @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
   findOneStatus(@Param('id') id: string) { return this.service.findOne('statusTicket', id); }
-  @Get('status-tickets/:id')
-  findOneStatusAlias(@Param('id') id: string) { return this.findOneStatus(id); }
   @Patch('chamados-status/:id')
   @RequirePermission(MODULO, TELA_CATEGORIES, 'editar')
   updateStatus(@Param('id') id: string, @Body() dto: UpdateStatusTicketDto) { return this.service.update('statusTicket', id, dto); }
-  @Patch('status-tickets/:id')
-  updateStatusAlias(@Param('id') id: string, @Body() dto: UpdateStatusTicketDto) { return this.updateStatus(id, dto); }
   @Delete('chamados-status/:id')
   @RequirePermission(MODULO, TELA_CATEGORIES, 'editar')
   removeStatus(@Param('id') id: string) { return this.service.remove('statusTicket', id); }
-  @Delete('status-tickets/:id')
-  removeStatusAlias(@Param('id') id: string) { return this.removeStatus(id); }
 
   @Post('chamados')
   @RequirePermission(MODULO, TELA_TICKETS, 'criar')
@@ -181,24 +160,12 @@ export class RoosterDeskController {
     return this.service.createTicket({ ...dto, usuarioId });
   }
 
-  @Post('tickets')
-  @RequirePermission(MODULO, TELA_TICKETS, 'criar')
-  async createTicketAlias(@Req() request: Request, @Body() dto: CreateTicketDto) {
-    return this.createTicket(request, dto);
-  }
-
   @Get('chamados')
   @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
   @ApiOperation({ summary: 'Lista chamados' })
-  async findTickets(@Req() request: Request) {
+  async findTickets(@Req() request: Request, @Query() paginacao: PaginacaoQueryDto) {
     const usuarioId = (request.user as { id: string }).id;
-    return this.service.findTicketsForUser(usuarioId, await this.usuariosService.isAdmin(usuarioId));
-  }
-
-  @Get('tickets')
-  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
-  async findTicketsAlias(@Req() request: Request) {
-    return this.findTickets(request);
+    return this.service.findTicketsForUser(usuarioId, await this.usuariosService.isAdmin(usuarioId), paginacao);
   }
 
   @Get('chamados/:id')
@@ -208,12 +175,6 @@ export class RoosterDeskController {
     const usuarioId = (request.user as { id: string }).id;
     if (!(await this.service.canViewTicket(id, usuarioId, await this.usuariosService.isAdmin(usuarioId)))) throw new NotFoundException('Chamado não encontrado.');
     return this.service.findOne('ticket', id);
-  }
-
-  @Get('tickets/:id')
-  @RequirePermission(MODULO, TELA_TICKETS, 'acessar')
-  async findTicketAlias(@Req() request: Request, @Param('id') id: string) {
-    return this.findTicket(request, id);
   }
 
   @Patch('chamados/:id')
@@ -250,17 +211,9 @@ export class RoosterDeskController {
     return undefined;
   }
 
-  @Patch('tickets/:id')
-  async updateTicketAlias(@Req() request: Request, @Param('id') id: string, @Body() dto: UpdateTicketDto) {
-    return this.updateTicket(request, id, dto);
-  }
-
   @Delete('chamados/:id')
   @RequirePermission(MODULO, TELA_CATEGORIES, 'excluir')
   removeTicket(@Param('id') id: string) { return this.service.remove('ticket', id); }
-
-  @Delete('tickets/:id')
-  removeTicketAlias(@Param('id') id: string) { return this.removeTicket(id); }
 
   @Patch('chamados/:id/status')
   @ApiOperation({ summary: 'Atualiza somente o status de um chamado' })
@@ -297,6 +250,23 @@ export class RoosterDeskController {
     const usuarioId = (request.user as { id: string } | undefined)?.id;
     await this.requireManagement(usuarioId, 'vincular-categoria', 'atendentes', id, TELA_TEAM);
     return this.service.setSubcategoryAgents(id, dto.usuarioIds, usuarioId!);
+  }
+
+  /**
+   * Taxonomia de chamado (categoria, subcategoria, prioridade, status) é lida
+   * por qualquer um que precise abrir um chamado, não só por quem enxerga a
+   * fila inteira — exigir só `acessar` deixava sem opção no formulário quem
+   * tinha apenas `criar` (ex.: um solicitante que só abre chamado, nunca
+   * navega para `/desk/tickets` como lista). Achado real: o formulário de
+   * novo chamado ficava com categoria/subcategoria vazias, sem nenhum erro
+   * visível, para um usuário com `criar` mas sem `acessar`.
+   */
+  private async exigirVisualizarTaxonomia(usuarioId: string) {
+    const podeAcessar = await this.usuariosService.hasPermission(usuarioId, MODULO, TELA_TICKETS, 'acessar');
+    const podeCriar = await this.usuariosService.hasPermission(usuarioId, MODULO, TELA_TICKETS, 'criar');
+    if (!podeAcessar && !podeCriar) {
+      throw new ForbiddenException('Sem permissão para consultar categorias/status/prioridades de chamado.');
+    }
   }
 
   /** Regra do Desk: o gestor precisa da permissão da tela e o recurso precisa pertencer ao setor dele. */

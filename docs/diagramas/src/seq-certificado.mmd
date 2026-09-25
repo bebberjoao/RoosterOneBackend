@@ -1,0 +1,27 @@
+sequenceDiagram
+  actor A as Aluno externo
+  participant FE as Portal Boost
+  participant G as BoostJwtAuthGuard
+  participant CTRL as BoostPortalController
+  participant SVC as BoostPortalService
+  participant CERT as CertificadoBoostService
+  participant DB as PostgreSQL
+
+  A->>FE: marca ultima aula como concluida
+  FE->>G: PATCH /boost/aulas/:id/concluir + token tipo=boost
+  G->>G: verifica token contra boost_usuarios
+  G->>CTRL: autorizado
+  CTRL->>SVC: concluirAula(aulaId, boostUsuarioId)
+  SVC->>SVC: exigirMatriculaDaAula()
+  SVC->>DB: BEGIN TRANSACTION
+  SVC->>DB: cria ProgressoAula
+  SVC->>DB: recalcula progressoPct da matricula
+  alt progressoPct = 100 e curso emite certificado
+    SVC->>DB: matricula status = concluida
+    SVC->>CERT: gerar(matricula)
+    CERT->>CERT: monta PDF com pdfkit
+    CERT->>DB: cria CertificadoBoost (codigo unico)
+  end
+  SVC->>DB: COMMIT
+  SVC-->>FE: 200 { progressoPct, certificado }
+  FE-->>A: certificado disponivel para download
