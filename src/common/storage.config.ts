@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync } from 'fs';
 import { isAbsolute, join } from 'path';
+import type { Request } from 'express';
 
 /**
  * Onde cada tipo de arquivo enviado é gravado.
@@ -55,6 +56,37 @@ export function resolverPastaUpload(subpasta: string, variavel?: string): string
  * mudar a variável de ambiente exige reiniciar a aplicação, o que é o
  * comportamento esperado para configuração de infraestrutura.
  */
+/**
+ * Documentos genéricos aceitos em anexo de chamado, documento acadêmico, entrega do Learn e
+ * material de apoio do Boost — pdf/office/imagem/texto/zip. Antes desses quatro pontos, só o
+ * tamanho era limitado; qualquer mimetype passava (achado registrado em
+ * docs/security/05-analise-de-seguranca.md).
+ */
+export const MIMETYPES_DOCUMENTO = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/csv',
+  'application/zip',
+  'application/x-zip-compressed',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+];
+
+/** Fábrica de `fileFilter` do multer a partir de uma lista de mimetypes aceitos. */
+export function criarFiltroMimetype(permitidos: readonly string[]) {
+  return (_req: Request, file: Express.Multer.File, cb: (error: Error | null, aceitar: boolean) => void) => {
+    cb(null, permitidos.includes(file.mimetype));
+  };
+}
+
 export const PASTAS = {
   /** Vídeos de aula do Boost. Variável própria — são os arquivos maiores do sistema. */
   videosBoost: () => resolverPastaUpload('videos-boost', 'BOOST_VIDEOS_DIR'),

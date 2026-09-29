@@ -1,4 +1,4 @@
-import { mascararSegredosNaUrl } from './mail.service';
+import { MailService, mascararSegredosNaUrl } from './mail.service';
 
 /**
  * O link de redefinição de senha carrega um token que vale por 1 hora e dá
@@ -44,5 +44,55 @@ describe('mascararSegredosNaUrl', () => {
     // `csrftoken=` não casa: a regex exige o nome exato depois de ? ou &.
     const texto = 'https://app?csrftoken=abc';
     expect(mascararSegredosNaUrl(texto)).toBe(texto);
+  });
+});
+
+/**
+ * `status()`/`enviarTeste()` alimentam a seção "E-mail" de `/settings`
+ * (só admin, ver `roster-hub/configuracoes`). Nunca expõem SMTP_USER/SMTP_PASS —
+ * só o suficiente pra confirmar "está configurado, e é isto aqui".
+ */
+describe('MailService.status/enviarTeste', () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it('reporta não configurado quando SMTP_HOST está ausente', () => {
+    delete process.env.SMTP_HOST;
+    const service = new MailService();
+    expect(service.status()).toEqual({
+      configurado: false,
+      host: null,
+      porta: null,
+      seguro: false,
+      remetente: 'Rooster One <no-reply@rooster.local>',
+      modoDev: true,
+    });
+  });
+
+  it('reporta configurado com host/porta/remetente quando SMTP_HOST está definido', () => {
+    process.env.SMTP_HOST = 'smtp.exemplo.com';
+    process.env.SMTP_PORT = '2525';
+    process.env.SMTP_SECURE = 'true';
+    process.env.MAIL_FROM = 'Instituição <no-reply@instituicao.edu>';
+    const service = new MailService();
+    expect(service.status()).toEqual({
+      configurado: true,
+      host: 'smtp.exemplo.com',
+      porta: 2525,
+      seguro: true,
+      remetente: 'Instituição <no-reply@instituicao.edu>',
+      modoDev: true,
+    });
+  });
+
+  it('enviarTeste rejeita com mensagem clara quando SMTP não está configurado', async () => {
+    delete process.env.SMTP_HOST;
+    const service = new MailService();
+    await expect(service.enviarTeste('alguem@exemplo.com')).rejects.toThrow(
+      'SMTP não configurado neste ambiente. Defina SMTP_HOST no servidor para habilitar o envio.',
+    );
   });
 });

@@ -87,6 +87,7 @@ Documentação completa no repositório do frontend: [`RoosterOneFrontEnd-main/d
 - [CI/CD](operations/05-cicd.md)
 - [Backup e Recuperação](operations/06-backup-e-recuperacao.md)
 - [Troubleshooting](operations/07-troubleshooting.md)
+- [Requisitos de hardware](operations/08-requisitos-de-hardware.md)
 
 ## Diagramas
 

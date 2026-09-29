@@ -346,6 +346,7 @@ export class RoosterDeskService implements OnModuleInit {
             usuarioId: destinatarioId,
             titulo: 'Nova mensagem no seu chamado',
             mensagem: dto.mensagem.slice(0, 140),
+            rota: `/desk/tickets/${ticketId}`,
             criadoEm: new Date(),
           },
         });

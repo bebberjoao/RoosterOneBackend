@@ -8,11 +8,12 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
 import { NotificacoesService } from '../roster-hub/notificacoes/notificacoes.service';
+import { AuditoriaService } from '../roster-hub/shared/auditoria.service';
 import { PaginacaoQueryDto, montarPagina, pediuPaginacao, prismaSkipTake } from '../common/pagination';
 import {
   AtribuirDescontoDto, CancelarCobrancaDto, CreateCobrancaDto, CreateDescontoDto,
-  CreateProdutoDto, CreateServicoDto, GerarLoteMensalidadeDto, MarcarPagoDto,
-  NegociarCobrancaDto, UpdateCobrancaDto, UpdateDescontoDto, UpdateProdutoDto, UpdateServicoDto,
+  CreatePoliticaMultaJurosDto, CreateProdutoDto, CreateServicoDto, GerarLoteMensalidadeDto, MarcarPagoDto,
+  NegociarCobrancaDto, UpdateCobrancaDto, UpdateDescontoDto, UpdatePoliticaMultaJurosDto, UpdateProdutoDto, UpdateServicoDto,
 } from './dto/finance.dto';
 
 type CobrancaComoStatus = { status: string; vencimento: Date };
@@ -22,12 +23,13 @@ export class FinanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificacoes: NotificacoesService,
+    private readonly auditoria: AuditoriaService,
   ) {}
 
   /** Avisa o aluno (via o Usuario do Hub vinculado a ele) sobre algo na cobrança dele. */
   private async avisarAluno(alunoId: string, titulo: string, mensagem: string) {
     const aluno = await this.prisma.aluno.findUnique({ where: { id: alunoId }, select: { usuarioId: true } });
-    await this.notificacoes.notificar(aluno?.usuarioId, titulo, mensagem);
+    await this.notificacoes.notificar(aluno?.usuarioId, titulo, mensagem, '/student/finance');
   }
 
   private static fmtBRL(v: unknown) {
@@ -83,7 +85,7 @@ export class FinanceService {
     return this.prisma.servico.findMany({ orderBy: { nome: 'asc' } });
   }
   async findOneServico(id: string) {
-    const servico = await this.prisma.servico.findUnique({ where: { id } });
+    const servico = await this.prisma.servico.findUnique({ where: { id }, include: { politicaMultaJuros: true } });
     if (!servico) throw new NotFoundException(`Serviço com id ${id} não encontrado.`);
     return servico;
   }
@@ -101,6 +103,51 @@ export class FinanceService {
       return await this.prisma.servico.delete({ where: { id } });
     } catch (error) {
       this.handleError(error, 'remover serviço');
+    }
+  }
+
+  // ===================== Política de multa/juros (o financeiro cria as próprias regras) =====================
+  async createPoliticaMultaJuros(dto: CreatePoliticaMultaJurosDto, criadoPorId?: string) {
+    try {
+      return await this.prisma.politicaMultaJuros.create({
+        data: { ...dto, criadoPorId, criadoEm: new Date(), atualizadoEm: new Date() },
+      });
+    } catch (error) {
+      this.handleError(error, 'criar política de multa/juros');
+    }
+  }
+  findAllPoliticasMultaJuros() {
+    return this.prisma.politicaMultaJuros.findMany({
+      orderBy: { nome: 'asc' },
+      include: { _count: { select: { servicos: true, cobrancas: true } } },
+    });
+  }
+  async findOnePoliticaMultaJuros(id: string) {
+    const politica = await this.prisma.politicaMultaJuros.findUnique({ where: { id } });
+    if (!politica) throw new NotFoundException(`Política de multa/juros com id ${id} não encontrada.`);
+    return politica;
+  }
+  async updatePoliticaMultaJuros(id: string, dto: UpdatePoliticaMultaJurosDto) {
+    await this.findOnePoliticaMultaJuros(id);
+    try {
+      return await this.prisma.politicaMultaJuros.update({ where: { id }, data: { ...dto, atualizadoEm: new Date() } });
+    } catch (error) {
+      this.handleError(error, 'atualizar política de multa/juros');
+    }
+  }
+  async removePoliticaMultaJuros(id: string) {
+    await this.findOnePoliticaMultaJuros(id);
+    const emUso = await this.prisma.politicaMultaJuros.findUnique({
+      where: { id },
+      select: { _count: { select: { servicos: true, cobrancas: true } } },
+    });
+    if (emUso && (emUso._count.servicos > 0 || emUso._count.cobrancas > 0)) {
+      throw new BadRequestException('Esta política está vinculada a serviços ou cobranças — desvincule antes de excluir.');
+    }
+    try {
+      return await this.prisma.politicaMultaJuros.delete({ where: { id } });
+    } catch (error) {
+      this.handleError(error, 'remover política de multa/juros');
     }
   }
 
@@ -193,8 +240,10 @@ export class FinanceService {
   async createCobranca(dto: CreateCobrancaDto) {
     await this.exigirAluno(dto.alunoId);
     if (dto.produtoId) await this.findOneProduto(dto.produtoId);
-    if (dto.servicoId) await this.findOneServico(dto.servicoId);
+    let servico: { politicaMultaJurosId: string | null } | null = null;
+    if (dto.servicoId) servico = await this.findOneServico(dto.servicoId);
     if (dto.descontoId) await this.findOneDesconto(dto.descontoId);
+    if (dto.politicaMultaJurosId) await this.findOnePoliticaMultaJuros(dto.politicaMultaJurosId);
     let criada;
     try {
       criada = await this.prisma.cobranca.create({
@@ -210,6 +259,8 @@ export class FinanceService {
           valorDesconto: dto.valorDesconto ?? 0,
           vencimento: new Date(dto.vencimento),
           formaPagamento: dto.formaPagamento,
+          // Sem política explícita, herda a do serviço (ex.: mensalidade já nasce com a regra do curso).
+          politicaMultaJurosId: dto.politicaMultaJurosId ?? servico?.politicaMultaJurosId ?? undefined,
           status: 'aberto',
           criadoEm: new Date(),
           atualizadoEm: new Date(),
@@ -253,6 +304,7 @@ export class FinanceService {
   private static readonly INCLUDE_COBRANCA = {
     aluno: { include: { usuario: { select: { id: true, nome: true, email: true } } } },
     notaFiscal: true,
+    politicaMultaJuros: true,
   };
 
   /** Lista completa do filtro, sem paginação — usada internamente (ex.: exportação CSV). */
@@ -290,7 +342,7 @@ export class FinanceService {
     const cobranca = await this.prisma.cobranca.findUnique({
       where: { id },
       include: {
-        aluno: { include: { usuario: { select: { id: true, nome: true, email: true } } } }, produto: true, servico: true, desconto: true, notaFiscal: true,
+        aluno: { include: { usuario: { select: { id: true, nome: true, email: true } } } }, produto: true, servico: true, desconto: true, notaFiscal: true, politicaMultaJuros: true,
       },
     });
     if (!cobranca) throw new NotFoundException(`Cobrança com id ${id} não encontrada.`);
@@ -309,7 +361,7 @@ export class FinanceService {
     }
   }
 
-  async marcarPago(id: string, dto: MarcarPagoDto) {
+  async marcarPago(id: string, dto: MarcarPagoDto, atorId?: string) {
     const cobranca = await this.findOneCobranca(id);
     if (cobranca.status === 'pago') throw new BadRequestException('Esta cobrança já está paga.');
     if (cobranca.status === 'cancelado') throw new BadRequestException('Não é possível marcar uma cobrança cancelada como paga.');
@@ -325,10 +377,13 @@ export class FinanceService {
       },
     });
     await this.avisarAluno(cobranca.alunoId, 'Pagamento confirmado', `${cobranca.descricao} — ${FinanceService.fmtBRL(paga.valorPago)}.`);
+    await this.auditoria.registrar({
+      usuarioId: atorId, modulo: 'Rooster Finance', acao: 'cobranca_marcada_paga', entidade: 'cobranca', entidadeId: id,
+    });
     return paga;
   }
 
-  async negociar(id: string, dto: NegociarCobrancaDto) {
+  async negociar(id: string, dto: NegociarCobrancaDto, atorId?: string) {
     const cobranca = await this.findOneCobranca(id);
     if (cobranca.status === 'pago' || cobranca.status === 'cancelado') {
       throw new BadRequestException('Não é possível negociar uma cobrança paga ou cancelada.');
@@ -348,10 +403,13 @@ export class FinanceService {
       'Cobrança renegociada',
       `${cobranca.descricao} — vence em ${FinanceService.fmtData(negociada.vencimento)}, valor ${FinanceService.fmtBRL(negociada.valorOriginal)}.`,
     );
+    await this.auditoria.registrar({
+      usuarioId: atorId, modulo: 'Rooster Finance', acao: 'cobranca_renegociada', entidade: 'cobranca', entidadeId: id,
+    });
     return negociada;
   }
 
-  async cancelar(id: string, dto: CancelarCobrancaDto) {
+  async cancelar(id: string, dto: CancelarCobrancaDto, atorId?: string) {
     const cobranca = await this.findOneCobranca(id);
     if (cobranca.status === 'pago') throw new BadRequestException('Não é possível cancelar uma cobrança já paga.');
     const cancelada = await this.prisma.cobranca.update({
@@ -359,6 +417,9 @@ export class FinanceService {
       data: { status: 'cancelado', motivoCancelamento: dto.motivo, atualizadoEm: new Date() },
     });
     await this.avisarAluno(cobranca.alunoId, 'Cobrança cancelada', `${cobranca.descricao}. Motivo: ${dto.motivo}`);
+    await this.auditoria.registrar({
+      usuarioId: atorId, modulo: 'Rooster Finance', acao: 'cobranca_cancelada', entidade: 'cobranca', entidadeId: id,
+    });
     return cancelada;
   }
 
@@ -395,6 +456,7 @@ export class FinanceService {
           competencia: dto.competencia,
           servicoId: dto.servicoId,
           descontoId: desconto?.id,
+          politicaMultaJurosId: servico.politicaMultaJurosId ?? undefined,
           valorOriginal,
           valorDesconto,
           vencimento: new Date(dto.vencimento),
@@ -461,7 +523,7 @@ export class FinanceService {
     const fimAno = new Date(hoje.getFullYear() + 1, 0, 1);
     const cobrancasAno = (await this.prisma.cobranca.findMany({
       where: { vencimento: { gte: inicioAno, lt: fimAno } },
-      include: { aluno: { include: { usuario: { select: { id: true, nome: true, email: true } } } } },
+      include: { aluno: { include: { usuario: { select: { id: true, nome: true, email: true } } } }, politicaMultaJuros: true },
       orderBy: { vencimento: 'desc' },
     })).map((c) => ({ ...c, status: this.statusEfetivo(c) }));
 
@@ -493,6 +555,7 @@ export class FinanceService {
     const fimAno = new Date(hoje.getFullYear() + 1, 0, 1);
     const cobrancas = (await this.prisma.cobranca.findMany({
       where: { vencimento: { gte: inicioAno, lt: fimAno } },
+      include: { politicaMultaJuros: true },
     })).map((c) => ({ ...c, status: this.statusEfetivo(c) }));
     return this.agruparPorMes(cobrancas);
   }
@@ -503,6 +566,7 @@ export class FinanceService {
     const fimAno = new Date(hoje.getFullYear() + 1, 0, 1);
     const cobrancas = (await this.prisma.cobranca.findMany({
       where: { vencimento: { gte: inicioAno, lt: fimAno } },
+      include: { politicaMultaJuros: true },
     })).map((c) => ({ ...c, status: this.statusEfetivo(c) }));
     const meses = this.agruparPorMes(cobrancas);
     return meses.map((m) => ({ mes: m.mes, entradas: m.recebido, pendente: m.previsto - m.recebido }));
@@ -514,6 +578,7 @@ export class FinanceService {
     const fimAno = new Date(hoje.getFullYear() + 1, 0, 1);
     const cobrancas = (await this.prisma.cobranca.findMany({
       where: { vencimento: { gte: inicioAno, lt: fimAno } },
+      include: { politicaMultaJuros: true },
     })).map((c) => ({ ...c, status: this.statusEfetivo(c) }));
     const total = this.somaValores(cobrancas.filter((c) => c.status !== 'cancelado'));
     const vencido = this.somaValores(cobrancas.filter((c) => c.status === 'vencido'));
@@ -526,7 +591,7 @@ export class FinanceService {
   async findCobrancasDoAluno(alunoId: string) {
     const cobrancas = await this.prisma.cobranca.findMany({
       where: { alunoId },
-      include: { notaFiscal: true },
+      include: { notaFiscal: true, politicaMultaJuros: true },
       orderBy: { vencimento: 'desc' },
     });
     return cobrancas.map((c) => ({ ...c, status: this.statusEfetivo(c) }));
@@ -539,15 +604,37 @@ export class FinanceService {
     return c.status;
   }
 
-  private valorDevido(c: { valorOriginal: unknown; valorDesconto: unknown; multa: unknown; juros: unknown }): number {
-    return Number(c.valorOriginal) - Number(c.valorDesconto) + Number(c.multa) + Number(c.juros);
+  /**
+   * Multa/juros MANUAIS (colunas `multa`/`juros`, digitados pela equipe) sempre têm prioridade.
+   * Sem valor manual e com uma política vinculada, calcula dinamicamente a partir do vencimento —
+   * nunca grava o resultado na cobrança (RN030: derivado, nunca persistido), então uma política
+   * editada depois muda o valor de cobranças em aberto automaticamente, sem migração de dado.
+   */
+  private valorDevido(c: {
+    valorOriginal: unknown; valorDesconto: unknown; multa: unknown; juros: unknown;
+    vencimento?: Date; status?: string;
+    politicaMultaJuros?: { percentualMulta: unknown; percentualJurosDia: unknown; diasCarencia: number } | null;
+  }): number {
+    const base = Number(c.valorOriginal) - Number(c.valorDesconto);
+    if (Number(c.multa) > 0 || Number(c.juros) > 0) {
+      return base + Number(c.multa) + Number(c.juros);
+    }
+    if (c.politicaMultaJuros && c.vencimento && c.status !== 'pago' && c.status !== 'cancelado') {
+      const diasAtraso = Math.floor((Date.now() - c.vencimento.getTime()) / 86_400_000) - c.politicaMultaJuros.diasCarencia;
+      if (diasAtraso > 0) {
+        const multaCalc = base * (Number(c.politicaMultaJuros.percentualMulta) / 100);
+        const jurosCalc = base * (Number(c.politicaMultaJuros.percentualJurosDia) / 100) * diasAtraso;
+        return base + multaCalc + jurosCalc;
+      }
+    }
+    return base;
   }
 
-  private somaValores(cobrancas: { valorOriginal: unknown; valorDesconto: unknown; multa: unknown; juros: unknown }[]): number {
+  private somaValores(cobrancas: Parameters<FinanceService['valorDevido']>[0][]): number {
     return cobrancas.reduce((s, c) => s + this.valorDevido(c), 0);
   }
 
-  private agruparPorMes(cobrancas: { vencimento: Date; status: string; valorPago: unknown; valorOriginal: unknown; valorDesconto: unknown; multa: unknown; juros: unknown }[]) {
+  private agruparPorMes(cobrancas: (Parameters<FinanceService['valorDevido']>[0] & { vencimento: Date; status: string; valorPago: unknown })[]) {
     const nomes = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
     return nomes.map((mes, i) => {
       const doMes = cobrancas.filter((c) => c.vencimento.getMonth() === i && c.status !== 'cancelado');

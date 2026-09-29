@@ -4,11 +4,11 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { randomUUID } from 'crypto';
-import { extname, join } from 'path';
+import { memoryStorage } from 'multer';
+import { join } from 'path';
 import { ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PaginacaoQueryDto } from '../common/pagination';
+import { escreverDocumentoEncriptado, lerDocumentoDescriptografado } from '../common/file-encryption.util';
 import {
   CreateAnexoTicketDto, CreateAvaliacaoTicketDto, CreateCategoriaTicketDto,
   CreateHistoricoTicketDto, CreateMensagemChamadoDto, CreatePrioridadeTicketDto,
@@ -23,7 +23,7 @@ import { MensagensGateway } from './mensagens.gateway';
 import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
-import { PASTAS } from '../common/storage.config';
+import { PASTAS, MIMETYPES_DOCUMENTO, criarFiltroMimetype } from '../common/storage.config';
 
 const MODULO = 'Rooster Desk';
 const TELA_TICKETS = '/desk/tickets';
@@ -384,11 +384,9 @@ export class RoosterDeskController {
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
     FileInterceptor('arquivo', {
-      storage: diskStorage({
-        destination: UPLOADS_DIR,
-        filename: (_req, file, cb) => cb(null, `${randomUUID()}${extname(file.originalname)}`),
-      }),
+      storage: memoryStorage(),
       limits: { fileSize: MAX_ANEXO_BYTES },
+      fileFilter: criarFiltroMimetype(MIMETYPES_DOCUMENTO),
     }),
   )
   async uploadAnexoChamado(
@@ -396,10 +394,13 @@ export class RoosterDeskController {
     @Param('id') id: string,
     @UploadedFile() arquivo?: Express.Multer.File,
   ) {
-    if (!arquivo) throw new BadRequestException('Nenhum arquivo enviado (campo "arquivo").');
+    if (!arquivo) throw new BadRequestException('Nenhum arquivo enviado, ou formato não aceito (campo "arquivo").');
+    const { filename } = escreverDocumentoEncriptado(UPLOADS_DIR, arquivo.originalname, arquivo.buffer);
     const usuarioId = (request.user as { id: string }).id;
     const isAdmin = await this.usuariosService.isAdmin(usuarioId);
-    return this.service.createAnexoChamado(id, usuarioId, isAdmin, arquivo);
+    return this.service.createAnexoChamado(id, usuarioId, isAdmin, {
+      originalname: arquivo.originalname, filename, mimetype: arquivo.mimetype, size: arquivo.size,
+    });
   }
 
   @Get('chamados/:id/anexos/:anexoId/arquivo')
@@ -415,7 +416,9 @@ export class RoosterDeskController {
     const isAdmin = await this.usuariosService.isAdmin(usuarioId);
     const anexo = await this.service.getAnexoParaDownload(id, anexoId, usuarioId, isAdmin);
     if (!anexo.caminho) throw new NotFoundException('Arquivo não encontrado.');
-    return response.download(join(UPLOADS_DIR, anexo.caminho), anexo.nomeArquivo ?? anexo.caminho);
+    const nome = (anexo.nomeArquivo ?? anexo.caminho).replace(/["\\]/g, '_');
+    response.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
+    return response.type(anexo.caminho).send(lerDocumentoDescriptografado(join(UPLOADS_DIR, anexo.caminho)));
   }
 
   @Post('anexos-tickets')

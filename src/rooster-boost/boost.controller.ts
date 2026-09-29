@@ -5,9 +5,8 @@ import {
 import type { Request, Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtService } from '@nestjs/jwt';
-import { diskStorage } from 'multer';
-import { randomUUID } from 'crypto';
-import { extname, join } from 'path';
+import { memoryStorage } from 'multer';
+import { join } from 'path';
 import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
@@ -16,7 +15,8 @@ import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
 import { AcademyService } from '../rooster-academy/academy.service';
 import { BoostService } from './boost.service';
 import { BoostChatGateway } from './boost-chat.gateway';
-import { PASTAS } from '../common/storage.config';
+import { PASTAS, MIMETYPES_DOCUMENTO, criarFiltroMimetype } from '../common/storage.config';
+import { escreverDocumentoEncriptado, lerDocumentoDescriptografado, storageVideoEncriptado } from '../common/file-encryption.util';
 import { PaginacaoQueryDto } from '../common/pagination';
 import { enviarVideoComRange } from '../common/video-stream.util';
 import { emitirTokenDeStream, validarTokenDeStream } from '../common/stream-token.util';
@@ -159,14 +159,18 @@ export class BoostController {
   @ApiOperation({ summary: 'Envia um material de apoio (até 25MB) para a aula' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('arquivo', {
-    storage: diskStorage({ destination: MATERIAIS_DIR, filename: (_req, file, cb) => cb(null, `${randomUUID()}${extname(file.originalname)}`) }),
+    storage: memoryStorage(),
     limits: { fileSize: MAX_MATERIAL_BYTES },
+    fileFilter: criarFiltroMimetype(MIMETYPES_DOCUMENTO),
   }))
   async uploadMaterial(@Req() request: Request, @Param('id') aulaId: string, @UploadedFile() arquivo?: Express.Multer.File) {
-    if (!arquivo) throw new BadRequestException('Nenhum arquivo enviado (campo "arquivo").');
+    if (!arquivo) throw new BadRequestException('Nenhum arquivo enviado, ou formato não aceito (campo "arquivo").');
     const cursoId = await this.boostService.cursoIdDaAula(aulaId);
     await this.exigirPermissao((request.user as AuthedUser).id, 'gerenciar-conteudo');
-    return this.boostService.createMaterial(aulaId, arquivo);
+    const { filename } = escreverDocumentoEncriptado(MATERIAIS_DIR, arquivo.originalname, arquivo.buffer);
+    return this.boostService.createMaterial(aulaId, {
+      originalname: arquivo.originalname, filename, mimetype: arquivo.mimetype, size: arquivo.size,
+    });
   }
 
   @Delete('materiais-boost/:id')
@@ -182,7 +186,9 @@ export class BoostController {
     const cursoId = await this.boostService.cursoIdDoMaterial(id);
     await this.exigirPermissao((request.user as AuthedUser).id, 'gerenciar-conteudo');
     const material = await this.boostService.findOneMaterial(id);
-    return response.download(join(MATERIAIS_DIR, material.caminho), material.nome);
+    const nome = material.nome.replace(/["\\]/g, '_');
+    response.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
+    return response.type(material.caminho).send(lerDocumentoDescriptografado(join(MATERIAIS_DIR, material.caminho)));
   }
 
   // ===================== Vídeo hospedado =====================
@@ -190,7 +196,7 @@ export class BoostController {
   @ApiOperation({ summary: 'Envia o vídeo hospedado da aula (até 2GB; mp4, webm ou mov)' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('arquivo', {
-    storage: diskStorage({ destination: VIDEOS_DIR, filename: (_req, file, cb) => cb(null, `${randomUUID()}${extname(file.originalname)}`) }),
+    storage: storageVideoEncriptado(() => VIDEOS_DIR),
     limits: { fileSize: MAX_VIDEO_BYTES },
     fileFilter: (_req, file, cb) => cb(null, MIMETYPES_VIDEO.includes(file.mimetype)),
   }))
@@ -290,15 +296,15 @@ export class BoostController {
   @Patch('boost-alunos-externos/:id')
   @RequirePermission(MODULO, TELA_STUDENTS, 'gerenciar')
   @ApiOperation({ summary: 'Ativa ou desativa uma conta externa' })
-  toggleAtivoBoostUsuario(@Param('id') id: string, @Body() dto: ToggleAtivoBoostUsuarioDto) {
-    return this.boostService.toggleAtivoBoostUsuario(id, dto.ativo);
+  toggleAtivoBoostUsuario(@Req() request: Request, @Param('id') id: string, @Body() dto: ToggleAtivoBoostUsuarioDto) {
+    return this.boostService.toggleAtivoBoostUsuario(id, dto.ativo, (request.user as AuthedUser).id);
   }
 
   @Post('boost-alunos-externos/:id/redefinir-senha')
   @RequirePermission(MODULO, TELA_STUDENTS, 'gerenciar')
   @ApiOperation({ summary: 'Gera uma senha temporária para a conta externa (devolvida uma única vez)' })
-  redefinirSenhaBoostUsuario(@Param('id') id: string) {
-    return this.boostService.redefinirSenhaBoostUsuario(id);
+  redefinirSenhaBoostUsuario(@Req() request: Request, @Param('id') id: string) {
+    return this.boostService.redefinirSenhaBoostUsuario(id, (request.user as AuthedUser).id);
   }
 
   // ===================== Helpers de escopo =====================

@@ -6,6 +6,8 @@ O que ainda não existe é o ambiente provisionado: as máquinas de teste foram 
 
 ## Pré-requisitos no servidor
 
+Dimensionamento de CPU/RAM/disco (medido, não chutado) em `docs/operations/08-requisitos-de-hardware.md`.
+
 | Item | Observação |
 |---|---|
 | Windows Server | Ambiente alvo definido para os locais de teste |

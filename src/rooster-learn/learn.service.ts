@@ -7,11 +7,15 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
+import { NotificacoesService } from '../roster-hub/notificacoes/notificacoes.service';
 import { CorrigirEntregaDto, CreateAtividadeDto, EnviarEntregaDto, UpdateAtividadeDto } from './dto/learn.dto';
 
 @Injectable()
 export class LearnService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificacoes: NotificacoesService,
+  ) {}
 
   // ===================== Atividade =====================
   async createAtividade(dto: CreateAtividadeDto, professorId?: string) {
@@ -70,7 +74,7 @@ export class LearnService {
     const atividade = await this.findOneAtividade(id);
     if (atividade.status === 'publicada') return atividade;
 
-    return this.prisma.$transaction(async (tx) => {
+    const publicada = await this.prisma.$transaction(async (tx) => {
       const publicada = await tx.atividade.update({
         where: { id },
         data: { status: 'publicada', publicadoEm: new Date() },
@@ -92,6 +96,24 @@ export class LearnService {
 
       return publicada;
     });
+
+    await this.avisarTurmaSobreAtividade(atividade);
+    return publicada;
+  }
+
+  /** Avisa quem está matriculado na turma — chamado depois de publicar, fora da transação (não é crítico). */
+  private async avisarTurmaSobreAtividade(atividade: { turmaId: string; titulo: string; tipo: string; turma?: { disciplina?: { nome: string } | null } | null }) {
+    const matriculas = await this.prisma.matricula.findMany({
+      where: { turmaId: atividade.turmaId, status: 'ativa' },
+      include: { aluno: { select: { usuarioId: true } } },
+    });
+    const rotulo = atividade.tipo === 'material' ? 'Novo material' : 'Nova atividade';
+    const disciplina = atividade.turma?.disciplina?.nome ?? 'sua turma';
+    await Promise.all(
+      matriculas.map((m) =>
+        this.notificacoes.notificar(m.aluno.usuarioId, rotulo, `${atividade.titulo} — ${disciplina}.`, '/learn/student'),
+      ),
+    );
   }
 
   // ===================== Entrega =====================
@@ -176,13 +198,16 @@ export class LearnService {
    * avaliativo `origem: 'learn'` ligado a esta atividade), se existir.
    */
   async corrigirEntrega(entregaId: string, corrigidoPorId: string, dto: CorrigirEntregaDto) {
-    const entrega = await this.prisma.entrega.findUnique({ where: { id: entregaId }, include: { atividade: { include: { itemAvaliativo: true } } } });
+    const entrega = await this.prisma.entrega.findUnique({
+      where: { id: entregaId },
+      include: { atividade: { include: { itemAvaliativo: true } }, aluno: { select: { usuarioId: true } } },
+    });
     if (!entrega) throw new NotFoundException(`Entrega com id ${entregaId} não encontrada.`);
     if (Number(dto.nota) > Number(entrega.atividade.notaMaxima)) {
       throw new BadRequestException(`A nota não pode exceder o valor máximo da atividade (${entrega.atividade.notaMaxima}).`);
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const corrigida = await this.prisma.$transaction(async (tx) => {
       const corrigida = await tx.entrega.update({
         where: { id: entregaId },
         data: { status: 'corrigida', nota: dto.nota, feedback: dto.feedback, corrigidoPorId, corrigidoEm: new Date() },
@@ -198,6 +223,9 @@ export class LearnService {
 
       return corrigida;
     });
+
+    await this.notificacoes.notificar(entrega.aluno.usuarioId, 'Atividade corrigida', `${entrega.atividade.titulo}: nota ${dto.nota}.`, '/learn/student');
+    return corrigida;
   }
 
   // ===================== Anexo de entrega =====================

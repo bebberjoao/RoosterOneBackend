@@ -80,7 +80,84 @@ export class LogsAuditoriaService {
   // Regras de Negócio
   // =====================================================
 
-  // Seção preparada para futuras regras.
+  private whereRelatorio(filtros: { de?: string; ate?: string; modulo?: string; usuarioId?: string }): Prisma.LogAuditoriaWhereInput {
+    return {
+      ...(filtros.modulo ? { modulo: filtros.modulo } : {}),
+      ...(filtros.usuarioId ? { usuarioId: filtros.usuarioId } : {}),
+      ...(filtros.de || filtros.ate
+        ? {
+            criadoEm: {
+              ...(filtros.de ? { gte: new Date(filtros.de) } : {}),
+              ...(filtros.ate ? { lte: new Date(filtros.ate) } : {}),
+            },
+          }
+        : {}),
+    };
+  }
+
+  /**
+   * Resumo agregado (sempre calculado no banco, nunca em memória — mesma disciplina do Finance):
+   * total no período, distribuição por módulo e por ação, os usuários mais ativos e os eventos
+   * mais recentes que batem o filtro. É a base do relatório de auditoria (item 380 do Índice de
+   * Pendências: "auditoria de leitura de dado pessoal" continua fora — isto cobre AÇÕES
+   * administrativas/financeiras/acadêmicas registradas, não leitura).
+   */
+  async relatorio(filtros: { de?: string; ate?: string; modulo?: string; usuarioId?: string } = {}) {
+    const where = this.whereRelatorio(filtros);
+
+    const [total, porModulo, porAcao, porUsuarioRaw, recentes] = await Promise.all([
+      this.prisma.logAuditoria.count({ where }),
+      this.prisma.logAuditoria.groupBy({ by: ['modulo'], where, _count: { _all: true }, orderBy: { _count: { modulo: 'desc' } } }),
+      this.prisma.logAuditoria.groupBy({ by: ['acao'], where, _count: { _all: true }, orderBy: { _count: { acao: 'desc' } } }),
+      this.prisma.logAuditoria.groupBy({ by: ['usuarioId'], where, _count: { _all: true }, orderBy: { _count: { usuarioId: 'desc' } }, take: 15 }),
+      this.prisma.logAuditoria.findMany({
+        where, orderBy: { criadoEm: 'desc' }, take: 50,
+        include: { usuario: { select: { id: true, nome: true } } },
+      }),
+    ]);
+
+    const usuarioIds = porUsuarioRaw.map((r) => r.usuarioId).filter((id): id is string => !!id);
+    const usuarios = usuarioIds.length
+      ? await this.prisma.usuario.findMany({ where: { id: { in: usuarioIds } }, select: { id: true, nome: true } })
+      : [];
+    const nomePorId = new Map(usuarios.map((u) => [u.id, u.nome]));
+
+    return {
+      total,
+      porModulo: porModulo.map((r) => ({ modulo: r.modulo ?? '(sem módulo)', total: r._count._all })),
+      porAcao: porAcao.map((r) => ({ acao: r.acao ?? '(sem ação)', total: r._count._all })),
+      porUsuario: porUsuarioRaw.map((r) => ({
+        usuarioId: r.usuarioId,
+        nome: r.usuarioId ? (nomePorId.get(r.usuarioId) ?? '—') : '(sem usuário — ex.: login com e-mail inexistente)',
+        total: r._count._all,
+      })),
+      recentes,
+    };
+  }
+
+  /** Exportação sem paginação de propósito — o CSV precisa do conjunto completo do filtro. */
+  async exportarCsv(filtros: { de?: string; ate?: string; modulo?: string; usuarioId?: string } = {}) {
+    const linhas = await this.prisma.logAuditoria.findMany({
+      where: this.whereRelatorio(filtros),
+      orderBy: { criadoEm: 'desc' },
+      include: { usuario: { select: { nome: true } } },
+    });
+    const csv = [
+      'data,modulo,acao,entidade,entidadeId,usuario,ip',
+      ...linhas.map((l) =>
+        [
+          l.criadoEm?.toISOString() ?? '',
+          l.modulo ?? '',
+          l.acao ?? '',
+          l.entidade ?? '',
+          l.entidadeId ?? '',
+          `"${l.usuario?.nome ?? ''}"`,
+          l.ip ?? '',
+        ].join(','),
+      ),
+    ];
+    return csv.join('\n');
+  }
 
   // =====================================================
   // Métodos Auxiliares privados

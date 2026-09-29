@@ -12,10 +12,12 @@ import { AcademyService } from '../rooster-academy/academy.service';
 import { FinanceService } from './finance.service';
 import { NotaFiscalService, NOTAS_FISCAIS_DIR } from './notafiscal.service';
 import { BoletoService } from './boleto.service';
+import { lerDocumentoDescriptografado } from '../common/file-encryption.util';
 import {
-  AtribuirDescontoDto, CancelarCobrancaDto, CreateCobrancaDto, CreateDescontoDto, CreateProdutoDto,
-  CreateServicoDto, GerarLoteMensalidadeDto, MarcarPagoDto, NegociarCobrancaDto, UpdateCobrancaDto,
-  UpdateDescontoDto, UpdateProdutoDto, UpdateServicoDto,
+  AtribuirDescontoDto, CancelarCobrancaDto, CreateCobrancaDto, CreateDescontoDto,
+  CreatePoliticaMultaJurosDto, CreateProdutoDto, CreateServicoDto, GerarLoteMensalidadeDto, MarcarPagoDto,
+  NegociarCobrancaDto, UpdateCobrancaDto, UpdateDescontoDto, UpdatePoliticaMultaJurosDto, UpdateProdutoDto,
+  UpdateServicoDto,
 } from './dto/finance.dto';
 
 const MODULO = 'Rooster Finance';
@@ -28,6 +30,7 @@ const TELA_SERVICES = '/finance/services';
 const TELA_NFE = '/finance/nfe';
 const TELA_REPORTS = '/finance/reports';
 const TELA_DISCOUNTS = '/finance/discounts';
+const TELA_POLICIES = '/finance/policies';
 
 type AuthedUser = { id: string };
 
@@ -119,6 +122,28 @@ export class FinanceController {
   @RequirePermission(MODULO, TELA_SERVICES, 'excluir')
   removeServico(@Param('id') id: string) { return this.financeService.removeServico(id); }
 
+  // ===================== Políticas de multa/juros =====================
+  // O próprio financeiro cria e mantém as regras — não é um valor fixo no código (RN043).
+  @Post('politicas-multa-juros')
+  @RequirePermission(MODULO, TELA_POLICIES, 'criar')
+  createPoliticaMultaJuros(@Req() request: Request, @Body() dto: CreatePoliticaMultaJurosDto) {
+    return this.financeService.createPoliticaMultaJuros(dto, (request.user as AuthedUser).id);
+  }
+  @Get('politicas-multa-juros')
+  @RequirePermission(MODULO, TELA_POLICIES, 'acessar')
+  findAllPoliticasMultaJuros() { return this.financeService.findAllPoliticasMultaJuros(); }
+  @Get('politicas-multa-juros/:id')
+  @RequirePermission(MODULO, TELA_POLICIES, 'acessar')
+  findOnePoliticaMultaJuros(@Param('id') id: string) { return this.financeService.findOnePoliticaMultaJuros(id); }
+  @Patch('politicas-multa-juros/:id')
+  @RequirePermission(MODULO, TELA_POLICIES, 'editar')
+  updatePoliticaMultaJuros(@Param('id') id: string, @Body() dto: UpdatePoliticaMultaJurosDto) {
+    return this.financeService.updatePoliticaMultaJuros(id, dto);
+  }
+  @Delete('politicas-multa-juros/:id')
+  @RequirePermission(MODULO, TELA_POLICIES, 'excluir')
+  removePoliticaMultaJuros(@Param('id') id: string) { return this.financeService.removePoliticaMultaJuros(id); }
+
   // ===================== Descontos =====================
   @Post('descontos')
   @RequirePermission(MODULO, TELA_DISCOUNTS, 'criar')
@@ -179,15 +204,21 @@ export class FinanceController {
 
   @Post('cobrancas/:id/marcar-pago')
   @RequirePermission(MODULO, TELA_CHARGES, 'marcar-pago')
-  marcarPago(@Param('id') id: string, @Body() dto: MarcarPagoDto) { return this.financeService.marcarPago(id, dto); }
+  marcarPago(@Req() request: Request, @Param('id') id: string, @Body() dto: MarcarPagoDto) {
+    return this.financeService.marcarPago(id, dto, (request.user as AuthedUser).id);
+  }
 
   @Post('cobrancas/:id/negociar')
   @RequirePermission(MODULO, TELA_CHARGES, 'negociar')
-  negociar(@Param('id') id: string, @Body() dto: NegociarCobrancaDto) { return this.financeService.negociar(id, dto); }
+  negociar(@Req() request: Request, @Param('id') id: string, @Body() dto: NegociarCobrancaDto) {
+    return this.financeService.negociar(id, dto, (request.user as AuthedUser).id);
+  }
 
   @Post('cobrancas/:id/cancelar')
   @RequirePermission(MODULO, TELA_CHARGES, 'cancelar')
-  cancelar(@Param('id') id: string, @Body() dto: CancelarCobrancaDto) { return this.financeService.cancelar(id, dto); }
+  cancelar(@Req() request: Request, @Param('id') id: string, @Body() dto: CancelarCobrancaDto) {
+    return this.financeService.cancelar(id, dto, (request.user as AuthedUser).id);
+  }
 
   @Post('cobrancas/gerar-lote')
   @RequirePermission(MODULO, TELA_TUITIONS, 'gerar-lote')
@@ -223,7 +254,8 @@ export class FinanceController {
   @RequirePermission(MODULO, TELA_NFE, 'acessar')
   async baixarNotaFiscalPdf(@Res() response: Response, @Param('id') id: string) {
     const nota = await this.notaFiscalService.findOne(id);
-    return response.download(join(NOTAS_FISCAIS_DIR, nota.caminhoPdf), `${nota.numero}.pdf`);
+    response.setHeader('Content-Disposition', `attachment; filename="${nota.numero}.pdf"`);
+    return response.type('.pdf').send(lerDocumentoDescriptografado(join(NOTAS_FISCAIS_DIR, nota.caminhoPdf)));
   }
 
   @Get('notas-fiscais/:id/xml')
@@ -231,7 +263,8 @@ export class FinanceController {
   async baixarNotaFiscalXml(@Res() response: Response, @Param('id') id: string) {
     const nota = await this.notaFiscalService.findOne(id);
     const nomeXml = nota.caminhoPdf.replace(/\.pdf$/, '.xml');
-    return response.download(join(NOTAS_FISCAIS_DIR, nomeXml), `${nota.numero}.xml`);
+    response.setHeader('Content-Disposition', `attachment; filename="${nota.numero}.xml"`);
+    return response.type('.xml').send(lerDocumentoDescriptografado(join(NOTAS_FISCAIS_DIR, nomeXml)));
   }
 
   // ===================== Portal do aluno (`/financeiro/me/*`) =====================
@@ -270,7 +303,8 @@ export class FinanceController {
     const cobranca = await this.financeService.findOneCobranca(id);
     if (cobranca.alunoId !== aluno.id) throw new ForbiddenException('Esta cobrança não pertence ao aluno autenticado.');
     if (!cobranca.notaFiscal) throw new ForbiddenException('Nenhuma nota fiscal emitida para esta cobrança.');
-    return response.download(join(NOTAS_FISCAIS_DIR, cobranca.notaFiscal.caminhoPdf), `${cobranca.notaFiscal.numero}.pdf`);
+    response.setHeader('Content-Disposition', `attachment; filename="${cobranca.notaFiscal.numero}.pdf"`);
+    return response.type('.pdf').send(lerDocumentoDescriptografado(join(NOTAS_FISCAIS_DIR, cobranca.notaFiscal.caminhoPdf)));
   }
 
   // ===================== Helpers de escopo =====================

@@ -43,6 +43,10 @@ if (-not $env:DATABASE_URL) {
     Write-Error "DATABASE_URL nao definida (nem no ambiente, nem em .env)."
 }
 
+# pg_dump/pg_restore usam libpq puro, que rejeita "?schema=..." (parametro so
+# reconhecido pelo Prisma) com "parametro da consulta de URI invalido".
+$env:DATABASE_URL = $env:DATABASE_URL -replace '\?.*$', ''
+
 if (-not (Get-Command pg_dump -ErrorAction SilentlyContinue)) {
     Write-Error "pg_dump nao encontrado no PATH. Acrescente a pasta bin do PostgreSQL (ex.: C:\Program Files\PostgreSQL\16\bin)."
 }

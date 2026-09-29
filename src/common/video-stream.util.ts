@@ -1,8 +1,9 @@
-import { createReadStream, statSync } from 'fs';
 import type { Request, Response } from 'express';
+import { streamVideoDescriptografado, tamanhoPlaintextVideo } from './file-encryption.util';
 
 /**
- * Serve um arquivo de vídeo com suporte a `Range` (HTTP 206 Partial Content).
+ * Serve um arquivo de vídeo **cifrado em repouso** (AES-256-CTR, ver `file-encryption.util.ts`)
+ * com suporte a `Range` (HTTP 206 Partial Content).
  *
  * Sem isso, um `<video>` de vídeo hospedado (até 2GB) não permite arrastar a
  * barra de progresso: o navegador teria que baixar o arquivo inteiro antes de
@@ -13,11 +14,12 @@ import type { Request, Response } from 'express';
  * Implementa o protocolo mínimo que todo navegador espera de um servidor de
  * mídia: sem `Range`, devolve o arquivo inteiro com `200`; com `Range`,
  * devolve só o pedaço pedido com `206` e os cabeçalhos `Content-Range`/
- * `Accept-Ranges`; com `Range` fora dos limites do arquivo, `416`.
+ * `Accept-Ranges`; com `Range` fora dos limites do arquivo, `416`. O trecho
+ * pedido é decifrado sob demanda — nunca decifra bytes antes do início pedido,
+ * essencial pra um seek no meio de um vídeo de 2GB não reprocessar tudo antes.
  */
 export function enviarVideoComRange(request: Request, response: Response, caminhoArquivo: string, mimeType: string): void {
-  const stat = statSync(caminhoArquivo);
-  const tamanhoTotal = stat.size;
+  const tamanhoTotal = tamanhoPlaintextVideo(caminhoArquivo);
   const range = request.headers.range;
 
   if (!range) {
@@ -26,7 +28,7 @@ export function enviarVideoComRange(request: Request, response: Response, caminh
       'Content-Type': mimeType,
       'Accept-Ranges': 'bytes',
     });
-    createReadStream(caminhoArquivo).pipe(response);
+    streamVideoDescriptografado(caminhoArquivo, 0, tamanhoTotal - 1).pipe(response);
     return;
   }
 
@@ -46,5 +48,5 @@ export function enviarVideoComRange(request: Request, response: Response, caminh
     'Content-Length': fim - inicio + 1,
     'Content-Type': mimeType,
   });
-  createReadStream(caminhoArquivo, { start: inicio, end: fim }).pipe(response);
+  streamVideoDescriptografado(caminhoArquivo, inicio, fim).pipe(response);
 }

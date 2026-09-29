@@ -16,10 +16,11 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:db:push:test": "prisma db push --schema ./prisma/schema.test.prisma",
-    "test:e2e": "cross-env DATABASE_URL=file:./prisma/dev-test.db npm run prisma:db:push:test && cross-env DATABASE_URL=file:./prisma/dev-test.db JWT_SECRET=rooster-e2e-test-secret jest --config ./jest-e2e.json",
+    "test:e2e": "cross-env DATABASE_URL=file:./prisma/dev-test.db npm run prisma:db:push:test && cross-env DATABASE_URL=file:./prisma/dev-test.db JWT_SECRET=rooster-e2e-test-secret FILE_ENCRYPTION_KEY=/JgqJCHHkibI+uTXm5rTjW2UwxVUnXxbWEFvhb3TbfY= jest --config ./jest-e2e.json",
     "test:watch": "jest --config ./jest-unit.json --watch",
     "audit": "npm audit --omit=dev",
-    "test:all": "npm test && npm run test:e2e"
+    "test:all": "npm test && npm run test:e2e",
+    "load-test": "node scripts/load-test.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

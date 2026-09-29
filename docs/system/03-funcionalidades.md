@@ -94,7 +94,7 @@ Não é um módulo NestJS/controller próprio — é o conjunto de rotas `/me/*`
 | RF-S06 | Documentos institucionais | Aluno (`student.documents.acessar`/`enviar`/`baixar`) | Mesmas rotas `/documentos-academicos*` do Academy, liberadas também para quem tem a permissão de aluno (`Rooster Student /student/documents`). `academy.controller.ts` |
 | RF-S07 | Minhas atividades e entregas (Learn) | Aluno (`Rooster Learn /learn/student`) | Ver RF-L05 acima — tecnicamente servido pelo `LearnController`, mas parte da experiência "Rooster Student" no produto. |
 
-**Não implementado** neste portal: notificação de nota lançada e de novo conteúdo (Academy/Learn não emitem notificação). A central de notificações do portal (`/student/notifications`) usa a caixa de entrada real do Hub — cobranças e respostas de chamado/reserva chegam por ela.
+A central de notificações do portal (`/student/notifications`) usa a caixa de entrada real do Hub — cobranças, respostas de chamado/reserva, nota lançada (Academy) e atividade publicada/corrigida (Learn) chegam por ela, cada uma com a rota de origem (clicar navega direto para a tela do evento). **Não implementado**: aviso proativo de prazo de entrega se aproximando — o aluno precisa checar a atividade.
 
 ## Rooster Boost
 

@@ -275,6 +275,7 @@ export class RoomsService {
       horarioFim: dto.horarioFim,
       participantes: dto.participantes,
       status: dto.status ?? 'analise',
+      turma: dto.turmaId ? { connect: { id: dto.turmaId } } : undefined,
       recorrencia: dto.recorrencia ?? 'unica',
       observacoes: dto.observacoes,
       decididoPor: dto.decididoPor,
@@ -353,6 +354,7 @@ export class RoomsService {
             horarioFim: dto.horarioFim,
             participantes: dto.participantes,
             status: dto.status ?? 'analise',
+            turma: dto.turmaId ? { connect: { id: dto.turmaId } } : undefined,
             recorrencia: dto.recorrencia ?? 'semanal',
             serieId,
             serieTotal: datas.length,
@@ -431,7 +433,7 @@ export class RoomsService {
       ...filtroData,
     };
     const orderBy = { criadoEm: 'desc' } as const;
-    const include = { ambiente: true };
+    const include = { ambiente: true, turma: { select: { id: true, codigo: true, disciplina: { select: { nome: true } } } } };
 
     if (!pediuPaginacao(paginacao)) {
       return this.prisma.reserva.findMany({ where, orderBy, include });
@@ -449,6 +451,7 @@ export class RoomsService {
       where: { id },
       include: {
         ambiente: true,
+        turma: { select: { id: true, codigo: true, disciplina: { select: { nome: true } } } },
         historico: { orderBy: { criadoEm: 'asc' }, include: { usuario: { select: { id: true, nome: true } } } },
       },
     });
@@ -576,6 +579,7 @@ export class RoomsService {
           reserva.responsavelId,
           `Reserva ${rotulo}`,
           `${reserva.codigo} — ${atualizada.ambiente?.nome ?? 'ambiente'}, ${reserva.data.toISOString().slice(0, 10)} ${reserva.horarioInicio}-${reserva.horarioFim}.${status === 'cancelada' && motivo ? ` Motivo: ${motivo}` : ''}`,
+          `/rooms/reservations/${reserva.id}`,
         );
       }
     }
@@ -670,6 +674,7 @@ export class RoomsService {
         reserva.responsavelId,
         'Nova resposta na sua reserva',
         `${reserva.codigo}: ${dto.mensagem.slice(0, 140)}`,
+        `/rooms/reservations/${reservaId}`,
       );
     }
     return criada;

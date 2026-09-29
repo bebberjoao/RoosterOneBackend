@@ -12,6 +12,7 @@ import { BoostChatGateway } from '../rooster-boost/boost-chat.gateway';
 import { MATERIAIS_DIR, VIDEOS_DIR } from '../rooster-boost/boost.controller';
 import { CERTIFICADOS_DIR } from '../rooster-boost/certificado-boost.service';
 import { enviarVideoComRange } from '../common/video-stream.util';
+import { lerDocumentoDescriptografado } from '../common/file-encryption.util';
 import { emitirTokenDeStream, validarTokenDeStream } from '../common/stream-token.util';
 import { AtualizarProgressoVideoDto } from '../rooster-boost/dto/boost.dto';
 import { BoostJwtAuthGuard } from './boost-jwt-auth.guard';
@@ -154,7 +155,9 @@ export class BoostPortalController {
   @ApiOperation({ summary: 'Baixa um material de apoio — só o aluno matriculado no curso da aula' })
   async downloadMaterial(@Req() request: Request, @Res() response: Response, @Param('id') id: string) {
     const material = await this.boostPortalService.findMaterialParaDownload(id, (request.user as AuthedBoostUser).id);
-    return response.download(join(MATERIAIS_DIR, material.caminho), material.nome);
+    const nome = material.nome.replace(/["\\]/g, '_');
+    response.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
+    return response.type(material.caminho).send(lerDocumentoDescriptografado(join(MATERIAIS_DIR, material.caminho)));
   }
 
   // ===================== Certificado =====================
@@ -164,6 +167,7 @@ export class BoostPortalController {
   async downloadCertificado(@Req() request: Request, @Res() response: Response, @Param('id') id: string) {
     const certificado = await this.boostPortalService.findCertificadoParaDownload(id, (request.user as AuthedBoostUser).id);
     if (!certificado.caminhoPdf) throw new NotFoundException('Arquivo não encontrado.');
-    return response.download(join(CERTIFICADOS_DIR, certificado.caminhoPdf), `certificado-${certificado.codigo}.pdf`);
+    response.setHeader('Content-Disposition', `attachment; filename="certificado-${certificado.codigo}.pdf"`);
+    return response.type('.pdf').send(lerDocumentoDescriptografado(join(CERTIFICADOS_DIR, certificado.caminhoPdf)));
   }
 }

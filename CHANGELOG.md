@@ -29,6 +29,52 @@ de migration (ver a primeira entrada abaixo); o restante não altera o banco.
 
 ### Adicionado
 
+- **Requisitos de hardware** (`docs/operations/08-requisitos-de-hardware.md`): levantamento medido (não
+  estimado de cabeça) do consumo de CPU/memória do backend em repouso e sob rajada de carga, tamanho real
+  do banco de dados de demonstração, footprint do frontend (hoje uma SPA estática) e do PostgreSQL —
+  com faixas de hardware mínimo recomendado por porte de instituição.
+- **Status e teste de envio de e-mail (SMTP) em Configurações**, visível só para quem administra o
+  sistema (nova permissão `hub.configuracoes.acessar`). Antes não havia nenhuma visibilidade sobre se o
+  SMTP estava configurado — era preciso ler o log do servidor pra descobrir. Agora a seção "E-mail"
+  dentro de `/settings` mostra se está configurado, qual servidor e remetente, e tem um botão "Enviar
+  e-mail de teste" que confirma o envio de verdade. Host/porta/usuário/senha do SMTP continuam só no
+  `.env` do servidor — nenhum segredo de e-mail passou a ser gravado no banco. `GET /configuracoes/email`
+  e `POST /configuracoes/email/teste` (`src/roster-hub/configuracoes/`).
+- **Políticas de multa/juros configuráveis pelo financeiro** (não mais um valor fixo no código).
+  **Exige migration** (`20260928120000_rastreamento_de_erros` cobre também os itens abaixo; a política em si
+  veio em `20260928090000_multa_juros_turma_auditoria_notificacao_rota`). Modelo `PoliticaMultaJuros`
+  (`multa`/`juros por dia`/`dias de carência`, CRUD completo em `/politicas-multa-juros`, nova permissão
+  `finance.policies.*`) pode ser vinculado a um `Servico` (herdado por toda cobrança gerada a partir dele,
+  ex.: mensalidade) ou diretamente a uma `Cobranca`. **Regra: multa/juros definidos manualmente na cobrança
+  sempre vencem o cálculo dinâmico da política** — o cálculo nunca é persistido (mesma disciplina do RN028,
+  "status vencido é sempre derivado"). Tela `/finance/policies` e seletor de política no formulário de
+  Serviço.
+- **Vínculo opcional entre Reserva e Turma** (Rooms ↔ Academy), só no momento de criar a reserva de uma
+  aula: o professor pode vincular uma das *suas próprias* turmas (`GET /turmas?minhas=true`); quem tem
+  `/academy/manage acessar` vincula qualquer turma. Campo `Reserva.turmaId`, formulário de reserva ganha o
+  seletor "Turma" quando a finalidade é "aula", e o detalhe da reserva mostra a turma vinculada.
+- **Relatório de auditoria** (`GET /logs-auditoria/relatorio` e `/exportar`, permissão
+  `hub.acessos.relatorio-auditoria`): total do período, distribuição por módulo/ação, usuários mais ativos e
+  os 50 eventos mais recentes, com exportação em CSV. Painel novo em `/hub/acessos`.
+- **Rastreamento de erros.** Filtro global `AllExceptionsFilter` (substitui o antigo
+  `PrismaExceptionFilter`) persiste em `logs_erro` toda exceção com status **>= 500** — bug de verdade, não
+  recusa esperada (400/401/403/404/409, que nunca é gravada). Guarda método, rota, status, mensagem, stack e
+  o usuário autenticado. Relatório e exportação em `GET /logs-erro/relatorio` e `/exportar`
+  (`hub.acessos.relatorio-erros`), com o mesmo painel em `/hub/acessos`.
+- **Notificação com rota de origem** (coluna `rota` em `Notificacao`): clicar numa notificação agora navega
+  para a tela do evento (reserva, chamado, nota lançada, atividade corrigida) em vez de só marcar como lida.
+- **Validação de mimetype em todo upload de documento** (anexo de chamado, documento acadêmico, entrega do
+  Learn, material de apoio do Boost): antes só o tamanho era limitado, qualquer tipo de arquivo passava
+  (achado registrado em `docs/security/05-analise-de-seguranca.md`). `criarFiltroMimetype` em
+  `src/common/storage.config.ts`, lista `MIMETYPES_DOCUMENTO` (pdf/office/imagem/texto/zip).
+- **`scripts/load-test.mjs`**: teste de carga leve (detector de regressão de desempenho, não benchmark de
+  capacidade), zero dependências, mede p50/p95/p99 e taxa de erro de 5 cenários de leitura e falha o
+  processo (código 1) se estourar limiar configurável — pensado para rodar localmente ou como *gate* de CI.
+  `npm run load-test`.
+- **`scripts/recovery-drill.ps1`**: restaura um backup real (de `backup.ps1`) num banco Postgres
+  **descartável**, confere que as tabelas centrais vieram populadas e que um arquivo referenciado no banco
+  existe de fato no `uploads.zip`, e limpa tudo ao final — nunca toca no banco nem no `uploads/` reais. Prova
+  rotineiramente que os backups são restauráveis, sem o risco/confirmação de `restore.ps1`.
 - **Rooster Boost — gestão por permissão, orientadores e conversa por aluno.** **Exige migration**
   (`20260926120000_boost_gestao_orientadores_conversas`, já com backfill e migração de permissões).
   - **O curso deixa de ter "dono".** Quem tem a ação em `/boost/manage` gere **qualquer** curso
@@ -122,6 +168,31 @@ de migration (ver a primeira entrada abaixo); o restante não altera o banco.
 
 ### Segurança
 
+- **Pentest interno (revisão estática + testes ativos contra o servidor real)** encontrou e corrigiu um
+  IDOR/path traversal armazenado: `POST /anexos-tickets` aceitava um campo `caminho` livre do cliente,
+  gravado sem validação e depois usado para montar o caminho de download — qualquer usuário com a
+  permissão comum `anexar` podia apontar um anexo de ticket próprio para o arquivo de **outro** anexo do
+  sistema (de um ticket ao qual não tinha acesso) e baixá-lo. Corrigido removendo `caminho`/`tipo`/
+  `tamanho` de `CreateAnexoTicketDto` — com `ValidationPipe({forbidNonWhitelisted:true})` já global, isso
+  basta para a requisição ser recusada com `400`. Teste de regressão e2e adicionado. Demais achados
+  (validação de mimetype por `Content-Type` declarado, não por conteúdo real; Swagger público em dev) e
+  as confirmações positivas (JWT, SQL/NoSQL injection, elevação de privilégio, rate limiting, headers,
+  CORS) em `docs/security/06-pentest-2026-09.md`.
+- **Criptografia em repouso de todo arquivo gravado em disco** — anexo de chamado, documento acadêmico,
+  anexo de entrega, material de apoio e vídeo hospedado do Boost, certificado, nota fiscal (PDF+XML). Antes
+  todos ficavam em texto puro em `uploads/`, legíveis por qualquer um com acesso ao disco, a um backup ou a
+  um servidor de arquivo estático mal configurado. `src/common/file-encryption.util.ts` (novo): documentos
+  em AES-256-GCM (autenticado — arquivo adulterado falha ao decifrar em vez de servir lixo); o vídeo do
+  Boost (até 2GB, único que usa HTTP `Range` para a barra de progresso) em AES-256-CTR, que permite decifrar
+  só o trecho pedido sem processar o arquivo inteiro — GCM não permitiria isso sem ler o ciphertext completo
+  primeiro. Nova variável obrigatória `FILE_ENCRYPTION_KEY` (32 bytes em base64), validada com a mesma
+  disciplina do `JWT_SECRET`: a aplicação recusa subir sem ela. **Trade-off aceito conscientemente**: o
+  esquema de vídeo (CTR) não detecta adulteração do arquivo cifrado no disco — ameaça mais estreita (exige
+  acesso de escrita ao servidor) que a que isto resolve. Transparente pra API: nenhum contrato de
+  upload/download mudou, provado pela suíte e2e completa passando sem alteração nas próprias asserções, mais
+  um teste novo que lê o arquivo cru direto do disco e confirma que o conteúdo original não aparece nos
+  bytes gravados. Arquivos já existentes antes desta mudança continuam em texto puro até serem reenviados —
+  sem produção ainda, não há migração retroativa.
 - **Proteção do último administrador**: revogar a permissão de administrador,
   excluir ou desativar o último administrador ativo passou a responder `409`.
   Perder o último era irreversível pela interface — não sobrava ninguém capaz
@@ -135,6 +206,20 @@ de migration (ver a primeira entrada abaixo); o restante não altera o banco.
 
 ### Corrigido
 
+- **`docker-compose.yml` não passava `FILE_ENCRYPTION_KEY` para o container `api`** — regressão da
+  criptografia de arquivo em repouso (acima): desde que `main.ts` passou a exigir essa variável no boot,
+  `docker compose up` quebrava com o container reiniciando em loop. Corrigido no mesmo padrão do
+  `JWT_SECRET` (obrigatória, sem valor padrão embutido).
+- **Criar reserva vinculada a uma turma respondia `500`.** `RoomsService.createReserva`/
+  `createReservaSerie` misturavam sintaxe de relação "checked" (`ambiente: { connect: ... } }`) com o campo
+  escalar `turmaId` no mesmo `data` do Prisma — o cast `as any` escondia o erro do TypeScript, mas o Prisma
+  recusa a mistura em tempo de execução (`PrismaClientValidationError`). Trocado por
+  `turma: { connect: { id } } }`, mesmo padrão do `ambiente`.
+- **`backup.ps1`/`restore.ps1`/`backup.sh`/`restore.sh` falhavam com "parâmetro da consulta de URI
+  inválido"** contra o `DATABASE_URL` real do projeto (`...?schema=public`): `pg_dump`/`pg_restore` usam
+  libpq puro, que não reconhece `schema` — parâmetro só entendido pelo Prisma. A query string passou a ser
+  removida antes de repassar a URL a essas ferramentas. Achado ao validar `recovery-drill.ps1` contra um
+  backup de verdade.
 - **Listas suspensas (categoria, subcategoria, prioridade…) abriam ATRÁS de qualquer janela modal** e
   ficavam inacessíveis: o menu do `SelectInput` usava `z-60` e o modal `z-70`. Subiu para `z-80` (e os
   menus Radix — select, popover, dropdown — também), em todo o sistema, não só no novo chamado.

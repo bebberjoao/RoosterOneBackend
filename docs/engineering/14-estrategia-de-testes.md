@@ -6,12 +6,12 @@ Status: setembro/2026. Descreve o que existe de fato — comandos, camadas, o qu
 
 | Camada | Onde | Comando | Quantidade |
 |---|---|---|---|
-| e2e de API (backend) | `test/*.e2e-spec.ts` | `npm run test:e2e` | 70 testes, 2 arquivos |
-| Unitário (backend) | `src/**/*.spec.ts` | `npm test` | 69 testes, 7 arquivos |
+| e2e de API (backend) | `test/*.e2e-spec.ts` | `npm run test:e2e` | 73 testes, 2 arquivos |
+| Unitário (backend) | `src/**/*.spec.ts` | `npm test` | 90 testes, 9 arquivos |
 | Unitário + componente (frontend) | `src/**/*.test.{ts,tsx}` | `npm test` (no repo do frontend) | 70 testes, 6 arquivos |
 | Acessibilidade (frontend) | `src/components/shared/acessibilidade.test.tsx` | incluída no `npm test` | 12 dos 70 acima |
 
-Total: **209 testes**. No backend, `npm run test:all` roda unitários e e2e em sequência.
+Total: **233 testes**. No backend, `npm run test:all` roda unitários e e2e em sequência.
 
 ### e2e de API — a camada principal
 
@@ -53,8 +53,8 @@ Estado atual: o **frontend está limpo**; o **backend tem 8 avisos** vindos de `
 
 Registrado aqui para não ser lido como esquecimento:
 
-- **Teste de carga/desempenho**: nenhum. Sem ambiente de produção e sem volume real, um número medido na máquina de desenvolvimento não significaria nada. O que existe hoje é a análise de consulta em `09-performance.md`.
-- **Teste de recuperação de desastre**: depende de uma rotina de backup, que ainda não existe (ver Índice de Pendências).
+- **Teste de carga/desempenho**: não faz parte de nenhuma suíte automatizada (não roda em `npm test`/`test:e2e`, não há CI). Existe `scripts/load-test.mjs` (ver `docs/engineering/09-performance.md`) — um detector de regressão de desempenho que pode ser rodado manualmente ou como *gate* separado, não um número de capacidade de produção: sem volume real, isso ainda não significaria nada.
+- **Teste de recuperação de desastre**: não agendado (depende de um ambiente que rode continuamente — ver Índice de Pendências), mas deixou de depender só de execução manual: `scripts/recovery-drill.ps1` restaura um backup de verdade num banco descartável e confere a integridade de forma repetível (ver `docs/operations/06-backup-e-recuperacao.md`).
 - **Teste de interface ponta a ponta (navegador)**: não há Playwright/Cypress. O fluxo de tela é verificado manualmente; o que os testes de frontend cobrem é lógica, componente isolado e acessibilidade da árvore renderizada — não a jornada completa nem a navegação real por teclado.
 - **Teste de responsividade**: não automatizado. O jsdom não faz layout, então não há o que medir; a verificação é manual, em diferentes larguras de viewport.
 - **Teste de penetração e fuzzing**: não realizados. O que existe é a análise de segurança em `docs/security/05-analise-de-seguranca.md`, verificada contra o código, mais a varredura de dependência acima.
@@ -99,6 +99,8 @@ Liga cada regra de negócio numerada (`docs/system/04-regras-de-negocio.md`) ao 
 | RN042 | Certificado por curso: pode não existir; texto do gestor | e2e: "Certificado: desligado, o curso conclui sem emitir (material de apoio); ligado, usa o texto configurado". Unitário: `certificado-boost.service.spec.ts` (`aplicarModelo`) |
 | RN039 | Notificação: cada usuário só lê/marca as próprias; emissão não derruba a operação | e2e: "Caixa de entrada: cada usuário lê e marca só as próprias notificações (sem exigir permissão)" (401 sem token, 404 em notificação alheia) e "Cobrança criada e paga gera notificação para o aluno na caixa de entrada dele — e só dele". Front: `role-context.test.ts` cobre `deriveRole` (perfil deduzido, nunca admin por omissão) e `tempoRelativo` |
 | RN035 | Instituição nunca fica sem administrador | e2e: "Proteção do último administrador: não dá para revogar, excluir nem desativar o único admin ativo". Unitário: `administradores.service.spec.ts` |
+| RN043 | Multa/juros manuais vencem a política; cálculo por política nunca é persistido | e2e: "Política de multa/juros: o financeiro cria a própria regra; ela calcula dinamicamente, mas valor manual sempre vence" (também cobre exclusão bloqueada de política em uso) |
+| RN044 | Vínculo Reserva↔Turma é por posse do professor, ou gestão ampla do Academy | e2e: "Rooms ↔ Academy: ao criar a reserva de uma aula, só o professor dono da turma pode vinculá-la" (dono vincula, outro professor recebe 403, coordenação vincula qualquer turma) |
 
 ### Requisitos não funcionais e de contrato
 
@@ -116,6 +118,8 @@ Liga cada regra de negócio numerada (`docs/system/04-regras-de-negocio.md`) ao 
 | Validação de entrada, regra a regra (DTOs) | Unitário: `validacao-dtos.spec.ts` |
 | Senha mínima igual em todo fluxo que define senha (8 caracteres) | Unitário: `validacao-dtos.spec.ts` ("Senha mínima é a mesma em todo fluxo que define senha") |
 | Acessibilidade dos componentes compartilhados | Frontend: `acessibilidade.test.tsx` (axe-core) |
+| Rastreamento de erros: só status >= 500 é persistido, nunca 400/403/404/409 | Unitário: `all-exceptions.filter.spec.ts` (Prisma P2002/P2025, `HttpException` conhecida e erro genuíno, com/sem persistência). e2e: "Rastreamento de erros: relatório e exportação exigem permissão própria…" (permissão + formato do relatório/CSV) |
+| Criptografia de arquivo em repouso (GCM/documento e CTR/vídeo, transparente na API) | Unitário: `file-encryption.util.spec.ts` (round-trip GCM, detecção de adulteração, round-trip CTR início/fronteira de bloco/fim/arquivo inteiro/byte único) e `video-stream.util.spec.ts` (Range sobre fixture cifrado). e2e: asserção no fluxo de anexo de chamado que lê o arquivo cru direto do disco e confirma que o texto original não aparece nos bytes gravados |
 
 ## Como rodar
 

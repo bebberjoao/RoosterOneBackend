@@ -17,6 +17,7 @@ import { FindReservasQueryDto } from './dto/find-reservas-query.dto';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
+import { AcademyService } from '../rooster-academy/academy.service';
 import { CreateAmbienteDto } from './dto/create-ambiente.dto';
 import { CreateBlocoDto } from './dto/create-bloco.dto';
 import { CreateCampusDto } from './dto/create-campus.dto';
@@ -43,6 +44,7 @@ export class RoomsController {
   constructor(
     private readonly roomsService: RoomsService,
     private readonly usuariosService: UsuariosService,
+    private readonly academyService: AcademyService,
   ) {}
 
   // Campus
@@ -175,6 +177,7 @@ export class RoomsController {
   @ApiBody({ type: CreateReservaDto })
   async createReserva(@Req() request: Request, @Body() dto: CreateReservaDto) {
     await this.assertDentroDoPrazo(request, dto.data);
+    if (dto.turmaId) await this.exigirTurmaValida(request, dto.turmaId);
     return this.roomsService.createReserva(dto);
   }
 
@@ -199,6 +202,7 @@ export class RoomsController {
     }
     // a data que importa pro limite de antecedência é a mais distante da série, não a primeira
     await this.assertDentroDoPrazo(request, dto.repetirAte);
+    if (dto.turmaId) await this.exigirTurmaValida(request, dto.turmaId);
     return this.roomsService.createReservaSerie(dto);
   }
 
@@ -297,6 +301,23 @@ export class RoomsController {
     }
 
     throw new ForbiddenException('Sem permissão para alterar esta reserva.');
+  }
+
+  /**
+   * A reserva é para uma aula: só o professor dono da turma (ou quem gerencia o Academy) pode
+   * vinculá-la ao criar. `Reserva.turmaId` não muda mais depois — vincular é uma decisão do
+   * momento da criação, igual ao pedido original.
+   */
+  private async exigirTurmaValida(request: Request, turmaId: string) {
+    const usuarioId = (request.user as { id?: string } | undefined)?.id;
+    if (!usuarioId) throw new ForbiddenException('Usuário não autenticado.');
+
+    if (await this.usuariosService.hasPermission(usuarioId, 'Rooster Academy', '/academy/manage', 'acessar')) return;
+
+    const professor = await this.academyService.findProfessorByUsuarioId(usuarioId);
+    if (!professor || !(await this.academyService.isTurmaDoProfessor(turmaId, professor.id))) {
+      throw new ForbiddenException('Você só pode vincular uma turma da qual é professor.');
+    }
   }
 
   /**

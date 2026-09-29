@@ -128,11 +128,40 @@ Nota: `PATCH /notificacoes/:id` usa a mesma permissão de leitura (`/hub`, `aces
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
+| GET | `/logs-auditoria/relatorio` | Bearer | Rooster Hub / `/hub/acessos` / `relatorio-auditoria` | Total do período + distribuição por módulo/ação + usuários mais ativos + 50 eventos mais recentes (query `de`/`ate`/`modulo`/`usuarioId` opcionais) |
+| GET | `/logs-auditoria/exportar` | Bearer | Rooster Hub / `/hub/acessos` / `relatorio-auditoria` | Exporta o conjunto completo do filtro em CSV (mesmos query params) |
 | POST | `/logs-auditoria` | Bearer | Rooster Hub / `/hub/acessos` / `gerenciar-permissoes` | Cria log manualmente |
 | GET | `/logs-auditoria` | Bearer | Rooster Hub / `/hub/acessos` / `gerenciar-permissoes` | Lista logs de auditoria; paginação opcional via `pagina`/`limite` (ver `01-visao-geral.md`) |
 | GET | `/logs-auditoria/:id` | Bearer | Rooster Hub / `/hub/acessos` / `gerenciar-permissoes` | Busca log por id |
 | PATCH | `/logs-auditoria/:id` | Bearer | Rooster Hub / `/hub/acessos` / `gerenciar-permissoes` | Atualiza log |
 | DELETE | `/logs-auditoria/:id` | Bearer | Rooster Hub / `/hub/acessos` / `gerenciar-permissoes` | Remove log |
+
+`relatorio`/`exportar` são declaradas antes de `:id` no controller — senão seriam lidas como um id.
+
+### 1.11 Rastreamento de Erros — `LogsErroController`, base `/logs-erro`
+
+Só leitura: os registros são criados exclusivamente pelo `AllExceptionsFilter` global a cada exceção com status `>= 500` — não existe `POST`/`PATCH`/`DELETE`. Ver `docs/backend/11-tratamento-erros.md`.
+
+| Método | Rota | Auth | Permissão exigida | Descrição |
+|---|---|---|---|---|
+| GET | `/logs-erro/relatorio` | Bearer | Rooster Hub / `/hub/acessos` / `relatorio-erros` | Total do período + distribuição por rota/status + 50 mais recentes (query `de`/`ate`/`statusCode`/`usuarioId` opcionais) |
+| GET | `/logs-erro/exportar` | Bearer | Rooster Hub / `/hub/acessos` / `relatorio-erros` | Exporta o conjunto completo do filtro em CSV |
+| GET | `/logs-erro` | Bearer | Rooster Hub / `/hub/acessos` / `relatorio-erros` | Lista; paginação opcional via `pagina`/`limite` |
+| GET | `/logs-erro/:id` | Bearer | Rooster Hub / `/hub/acessos` / `relatorio-erros` | Busca por id |
+
+### 1.12 Configurações — `ConfiguracoesController`, base `/configuracoes`
+
+Status e teste do envio de e-mail (SMTP), setembro/2026. Sem tela própria de propósito: consumido pela
+seção "E-mail" dentro de `/settings` no frontend. Host/porta/usuário/senha do SMTP continuam só no `.env`
+do servidor (`SMTP_HOST`/`SMTP_PORT`/`SMTP_SECURE`/`SMTP_USER`/`SMTP_PASS`/`MAIL_FROM`) — este endpoint
+nunca lê nem grava segredo no banco, só expõe o que já está configurado (nunca usuário/senha) e permite
+confirmar que o envio funciona de verdade. Permissão dedicada (`hub.configuracoes.acessar`) só para poder
+restringir a tela a quem administra o sistema, sem reaproveitar uma permissão de outro propósito.
+
+| Método | Rota | Auth | Permissão exigida | Descrição |
+|---|---|---|---|---|
+| GET | `/configuracoes/email` | Bearer | Rooster Hub / `/hub/configuracoes` / `acessar` | Status do SMTP: configurado (sim/não), host, porta, remetente, se está em modo desenvolvimento |
+| POST | `/configuracoes/email/teste` | Bearer | Rooster Hub / `/hub/configuracoes` / `acessar` | Envia um e-mail de teste real (corpo opcional `{ destino }`, padrão é o e-mail do próprio usuário autenticado); `502` com mensagem clara se o SMTP não estiver configurado |
 
 ---
 
@@ -450,7 +479,7 @@ Atenção à ordem: `GET /patrimonio-emprestimos-atrasados` e `PATCH /patrimonio
 | GET | `/turmas/:id/itens-avaliativos` | Bearer | manual — ver nota (2) | Lista itens avaliativos da turma |
 | PATCH | `/itens-avaliativos/:id` | Bearer | manual — ver nota (3), ação `configurar-pesos` | Atualiza item avaliativo |
 | DELETE | `/itens-avaliativos/:id` | Bearer | manual — ver nota (3), ação `configurar-pesos` | Remove item avaliativo — **bloqueado com `400 BadRequestException`** se `origem === 'learn'` (é preciso excluir/despublicar a atividade correspondente no Learn) |
-| PATCH | `/itens-avaliativos/:id/notas` | Bearer | manual — ver nota (3), ação `lancar-notas` | Lança (ou atualiza) a nota de um aluno no item avaliativo |
+| PATCH | `/itens-avaliativos/:id/notas` | Bearer | manual — ver nota (3), ação `lancar-notas` | Lança (ou atualiza) a nota de um aluno no item avaliativo; audita `nota_lancada` |
 
 ### 5.10 Calendário acadêmico
 
@@ -658,8 +687,8 @@ São gestão **entre cursos** e usam `@RequirePermission` estático numa tela pr
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
 | GET | `/boost-alunos-externos` | Bearer (Hub) | `Rooster Boost` / `/boost/students` / `acessar` | Lista as contas com contagem de matrículas; paginação opcional (`pagina`/`limite`, ver `01-visao-geral.md`) |
-| PATCH | `/boost-alunos-externos/:id` | Bearer (Hub) | `Rooster Boost` / `/boost/students` / `gerenciar` | Corpo `{ ativo: boolean }`. Conta desativada não consegue mais logar (`401`) |
-| POST | `/boost-alunos-externos/:id/redefinir-senha` | Bearer (Hub) | `Rooster Boost` / `/boost/students` / `gerenciar` | Gera uma **senha temporária aleatória**, salva só o hash e devolve o valor em texto plano **uma única vez** na resposta |
+| PATCH | `/boost-alunos-externos/:id` | Bearer (Hub) | `Rooster Boost` / `/boost/students` / `gerenciar` | Corpo `{ ativo: boolean }`. Conta desativada não consegue mais logar (`401`); audita `conta_externa_ativada`/`conta_externa_desativada` |
+| POST | `/boost-alunos-externos/:id/redefinir-senha` | Bearer (Hub) | `Rooster Boost` / `/boost/students` / `gerenciar` | Gera uma **senha temporária aleatória**, salva só o hash e devolve o valor em texto plano **uma única vez** na resposta; audita `conta_externa_senha_redefinida` |
 
 **Simplificação deliberada na redefinição de senha**: `BoostUsuario` não tem uma tabela de token de redefinição por e-mail (equivalente à `RedefinicaoSenha` do Hub). Construir esse fluxo inteiro só para a conta externa não se pagava neste momento — a senha temporária é repassada pelo admin por um canal seguro, no mesmo espírito informal de `PATCH /usuarios/:id` com `senhaHash` no Hub. Um fluxo por e-mail fica como evolução possível.
 
@@ -699,6 +728,14 @@ Todas as rotas de staff usam o `JwtAuthGuard` global de sempre (login do Hub) + 
 | POST | `/descontos/:id/atribuir` | `Rooster Finance` / `/finance/discounts` / `editar` | Atribui o desconto a um `Aluno` (corpo `{alunoId}`) |
 | DELETE | `/descontos/:id/atribuir/:alunoId` | `Rooster Finance` / `/finance/discounts` / `editar` | Remove a atribuição |
 
+### 8.2a Políticas de multa/juros
+
+O financeiro cria as próprias regras — ver RN043 em `docs/system/04-regras-de-negocio.md`.
+
+| Método | Rota | Permissão exigida | Descrição |
+|---|---|---|---|
+| POST/GET/PATCH/DELETE | `/politicas-multa-juros[/:id]` | `Rooster Finance` / `/finance/policies` / `criar`\|`acessar`\|`editar`\|`excluir` | CRUD padrão — `DELETE` responde `400` se a política estiver vinculada a algum `Servico` ou `Cobranca` |
+
 ### 8.3 Cobranças
 
 | Método | Rota | Permissão exigida | Descrição |
@@ -707,9 +744,9 @@ Todas as rotas de staff usam o `JwtAuthGuard` global de sempre (login do Hub) + 
 | GET | `/cobrancas?status=&alunoId=&tipo=&pagina=&limite=` | manual — ver nota (12) | Lista, com paginação opcional (ver `01-visao-geral.md`); `status=vencido` é traduzido para uma cláusula real no banco (`whereStatusCobranca`, `finance.service.ts`) mesmo sendo um status derivado (não existe coluna igual a esse valor) — corrigido em setembro/2026: antes era filtrado em memória **depois** da paginação, o que quebrava a contagem/paginação de fato (uma página podia voltar com menos itens que `limite`, e `total` não batia com o filtrado) |
 | GET | `/cobrancas/:id` | manual — ver nota (12) | Detalhe, com `aluno`/`produto`/`servico`/`desconto`/`notaFiscal` |
 | PATCH | `/cobrancas/:id` | `Rooster Finance` / `/finance/tuitions` / `editar` | Edita descrição/valor/vencimento/forma de pagamento |
-| POST | `/cobrancas/:id/marcar-pago` | `Rooster Finance` / `/finance/charges` / `marcar-pago` | `400` se já paga ou cancelada |
-| POST | `/cobrancas/:id/negociar` | `Rooster Finance` / `/finance/charges` / `negociar` | Novo vencimento/valor + motivo obrigatório; muda `status` para `negociado` |
-| POST | `/cobrancas/:id/cancelar` | `Rooster Finance` / `/finance/charges` / `cancelar` | Motivo obrigatório; `400` se já paga |
+| POST | `/cobrancas/:id/marcar-pago` | `Rooster Finance` / `/finance/charges` / `marcar-pago` | `400` se já paga ou cancelada; audita `cobranca_marcada_paga` |
+| POST | `/cobrancas/:id/negociar` | `Rooster Finance` / `/finance/charges` / `negociar` | Novo vencimento/valor + motivo obrigatório; muda `status` para `negociado`; audita `cobranca_renegociada` |
+| POST | `/cobrancas/:id/cancelar` | `Rooster Finance` / `/finance/charges` / `cancelar` | Motivo obrigatório; `400` se já paga; audita `cobranca_cancelada` |
 | POST | `/cobrancas/gerar-lote` | `Rooster Finance` / `/finance/tuitions` / `gerar-lote` | Gera uma `Cobranca` de mensalidade por aluno com matrícula ativa (opcionalmente filtrado por `turmaId`), aplicando o desconto ativo do aluno automaticamente. **Idempotente por competência+serviço** — rodar de novo não duplica |
 | GET | `/cobrancas/exportar?status=&alunoId=&tipo=` | `Rooster Finance` / `/finance/charges` / `exportar` | CSV |
 
@@ -850,19 +887,23 @@ Ver `03-autenticacao.md` (corpo, resposta, erros).
 | `horarioFim` | string | sim | formato `HH:MM`, deve ser maior que `horarioInicio` |
 | `participantes` | number | sim | inteiro `≥ 1`, deve respeitar a capacidade do ambiente |
 | `status` | string | não | `IsIn(['confirmada','analise','cancelada','finalizada','andamento'])` |
+| `turmaId` | string (uuid) | não | `IsUUID()` — vincula a reserva a uma `Turma` do Academy; ver nota abaixo |
 | `recorrencia` | string | não | `IsIn(['unica','diaria','semanal','mensal'])` |
 | `observacoes` | string | não | — |
 | `decididoPor` | string (uuid) | não | — |
 | `decididoEm` | string (data ISO) | não | — |
 
-**Resposta 201:** registro da reserva criada (schema Prisma `Reserva`).
+**Vínculo com Turma (`turmaId`, opcional):** quando informado, `RoomsController.exigirTurmaValida` checa posse **antes** de criar a reserva — quem tem `Rooster Academy`/`/academy/manage`/`acessar` pode vincular qualquer turma; senão, só a turma da qual o usuário é o professor (`403` caso contrário). Ver RN044 em `docs/system/04-regras-de-negocio.md`.
+
+**Resposta 201:** registro da reserva criada (schema Prisma `Reserva`), incluindo `ambiente` e, se vinculada, `turma: { id, codigo, disciplina: { nome } }`.
 
 **Erros:**
 
 | Status | Exceção | Causa |
 |---|---|---|
-| 400 | `ValidationPipe` | Campo obrigatório ausente, `status`/`recorrencia` fora do enum, `data` não é data ISO |
+| 400 | `ValidationPipe` | Campo obrigatório ausente, `status`/`recorrencia` fora do enum, `data` não é data ISO, `turmaId` não é UUID |
 | 400 | `BadRequestException` | Horário inválido (fora de `HH:MM`), horário fora do intervalo válido, término ≤ início, capacidade do ambiente excedida, ambiente não funciona no dia selecionado, horário fora da janela de funcionamento |
+| 403 | `ForbiddenException` | `turmaId` informado, mas o usuário não é o professor da turma nem tem gestão ampla do Academy |
 | 404 | `NotFoundException` | `ambienteId` não corresponde a um ambiente existente |
 | 409 | `ConflictException` | Sobreposição de horário com outra reserva ativa do mesmo ambiente — mensagem `Conflito de horário com a reserva "<evento>" (<inicio>–<fim>).` |
 

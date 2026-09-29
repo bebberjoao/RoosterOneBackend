@@ -25,6 +25,7 @@ model Usuario {
   notificacoes  Notificacao[]
   sessoes       Sessao[]
   logsAuditoria LogAuditoria[]
+  logsErro      LogErro[]
   ticketsCriados Ticket[] @relation("TicketSolicitante")
   ticketsTecnico Ticket[] @relation("TicketTecnico")
   mensagensTickets MensagemTicket[]
@@ -37,6 +38,7 @@ model Usuario {
   professorAcademico Professor?
   alunoAcademico     Aluno?
   subcategoriasAtendidas AtendimentoSubcategoria[]
+  politicasMultaJurosCriadas PoliticaMultaJuros[]
 }
 
 model RedefinicaoSenha {
@@ -112,6 +114,7 @@ model Notificacao {
   usuarioId   String?
   titulo      String?
   mensagem    String?
+  rota        String?
   lida        Boolean  @default(false)
   criadoEm    DateTime?
 
@@ -143,6 +146,21 @@ model LogAuditoria {
   criadoEm      DateTime?
 
   usuario       Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@index([criadoEm])
+}
+
+model LogErro {
+  id          String    @id @default(uuid())
+  usuarioId   String?
+  metodo      String?
+  rota        String?
+  statusCode  Int
+  mensagem    String
+  stack       String?
+  criadoEm    DateTime?
+
+  usuario     Usuario?  @relation(fields: [usuarioId], references: [id])
 
   @@index([criadoEm])
 }
@@ -365,6 +383,7 @@ model Reserva {
   horarioFim String
   participantes Int @default(1)
   status String @default("analise")
+  turmaId String?
   recorrencia String @default("unica")
   serieId String?
   serieTotal Int?
@@ -375,6 +394,7 @@ model Reserva {
   criadoEm DateTime?
   atualizadoEm DateTime?
   ambiente Ambiente @relation(fields: [ambienteId], references: [id], onDelete: Restrict)
+  turma Turma? @relation(fields: [turmaId], references: [id])
   mensagens ReservaMensagem[]
   historico ReservaHistorico[]
 }
@@ -560,6 +580,7 @@ model Turma {
   frequencias RegistroFrequencia[]
   itensAvaliativos ItemAvaliativo[]
   atividades Atividade[]
+  reservasVinculadas Reserva[]
 
   @@unique([codigo, periodoLetivoId])
 }
@@ -864,8 +885,10 @@ model Servico {
   categoria String?
   frequencia String @default("unico")
   ativo Boolean @default(true)
+  politicaMultaJurosId String?
   criadoEm DateTime?
   atualizadoEm DateTime?
+  politicaMultaJuros PoliticaMultaJuros? @relation(fields: [politicaMultaJurosId], references: [id])
   cobrancas Cobranca[]
 }
 
@@ -897,6 +920,22 @@ model DescontoAluno {
   @@unique([alunoId, descontoId])
 }
 
+model PoliticaMultaJuros {
+  id String @id @default(uuid())
+  nome String
+  descricao String?
+  percentualMulta Decimal @default(0)
+  percentualJurosDia Decimal @default(0)
+  diasCarencia Int @default(0)
+  ativo Boolean @default(true)
+  criadoPorId String?
+  criadoEm DateTime?
+  atualizadoEm DateTime?
+  criadoPor Usuario? @relation(fields: [criadoPorId], references: [id])
+  servicos Servico[]
+  cobrancas Cobranca[]
+}
+
 model Cobranca {
   id String @id @default(uuid())
   alunoId String
@@ -910,6 +949,7 @@ model Cobranca {
   valorDesconto Decimal @default(0)
   multa Decimal @default(0)
   juros Decimal @default(0)
+  politicaMultaJurosId String?
   valorPago Decimal?
   vencimento DateTime
   status String @default("aberto")
@@ -927,6 +967,7 @@ model Cobranca {
   produto Produto? @relation(fields: [produtoId], references: [id])
   servico Servico? @relation(fields: [servicoId], references: [id])
   desconto Desconto? @relation(fields: [descontoId], references: [id])
+  politicaMultaJuros PoliticaMultaJuros? @relation(fields: [politicaMultaJurosId], references: [id])
   notaFiscal NotaFiscal?
 
   @@index([alunoId])

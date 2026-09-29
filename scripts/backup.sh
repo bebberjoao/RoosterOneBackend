@@ -30,6 +30,10 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
   exit 1
 fi
 
+# pg_dump/pg_restore usam libpq puro, que rejeita "?schema=..." (parâmetro só
+# reconhecido pelo Prisma) com "invalid URI query parameter".
+DATABASE_URL="${DATABASE_URL%%\?*}"
+
 mkdir -p "${PASTA}"
 echo "==> Backup em ${PASTA}"
 

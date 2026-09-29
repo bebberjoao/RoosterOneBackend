@@ -38,7 +38,7 @@ Rotas públicas confirmadas no código (`src/roster-hub/usuarios/usuarios.contro
 | POST | `/auth/esqueci-senha` |
 | POST | `/auth/redefinir-senha` |
 
-Nenhuma outra rota do sistema usa `@Public()` — busca por esse decorator nos 12 controllers do projeto não retornou outras ocorrências.
+Nenhuma outra rota do sistema usa `@Public()` — busca por esse decorator nos 20 controllers do projeto não retornou outras ocorrências.
 
 Ver detalhes de obtenção e uso do token em `03-autenticacao.md`.
 

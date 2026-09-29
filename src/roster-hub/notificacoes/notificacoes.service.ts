@@ -101,11 +101,11 @@ export class NotificacoesService {
    * perdida não pode derrubar a operação de negócio que a originou (aprovar
    * reserva, gerar cobrança). Sem destinatário, simplesmente não faz nada.
    */
-  async notificar(usuarioId: string | null | undefined, titulo: string, mensagem: string) {
+  async notificar(usuarioId: string | null | undefined, titulo: string, mensagem: string, rota?: string) {
     if (!usuarioId) return;
     try {
       await this.prisma.notificacao.create({
-        data: { usuarioId, titulo: titulo.slice(0, 150), mensagem, criadoEm: new Date() },
+        data: { usuarioId, titulo: titulo.slice(0, 150), mensagem, rota: rota ?? null, criadoEm: new Date() },
       });
     } catch {
       // ver comentário acima

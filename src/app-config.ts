@@ -1,5 +1,6 @@
 import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
-import { PrismaExceptionFilter } from './common/prisma-exception.filter';
+import { AllExceptionsFilter } from './common/all-exceptions.filter';
+import { LogsErroService } from './roster-hub/logs-erro/logs-erro.service';
 
 /**
  * Configuração compartilhada entre a aplicação real (`main.ts`) e a suíte e2e.
@@ -32,6 +33,7 @@ export function configurarApp(app: INestApplication): void {
   );
 
   // Rede de segurança: cada service já mapeia P2002/P2025 com mensagem
-  // contextual antes disso — ver src/common/prisma-exception.filter.ts.
-  app.useGlobalFilters(new PrismaExceptionFilter());
+  // contextual antes disso — ver src/common/all-exceptions.filter.ts. Toda
+  // exceção com status >= 500 também é persistida em logs_erro.
+  app.useGlobalFilters(new AllExceptionsFilter(app.get(LogsErroService)));
 }

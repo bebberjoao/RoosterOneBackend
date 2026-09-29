@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
+import { NotificacoesService } from '../roster-hub/notificacoes/notificacoes.service';
+import { AuditoriaService } from '../roster-hub/shared/auditoria.service';
 import { PaginacaoQueryDto, montarPagina, pediuPaginacao, prismaSkipTake } from '../common/pagination';
 import {
   CreateAlunoDto, CreateCursoDto, CreateDisciplinaDto, CreateEventoCalendarioDto,
@@ -18,7 +20,11 @@ import {
 
 @Injectable()
 export class AcademyService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificacoes: NotificacoesService,
+    private readonly auditoria: AuditoriaService,
+  ) {}
 
   // ===================== Curso =====================
   async createCurso(dto: CreateCursoDto) {
@@ -477,17 +483,26 @@ export class AcademyService {
   }
 
   async lancarNota(itemAvaliativoId: string, lancadoPorId: string, dto: LancarNotaDto) {
+    // lancadoPorId é sempre o professor/coordenação autenticado — ver AcademyController.
     const item = await this.findOneItemAvaliativo(itemAvaliativoId);
     const matricula = await this.prisma.matricula.findUnique({ where: { alunoId_turmaId: { alunoId: dto.alunoId, turmaId: item.turmaId } } });
     if (!matricula) throw new BadRequestException('Aluno não está matriculado na turma deste item avaliativo.');
     if (dto.valor != null && Number(dto.valor) > Number(item.notaMaxima)) {
       throw new BadRequestException(`A nota não pode exceder o valor máximo do item (${item.notaMaxima}).`);
     }
-    return this.prisma.nota.upsert({
+    const nota = await this.prisma.nota.upsert({
       where: { itemAvaliativoId_alunoId: { itemAvaliativoId, alunoId: dto.alunoId } },
       create: { itemAvaliativoId, alunoId: dto.alunoId, valor: dto.valor ?? null, lancadoPorId, atualizadoEm: new Date() },
       update: { valor: dto.valor ?? null, lancadoPorId, atualizadoEm: new Date() },
     });
+    if (dto.valor != null) {
+      const aluno = await this.prisma.aluno.findUnique({ where: { id: dto.alunoId }, select: { usuarioId: true } });
+      await this.notificacoes.notificar(aluno?.usuarioId, 'Nova nota lançada', `${item.nome}: ${dto.valor}.`, '/student/grades');
+    }
+    await this.auditoria.registrar({
+      usuarioId: lancadoPorId, modulo: 'Rooster Academy', acao: 'nota_lancada', entidade: 'nota', entidadeId: nota.id,
+    });
+    return nota;
   }
 
   /** Média ponderada dos itens avaliativos lançados da turma para um aluno (itens sem nota lançada não entram no cálculo). */

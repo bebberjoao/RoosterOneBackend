@@ -78,4 +78,33 @@ export class MailService {
     }
     await this.transporter.sendMail({ from: this.from, to, subject, html });
   }
+
+  /**
+   * Estado do envio de e-mail, para a tela de Configurações (admin). Nunca
+   * expõe usuário/senha do SMTP — só o que ajuda a confirmar "está
+   * configurado, e é isto aqui" sem vazar credencial.
+   */
+  status() {
+    return {
+      configurado: this.transporter !== null,
+      host: process.env.SMTP_HOST ?? null,
+      porta: this.transporter ? Number(process.env.SMTP_PORT ?? 587) : null,
+      seguro: process.env.SMTP_SECURE === 'true',
+      remetente: this.from,
+      modoDev: !this.ehProducao,
+    };
+  }
+
+  /** Envia um e-mail de teste real, para o admin confirmar que o SMTP configurado funciona de fato. */
+  async enviarTeste(destino: string) {
+    if (!this.transporter) {
+      throw new Error('SMTP não configurado neste ambiente. Defina SMTP_HOST no servidor para habilitar o envio.');
+    }
+    await this.transporter.sendMail({
+      from: this.from,
+      to: destino,
+      subject: 'Rooster One — e-mail de teste',
+      html: '<p>Este é um e-mail de teste, enviado a partir da tela de Configurações do Rooster One.</p><p>Se você recebeu esta mensagem, o envio de e-mail está funcionando corretamente.</p>',
+    });
+  }
 }

@@ -1,9 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { createWriteStream, writeFileSync } from 'fs';
-import { join } from 'path';
 import PDFDocument from 'pdfkit';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
 import { PASTAS } from '../common/storage.config';
+import { escreverDocumentoEncriptadoComNome } from '../common/file-encryption.util';
 
 export const NOTAS_FISCAIS_DIR = PASTAS.notasFiscais();
 
@@ -51,12 +50,11 @@ export class NotaFiscalService {
     const valor = Number(cobranca.valorOriginal) - Number(cobranca.valorDesconto);
 
     const nomeBase = numero.replace(/[^a-zA-Z0-9-]/g, '');
-    await this.gerarPdf(join(NOTAS_FISCAIS_DIR, `${nomeBase}.pdf`), {
-      numero, alunoNome: cobranca.aluno.usuario.nome, descricao: cobranca.descricao, valor, data: new Date(),
-    });
-    this.gerarXml(join(NOTAS_FISCAIS_DIR, `${nomeBase}.xml`), {
-      numero, alunoNome: cobranca.aluno.usuario.nome, descricao: cobranca.descricao, valor, data: new Date(),
-    });
+    const dadosNota = { numero, alunoNome: cobranca.aluno.usuario.nome, descricao: cobranca.descricao, valor, data: new Date() };
+    const bufferPdf = await this.gerarPdf(dadosNota);
+    escreverDocumentoEncriptadoComNome(NOTAS_FISCAIS_DIR, `${nomeBase}.pdf`, bufferPdf);
+    const bufferXml = this.gerarXml(dadosNota);
+    escreverDocumentoEncriptadoComNome(NOTAS_FISCAIS_DIR, `${nomeBase}.xml`, bufferXml);
 
     return this.prisma.notaFiscal.create({
       data: {
@@ -66,13 +64,14 @@ export class NotaFiscalService {
   }
 
   private gerarPdf(
-    caminho: string,
     info: { numero: string; alunoNome: string; descricao: string; valor: number; data: Date },
-  ): Promise<void> {
+  ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ size: 'A4', margin: 50 });
-      const stream = createWriteStream(caminho);
-      doc.pipe(stream);
+      const partes: Buffer[] = [];
+      doc.on('data', (chunk: Buffer) => partes.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(partes)));
+      doc.on('error', reject);
 
       doc.font('Helvetica-Bold').fontSize(16).fillColor('#2b3a67').text('ROOSTER ONE · ROOSTER FINANCE', { align: 'center' });
       doc.moveDown(0.3);
@@ -92,15 +91,12 @@ export class NotaFiscalService {
       doc.font('Helvetica-Bold').fontSize(14).text(`Valor: ${info.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
 
       doc.end();
-      stream.on('finish', () => resolve());
-      stream.on('error', reject);
     });
   }
 
   private gerarXml(
-    caminho: string,
     info: { numero: string; alunoNome: string; descricao: string; valor: number; data: Date },
-  ) {
+  ): Buffer {
     const escapar = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <notaFiscalInterna>
@@ -112,7 +108,7 @@ export class NotaFiscalService {
   <observacao>Documento interno gerado pelo Rooster One — sem transmissão à SEFAZ, sem validade fiscal legal.</observacao>
 </notaFiscalInterna>
 `;
-    writeFileSync(caminho, xml, 'utf-8');
+    return Buffer.from(xml, 'utf-8');
   }
 
   async cancelar(id: string) {

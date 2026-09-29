@@ -1,6 +1,6 @@
 # Migrations — Rooster One
 
-Histórico incremental de `prisma/migrations/` (15 migrations), cada uma como uma pasta `<timestamp>_<descricao>/migration.sql`. O provider registrado em `migration_lock.toml` é `postgresql` — todas as migrations foram escritas e aplicadas contra PostgreSQL.
+Histórico incremental de `prisma/migrations/` (23 migrations), cada uma como uma pasta `<timestamp>_<descricao>/migration.sql`. O provider registrado em `migration_lock.toml` é `postgresql` — todas as migrations foram escritas e aplicadas contra PostgreSQL.
 
 ## Comandos do projeto (`package.json`)
 
@@ -39,6 +39,8 @@ Histórico incremental de `prisma/migrations/` (15 migrations), cada uma como um
 | 19 | `20260925162632_boost_video_hospedado_e_progresso` | Boost: `aulas_boost` ganha `video_arquivo`, `video_tamanho`, `video_mime_type`; `progresso_aulas_boost` ganha `posicao_seg` e `percentual_assistido`. Só colunas novas e anuláveis. |
 | 20 | `20260925180000_desk_permissao_ver_sla` | **Migration de dados** (sem mudança de estrutura): cria a permissão `desk.tickets.ver-sla` e a concede a quem já tinha `desk.tickets.acessar`. Idempotente. |
 | 21 | `20260926120000_boost_gestao_orientadores_conversas` | Boost sem "dono": cria `cursos_orientadores_boost` e `conversas_boost`; `cursos_boost` perde `professor_id` e ganha `certificado_texto`; `mensagens_boost` troca `curso_id` por `conversa_id` e ganha `lida_em`. **Backfill na mesma migration, antes dos DROP**: o dono de cada curso vira orientador; mensagens de aluno viram a conversa dele; mensagens de **professor do chat antigo são descartadas** (eram para a sala inteira, sem aluno de destino). Também é **migration de dados de permissão**: quem tinha `boost.manage.acessar` recebe `certificado` e `vincular-orientadores`; quem só tinha as chaves de professor perde as de gestão e recebe `boost.conversas.*` (senão viraria gestor de todos os cursos); remove `boost.manage.mensagem`. |
+| 22 | `20260928090000_multa_juros_turma_auditoria_notificacao_rota` | Combinada: (1) `notificacoes` ganha `rota` (VARCHAR, para o clique navegar até a tela de origem); (2) cria `politicas_multa_juros` (multa/juros/carência configuráveis pelo financeiro) e a coluna `politica_multa_juros_id` (nullable, `ON DELETE SET NULL`) em `servicos_financeiros` e em `cobrancas`; (3) `reservas` ganha `turma_id` (nullable, `ON DELETE SET NULL`, índice próprio) — vínculo opcional Rooms↔Academy. **Migration de dados**: cria as permissões `finance.policies.*` (concedidas a quem já tem `finance.dashboard.acessar`) e `hub.acessos.relatorio-auditoria` (concedida a quem já tem `hub.acessos.gerenciar-permissoes`). |
+| 23 | `20260928120000_rastreamento_de_erros` | Cria `logs_erro` (método, rota, status HTTP, mensagem, stack, usuário, índice em `criado_em`; FK `usuario_id → usuarios` `ON DELETE SET NULL`) — alimentada só pelo `AllExceptionsFilter` global, nunca por um endpoint de escrita. **Migration de dados**: cria a permissão `hub.acessos.relatorio-erros`, concedida a quem já tem `hub.acessos.gerenciar-permissoes`. |
 
 ## Observação histórica importante
 

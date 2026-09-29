@@ -4,8 +4,16 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { configurarApp } from './app-config';
+import { chaveMestraDeArquivos } from './common/file-encryption.util';
 
 async function bootstrap() {
+  // Falha cedo se FILE_ENCRYPTION_KEY estiver ausente/inválida — mesma disciplina do
+  // JWT_SECRET (que já falha sozinho na linha de baixo, via JwtModule.register). Não há um
+  // hook de "registro de módulo" equivalente aqui (não é um NestJS Module com factory), por
+  // isso a checagem é forçada explicitamente, só pelo efeito colateral do lançamento: a
+  // aplicação nunca deve subir prestes a gravar arquivo sem conseguir cifrá-lo depois.
+  chaveMestraDeArquivos();
+
   const app = await NestFactory.create(AppModule);
 
   app.use(

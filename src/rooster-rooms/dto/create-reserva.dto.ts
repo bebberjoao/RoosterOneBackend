@@ -81,6 +81,11 @@ export class CreateReservaDto {
   @IsString()
   observacoes?: string;
 
+  @ApiPropertyOptional({ example: '60000000-0000-0000-0000-000000000001', description: 'Id da Turma, quando a reserva é para uma aula — só o professor da turma (ou quem gerencia o Academy) pode vincular' })
+  @IsOptional()
+  @IsUUID()
+  turmaId?: string;
+
   @ApiPropertyOptional({ example: '22222222-2222-4222-8222-222222222222', description: 'Id do Usuário que aprovou ou recusou a reserva' })
   @IsOptional()
   @IsUUID()

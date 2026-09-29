@@ -13,6 +13,7 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
 import { PaginacaoQueryDto, montarPagina, pediuPaginacao, prismaSkipTake } from '../common/pagination';
 import { PASTAS } from '../common/storage.config';
+import { AuditoriaService } from '../roster-hub/shared/auditoria.service';
 import {
   ConfigurarCertificadoDto, CreateAulaBoostDto, CreateCursoBoostDto, CreateModuloBoostDto,
   UpdateAulaBoostDto, UpdateCursoBoostDto, UpdateModuloBoostDto,
@@ -22,7 +23,10 @@ const SALT_ROUNDS = 10;
 
 @Injectable()
 export class BoostService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditoria: AuditoriaService,
+  ) {}
 
   private slugify(titulo: string) {
     return titulo
@@ -436,11 +440,12 @@ export class BoostService {
     return montarPagina(dados, total, paginacao);
   }
 
-  async toggleAtivoBoostUsuario(id: string, ativo: boolean) {
+  async toggleAtivoBoostUsuario(id: string, ativo: boolean, atorId?: string) {
     const existente = await this.prisma.boostUsuario.findUnique({ where: { id } });
     if (!existente) throw new NotFoundException(`Aluno externo com id ${id} não encontrado.`);
+    let atualizado;
     try {
-      return await this.prisma.boostUsuario.update({
+      atualizado = await this.prisma.boostUsuario.update({
         where: { id },
         data: { ativo },
         select: { id: true, nome: true, email: true, ativo: true },
@@ -448,6 +453,10 @@ export class BoostService {
     } catch (error) {
       this.handleError(error, 'atualizar situação do aluno externo');
     }
+    await this.auditoria.registrar({
+      usuarioId: atorId, modulo: 'Rooster Boost', acao: ativo ? 'conta_externa_ativada' : 'conta_externa_desativada', entidade: 'boost_usuario', entidadeId: id,
+    });
+    return atualizado;
   }
 
   /**
@@ -458,7 +467,7 @@ export class BoostService {
    * valor em texto plano **uma única vez** — o admin repassa por fora, mesmo
    * espírito informal de `PATCH /usuarios/:id` com `senhaHash` no Hub.
    */
-  async redefinirSenhaBoostUsuario(id: string) {
+  async redefinirSenhaBoostUsuario(id: string, atorId?: string) {
     const existente = await this.prisma.boostUsuario.findUnique({ where: { id } });
     if (!existente) throw new NotFoundException(`Aluno externo com id ${id} não encontrado.`);
 
@@ -466,6 +475,9 @@ export class BoostService {
     await this.prisma.boostUsuario.update({
       where: { id },
       data: { senhaHash: await bcrypt.hash(senhaTemporaria, SALT_ROUNDS) },
+    });
+    await this.auditoria.registrar({
+      usuarioId: atorId, modulo: 'Rooster Boost', acao: 'conta_externa_senha_redefinida', entidade: 'boost_usuario', entidadeId: id,
     });
     return { id, email: existente.email, senhaTemporaria };
   }

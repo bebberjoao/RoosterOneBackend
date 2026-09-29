@@ -2,12 +2,15 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import * as bcrypt from 'bcryptjs';
 import { createHash } from 'crypto';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 const request = require('supertest');
 import { AppModule } from '../src/app.module';
 import { configurarApp } from '../src/app-config';
 import { PrismaService } from '../src/roster-hub/shared/prisma.service';
 import { PrismaTestService } from '../src/roster-hub/shared/prisma-test.service';
 import { MailService } from '../src/mail/mail.service';
+import { PASTAS } from '../src/common/storage.config';
 
 /**
  * Todo endpoint protegido exige `Authorization: Bearer <token>` (JwtAuthGuard
@@ -674,6 +677,13 @@ describe('Full API e2e tests', () => {
     expect(anexoRes.body.nomeArquivo).toBe('evidencia.txt');
     expect(typeof anexoRes.body.tamanho).toBe('number'); // BigInt no schema — precisa vir serializado como number
 
+    // Mimetype fora da lista permitida (ex.: executável) é recusado antes de chegar ao handler — 400.
+    await request(app.getHttpServer())
+      .post(`/v1/chamados/${ticketId}/anexos`)
+      .set('Authorization', authHeader)
+      .attach('arquivo', Buffer.from('MZ...'), { filename: 'suspeito.exe', contentType: 'application/x-msdownload' })
+      .expect(400);
+
     const anexosListRes = await request(app.getHttpServer())
       .get(`/v1/chamados/${ticketId}/anexos`)
       .set('Authorization', authHeader)
@@ -685,6 +695,13 @@ describe('Full API e2e tests', () => {
       .set('Authorization', authHeader)
       .expect(200);
     expect(downloadRes.text).toBe('conteúdo de teste');
+
+    // Prova de que o arquivo está cifrado em repouso, não só que a API continua funcionando:
+    // lê o arquivo cru direto do disco (nunca pela API) e confere que o texto original não
+    // aparece nos bytes gravados.
+    const anexoNoBanco = await prisma.anexoTicket.findUnique({ where: { id: anexoRes.body.id } });
+    const bytesNoDisco = readFileSync(join(PASTAS.anexosTickets(), anexoNoBanco!.caminho!));
+    expect(bytesNoDisco.includes('conteúdo de teste')).toBe(false);
 
     const ticketComAnexoRes = await request(app.getHttpServer())
       .get(`/v1/chamados/${ticketId}`)
@@ -1155,6 +1172,103 @@ describe('Full API e2e tests', () => {
     expect(acoes).toContain('login_falhou');
   });
 
+  it('Rastreamento de erros: relatório e exportação exigem permissão própria; recusas esperadas (403/404) nunca aparecem, só erros de verdade', async () => {
+    // A captura automática (status >= 500 -> logs_erro) é coberta em unidade
+    // (src/common/all-exceptions.filter.spec.ts) — aqui a semente vai direto
+    // no banco, do mesmo jeito que os outros testes de relatório já fazem.
+    await prisma.logErro.deleteMany();
+    await prisma.logErro.create({
+      data: {
+        metodo: 'GET', rota: '/v1/exemplo/quebrado', statusCode: 500,
+        mensagem: 'Falha simulada para o teste de relatório.', stack: 'Error: simulado\n  at teste',
+        criadoEm: new Date(),
+      },
+    });
+
+    const semPermissao = await criarUsuarioComPermissoes('Sem Permissao Erros', 'sem.permissao.erros@example.com', [
+      ['Rooster Hub', '/hub/acessos', 'acessar'],
+    ]);
+    await request(app.getHttpServer()).get('/v1/logs-erro/relatorio').set('Authorization', semPermissao.header).expect(403);
+    await request(app.getHttpServer()).get('/v1/logs-erro/exportar').set('Authorization', semPermissao.header).expect(403);
+
+    const relatorioRes = await request(app.getHttpServer()).get('/v1/logs-erro/relatorio').set('Authorization', authHeader).expect(200);
+    expect(relatorioRes.body.total).toBeGreaterThanOrEqual(1);
+    expect(relatorioRes.body.recentes[0].statusCode).toBe(500);
+    expect(relatorioRes.body.porStatus.some((r: any) => r.statusCode === 500)).toBe(true);
+
+    const csvRes = await request(app.getHttpServer()).get('/v1/logs-erro/exportar').set('Authorization', authHeader).expect(200);
+    expect(csvRes.text).toContain('Falha simulada para o teste de relatório.');
+  });
+
+  it('Segurança: POST /anexos-tickets não aceita caminho/tipo/tamanho do cliente (achado de pentest, setembro/2026)', async () => {
+    // Antes desta correção, qualquer usuário com a permissão `anexar` podia criar um
+    // AnexoTicket com `caminho` livre, apontando para o arquivo de outro anexo (de um
+    // ticket ao qual não tinha acesso) e baixá-lo através de um ticket próprio — IDOR via
+    // path traversal armazenado. O único jeito legítimo de um anexo apontar para um
+    // arquivo é `POST /chamados/:id/anexos` (multipart), que sempre gera o nome no servidor.
+    // `ticketId` não precisa existir de verdade: o `ValidationPipe` (whitelist) recusa os
+    // campos antes de qualquer lógica do controller rodar.
+    const ticketIdQualquer = '99999999-9999-4999-8999-999999999999';
+
+    await request(app.getHttpServer())
+      .post('/v1/anexos-tickets')
+      .set('Authorization', authHeader)
+      .send({ ticketId: ticketIdQualquer, nomeArquivo: 'x.txt', caminho: '../../../../.env', tipo: 'text/plain', tamanho: 10 })
+      .expect(400);
+
+    await request(app.getHttpServer())
+      .post('/v1/anexos-tickets')
+      .set('Authorization', authHeader)
+      .send({ ticketId: ticketIdQualquer, nomeArquivo: 'x.txt', tamanho: 10 })
+      .expect(400);
+  });
+
+  describe('Rooster Hub — Configurações (status/teste de e-mail)', () => {
+    it('GET /configuracoes/email exige permissão (403 para quem não é admin)', async () => {
+      const { header } = await criarUsuarioComPermissoes('Sem Acesso Config', 'sem-acesso-config@example.com', [
+        ['Rooster Desk', '/desk/tickets', 'acessar'],
+      ]);
+      await request(app.getHttpServer())
+        .get('/v1/configuracoes/email')
+        .set('Authorization', header)
+        .expect(403);
+    });
+
+    it('GET /configuracoes/email devolve o status sem expor usuário/senha do SMTP', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/v1/configuracoes/email')
+        .set('Authorization', authHeader)
+        .expect(200);
+      // Sem SMTP_HOST no ambiente de teste (ver package.json:test:e2e), o e2e roda sempre
+      // em modo dev — é exatamente o cenário "não configurado" que a tela precisa mostrar certo.
+      expect(res.body).toEqual({
+        configurado: false, host: null, porta: null, seguro: false,
+        remetente: expect.any(String), modoDev: true,
+      });
+      expect(JSON.stringify(res.body)).not.toMatch(/senha|pass/i);
+    });
+
+    it('POST /configuracoes/email/teste responde com erro claro quando SMTP não está configurado', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/v1/configuracoes/email/teste')
+        .set('Authorization', authHeader)
+        .send({})
+        .expect(502);
+      expect(res.body.message).toMatch(/SMTP não configurado/);
+    });
+
+    it('POST /configuracoes/email/teste também exige permissão', async () => {
+      const { header } = await criarUsuarioComPermissoes('Sem Acesso Config 2', 'sem-acesso-config-2@example.com', [
+        ['Rooster Desk', '/desk/tickets', 'acessar'],
+      ]);
+      await request(app.getHttpServer())
+        .post('/v1/configuracoes/email/teste')
+        .set('Authorization', header)
+        .send({})
+        .expect(403);
+    });
+  });
+
   describe('Rooster Academy + Rooster Learn', () => {
     const ACADEMY_COORDENADOR_KEYS: Array<[string, string, string]> = [
       ['Rooster Academy', '/academy', 'acessar'],
@@ -1229,6 +1343,71 @@ describe('Full API e2e tests', () => {
         .set('Authorization', cenario.coordenador.header)
         .expect(200);
       expect(matriculasRes.body[0].aluno.usuario.nome).toBe('João Teste');
+    });
+
+    it('Rooms ↔ Academy: ao criar a reserva de uma aula, só o professor dono da turma pode vinculá-la', async () => {
+      const cenario = await montarCenarioAcademico();
+
+      // profLima/profCosta só têm permissões de Academy/Learn — concede também `/rooms/book solicitar`.
+      async function concederSolicitarReserva(usuarioId: string) {
+        const modulo = (await prisma.modulo.findFirst({ where: { nome: 'Rooster Rooms' } })) ?? (await prisma.modulo.create({ data: { nome: 'Rooster Rooms', ativo: true } }));
+        const permissao = await prisma.permissao.create({ data: { moduloId: modulo.id, nome: `Rooster Rooms:/rooms/book:solicitar:${usuarioId}`, recurso: '/rooms/book', acao: 'solicitar' } });
+        await prisma.usuarioPermissao.create({ data: { usuarioId, permissaoId: permissao.id } });
+      }
+      async function concederAcessarRooms(usuarioId: string) {
+        const modulo = (await prisma.modulo.findFirst({ where: { nome: 'Rooster Rooms' } })) ?? (await prisma.modulo.create({ data: { nome: 'Rooster Rooms', ativo: true } }));
+        const permissao = await prisma.permissao.create({ data: { moduloId: modulo.id, nome: `Rooster Rooms:/rooms:acessar:${usuarioId}`, recurso: '/rooms', acao: 'acessar' } });
+        await prisma.usuarioPermissao.create({ data: { usuarioId, permissaoId: permissao.id } });
+      }
+      await concederSolicitarReserva(cenario.profLima.usuario.id);
+      await concederSolicitarReserva(cenario.profCosta.usuario.id);
+      await concederSolicitarReserva(cenario.coordenador.usuario.id);
+      await concederAcessarRooms(cenario.coordenador.usuario.id);
+
+      const campus = await prisma.campus.create({ data: { nome: 'Campus Rooms-Turma Teste', codigo: `RT-CAMPUS-${Date.now()}` } });
+      const bloco = await prisma.bloco.create({ data: { campusId: campus.id, nome: 'Bloco Único', codigo: `RT-BLOCO-${Date.now()}`, andares: 1 } });
+      const ambiente = await prisma.ambiente.create({
+        data: {
+          campusId: campus.id, blocoId: bloco.id, nome: 'Sala Rooms-Turma Teste', codigo: `RT-SALA-${Date.now()}`,
+          tipo: 'sala', capacidade: 50, status: 'disponivel', horarioAbertura: '00:00-23:59',
+          diasFuncionamento: ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'], duracaoMinutos: 60,
+        },
+      });
+      const data = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+      const corpoBase = {
+        codigo: `RT-RES-${Date.now()}`, ambienteId: ambiente.id, responsavel: 'Prof. Lima Teste',
+        evento: 'Aula de reposição', finalidade: 'aula', data, horarioInicio: '10:00', horarioFim: '11:00', participantes: 10,
+        turmaId: cenario.turmaAlg.id,
+      };
+
+      // O professor dono da turma consegue vincular.
+      const reservaRes = await request(app.getHttpServer())
+        .post('/v1/reservas')
+        .set('Authorization', cenario.profLima.header)
+        .send(corpoBase)
+        .expect(201);
+      expect(reservaRes.body.turmaId ?? reservaRes.body.turma?.id).toBeTruthy();
+
+      const reservaDetalhe = await request(app.getHttpServer())
+        .get(`/v1/reservas/${reservaRes.body.id}`)
+        .set('Authorization', cenario.coordenador.header)
+        .expect(200);
+      expect(reservaDetalhe.body.turma?.codigo).toBe(cenario.turmaAlg.codigo);
+
+      // Outro professor (não dono da turma) não consegue vincular a mesma turma.
+      await request(app.getHttpServer())
+        .post('/v1/reservas')
+        .set('Authorization', cenario.profCosta.header)
+        .send({ ...corpoBase, codigo: `RT-RES-OUTRO-${Date.now()}` })
+        .expect(403);
+
+      // Coordenação (gestão ampla do Academy) pode vincular qualquer turma, mesmo não sendo a dona.
+      // Horário diferente do de profLima — mesmo ambiente/data já está ocupado naquele slot.
+      await request(app.getHttpServer())
+        .post('/v1/reservas')
+        .set('Authorization', cenario.coordenador.header)
+        .send({ ...corpoBase, codigo: `RT-RES-COORD-${Date.now()}`, responsavel: 'Coordenadora Teste', horarioInicio: '14:00', horarioFim: '15:00' })
+        .expect(201);
     });
 
     it('Documento acadêmico: upload, listagem, download e remoção respondem com o tamanho (BigInt) serializado corretamente', async () => {
@@ -1941,6 +2120,10 @@ describe('Full API e2e tests', () => {
       ['Rooster Finance', '/finance/reports', 'acessar'],
       ['Rooster Finance', '/finance/discounts', 'acessar'],
       ['Rooster Finance', '/finance/discounts', 'criar'],
+      ['Rooster Finance', '/finance/policies', 'acessar'],
+      ['Rooster Finance', '/finance/policies', 'criar'],
+      ['Rooster Finance', '/finance/policies', 'editar'],
+      ['Rooster Finance', '/finance/policies', 'excluir'],
     ];
     const ALUNO_FINANCE_KEYS: Array<[string, string, string]> = [
       ['Rooster Student', '/student/finance', 'acessar'],
@@ -1968,6 +2151,77 @@ describe('Full API e2e tests', () => {
 
       return { financeiro, alunoUsuario, outroAlunoUsuario, aluno, outroAluno, curso, turma, servico, produto };
     }
+
+    it('Política de multa/juros: o financeiro cria a própria regra; ela calcula dinamicamente, mas valor manual sempre vence', async () => {
+      const { financeiro, aluno } = await montarCenarioFinanceiro();
+
+      const semPermissao = await criarUsuarioComPermissoes('Sem Permissao Politica', 'sem.permissao.politica@example.com', []);
+      await request(app.getHttpServer()).get('/v1/politicas-multa-juros').set('Authorization', semPermissao.header).expect(403);
+
+      const politicaRes = await request(app.getHttpServer())
+        .post('/v1/politicas-multa-juros')
+        .set('Authorization', financeiro.header)
+        .send({ nome: 'Atraso padrão — teste', percentualMulta: 2, percentualJurosDia: 1, diasCarencia: 3 })
+        .expect(201);
+      expect(politicaRes.body.id).toBeDefined();
+
+      // 10 dias de atraso, 3 de carência -> 7 dias efetivos. base 200: multa 2% = 4; juros 1%/dia * 7 = 14.
+      const vencidaHaDezDias = new Date(Date.now() - 10 * 86_400_000).toISOString().slice(0, 10);
+      const cobrancaRes = await request(app.getHttpServer())
+        .post('/v1/cobrancas')
+        .set('Authorization', financeiro.header)
+        .send({
+          alunoId: aluno.id, tipo: 'taxa', descricao: 'Taxa com política de atraso', valorOriginal: 200,
+          vencimento: vencidaHaDezDias, politicaMultaJurosId: politicaRes.body.id,
+        })
+        .expect(201);
+      expect(cobrancaRes.body.politicaMultaJurosId).toBe(politicaRes.body.id);
+
+      const pagaComPolitica = await request(app.getHttpServer())
+        .post(`/v1/cobrancas/${cobrancaRes.body.id}/marcar-pago`)
+        .set('Authorization', financeiro.header)
+        .send({})
+        .expect(201);
+      expect(Number(pagaComPolitica.body.valorPago)).toBeCloseTo(218, 1);
+
+      // Outra cobrança, mesma política — mas com multa/juros MANUAIS: o manual sempre vence.
+      const cobranca2Res = await request(app.getHttpServer())
+        .post('/v1/cobrancas')
+        .set('Authorization', financeiro.header)
+        .send({
+          alunoId: aluno.id, tipo: 'taxa', descricao: 'Taxa com override manual', valorOriginal: 200,
+          vencimento: vencidaHaDezDias, politicaMultaJurosId: politicaRes.body.id,
+        })
+        .expect(201);
+      await request(app.getHttpServer())
+        .patch(`/v1/cobrancas/${cobranca2Res.body.id}`)
+        .set('Authorization', financeiro.header)
+        .send({ multa: 1, juros: 1 })
+        .expect(200);
+      const pagaManual = await request(app.getHttpServer())
+        .post(`/v1/cobrancas/${cobranca2Res.body.id}/marcar-pago`)
+        .set('Authorization', financeiro.header)
+        .send({})
+        .expect(201);
+      expect(Number(pagaManual.body.valorPago)).toBeCloseTo(202, 1);
+
+      // Política em uso (vinculada às duas cobranças acima) não pode ser excluída.
+      await request(app.getHttpServer()).delete(`/v1/politicas-multa-juros/${politicaRes.body.id}`).set('Authorization', financeiro.header).expect(400);
+
+      // A confirmação de pagamento acima precisa aparecer no relatório de auditoria (Finance passou
+      // a ser auditado nesta rodada — antes só o Hub gerava LogAuditoria).
+      const semPermissaoRelatorio = await criarUsuarioComPermissoes('Sem Permissao Relatorio', 'sem.permissao.relatorio@example.com', []);
+      await request(app.getHttpServer()).get('/v1/logs-auditoria/relatorio').set('Authorization', semPermissaoRelatorio.header).expect(403);
+
+      const relatorioRes = await request(app.getHttpServer()).get('/v1/logs-auditoria/relatorio').set('Authorization', authHeader).expect(200);
+      expect(relatorioRes.body.total).toBeGreaterThan(0);
+      expect(relatorioRes.body.porAcao.some((a: any) => a.acao === 'cobranca_marcada_paga')).toBe(true);
+      expect(relatorioRes.body.porModulo.some((m: any) => m.modulo === 'Rooster Finance')).toBe(true);
+
+      const csvRes = await request(app.getHttpServer()).get('/v1/logs-auditoria/exportar').set('Authorization', authHeader).expect(200);
+      expect(csvRes.text.split('\n')[0]).toBe('data,modulo,acao,entidade,entidadeId,usuario,ip');
+      expect(csvRes.text).toContain('cobranca_marcada_paga');
+    });
 
     it('CRUD de produtos e descontos; beneficiários do desconto são sempre calculados', async () => {
       const { financeiro } = await montarCenarioFinanceiro();

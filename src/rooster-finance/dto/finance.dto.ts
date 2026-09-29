@@ -1,8 +1,30 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
-  IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Length, Min,
+  IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Length, Max, Min,
 } from 'class-validator';
+
+// ===================== Política de multa/juros =====================
+export class CreatePoliticaMultaJurosDto {
+  @ApiProperty({ example: 'Mensalidade — padrão institucional', description: 'Nome da política, para identificá-la ao vincular a um serviço' })
+  @IsString() @Length(2, 150) nome: string;
+
+  @ApiPropertyOptional({ example: 'Multa de 2% + 0,033%/dia (1%/mês), com 3 dias de carência.', description: 'Descrição livre da regra, para contexto de quem for reutilizá-la' })
+  @IsOptional() @IsString() descricao?: string;
+
+  @ApiPropertyOptional({ example: 2, description: 'Multa única por atraso, em % sobre o valor devido (0 a 100)' })
+  @IsOptional() @IsNumber() @Min(0) @Max(100) percentualMulta?: number;
+
+  @ApiPropertyOptional({ example: 0.033, description: 'Juros de mora por dia de atraso, em % sobre o valor devido (0 a 100)' })
+  @IsOptional() @IsNumber() @Min(0) @Max(100) percentualJurosDia?: number;
+
+  @ApiPropertyOptional({ example: 3, description: 'Dias de atraso tolerados antes de a multa/juros passarem a valer' })
+  @IsOptional() @IsInt() @Min(0) diasCarencia?: number;
+
+  @ApiPropertyOptional({ example: true, description: 'Indica se a política está ativa e pode ser vinculada' })
+  @IsOptional() @IsBoolean() @Transform(({ value }) => value === true || value === 'true') ativo?: boolean;
+}
+export class UpdatePoliticaMultaJurosDto extends PartialType(CreatePoliticaMultaJurosDto) {}
 
 // ===================== Produto =====================
 export class CreateProdutoDto {
@@ -58,6 +80,9 @@ export class CreateServicoDto {
 
   @ApiPropertyOptional({ example: true, description: 'Indica se o serviço está ativo e disponível para cobrança' })
   @IsOptional() @Transform(({ value }) => value === true || value === 'true') ativo?: boolean;
+
+  @ApiPropertyOptional({ example: 'a1000000-0000-0000-0000-00000000000a', description: 'Política de multa/juros aplicada às cobranças geradas a partir deste serviço (ex.: mensalidade)' })
+  @IsOptional() @IsUUID() politicaMultaJurosId?: string;
 }
 export class UpdateServicoDto extends PartialType(CreateServicoDto) {}
 
@@ -143,6 +168,9 @@ export class CreateCobrancaDto {
 
   @ApiPropertyOptional({ example: 'boleto', description: 'Forma de pagamento prevista para a cobrança' })
   @IsOptional() @IsString() @Length(1, 30) formaPagamento?: string;
+
+  @ApiPropertyOptional({ example: 'a1000000-0000-0000-0000-00000000000a', description: 'Política de multa/juros desta cobrança. Se omitida e o serviço tiver uma política própria, ela é herdada automaticamente' })
+  @IsOptional() @IsUUID() politicaMultaJurosId?: string;
 }
 export class UpdateCobrancaDto {
   @ApiPropertyOptional({ example: 'Mensalidade — Graduação — 2026-09 (revisada)', description: 'Descrição da cobrança exibida ao aluno' })
@@ -159,6 +187,15 @@ export class UpdateCobrancaDto {
 
   @ApiPropertyOptional({ example: 'pix', description: 'Forma de pagamento prevista para a cobrança' })
   @IsOptional() @IsString() @Length(1, 30) formaPagamento?: string;
+
+  @ApiPropertyOptional({ example: 17.0, description: 'Multa MANUAL — sempre tem prioridade sobre a política vinculada' })
+  @IsOptional() @IsNumber() @Min(0) multa?: number;
+
+  @ApiPropertyOptional({ example: 8.5, description: 'Juros MANUAL — sempre tem prioridade sobre a política vinculada' })
+  @IsOptional() @IsNumber() @Min(0) juros?: number;
+
+  @ApiPropertyOptional({ example: 'a1000000-0000-0000-0000-00000000000a', description: 'Política de multa/juros desta cobrança (null para desvincular)' })
+  @IsOptional() @IsUUID() politicaMultaJurosId?: string;
 }
 
 export class GerarLoteMensalidadeDto {

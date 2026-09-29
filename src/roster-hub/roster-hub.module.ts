@@ -8,6 +8,8 @@ import { UsuariosSetoresModule } from './usuarios-setores/usuarios-setores.modul
 import { NotificacoesModule } from './notificacoes/notificacoes.module';
 import { SessoesModule } from './sessoes/sessoes.module';
 import { LogsAuditoriaModule } from './logs-auditoria/logs-auditoria.module';
+import { LogsErroModule } from './logs-erro/logs-erro.module';
+import { ConfiguracoesModule } from './configuracoes/configuracoes.module';
 
 /**
  * Módulo principal do Rooster Hub.
@@ -24,6 +26,8 @@ import { LogsAuditoriaModule } from './logs-auditoria/logs-auditoria.module';
     NotificacoesModule,
     SessoesModule,
     LogsAuditoriaModule,
+    LogsErroModule,
+    ConfiguracoesModule,
   ],
 })
 export class RoosterHubModule {}

@@ -3,7 +3,7 @@
 # Sobe PostgreSQL e o backend já conectados. O objetivo é que alguém consiga
 # rodar o sistema sem instalar Node nem PostgreSQL na máquina:
 #
-#   cp .env.example .env    # e definir JWT_SECRET
+#   cp .env.example .env    # e definir JWT_SECRET e FILE_ENCRYPTION_KEY
 #   docker compose up --build
 #
 # Depois de subir, aplicar o schema e os dados de demonstração:
@@ -44,8 +44,12 @@ services:
     environment:
       DATABASE_URL: postgresql://rooster:rooster@db:5432/rooster_one?schema=public
       # Sem valor padrão de propósito: a aplicação não sobe sem JWT_SECRET, e
-      # embutir um aqui viraria segredo de produção por acidente.
+      # embutir um aqui viraria segredo de produção por acidente. Mesma lógica
+      # para FILE_ENCRYPTION_KEY (setembro/2026): sem ela a aplicação recusa
+      # subir (ver src/main.ts), e um valor fixo aqui vazaria a chave de
+      # descriptografar todo arquivo do sistema para qualquer um com o repositório.
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env antes de subir}
+      FILE_ENCRYPTION_KEY: ${FILE_ENCRYPTION_KEY:?defina FILE_ENCRYPTION_KEY no .env antes de subir}
       PORT: 3000
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
     ports:

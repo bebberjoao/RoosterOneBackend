@@ -2,8 +2,10 @@ import { mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { Writable } from 'stream';
+import { createCipheriv, randomBytes } from 'crypto';
 import type { Request, Response } from 'express';
 import { enviarVideoComRange } from './video-stream.util';
+import { IV_LEN_CTR } from './file-encryption.util';
 
 /**
  * `enviarVideoComRange` é o que permite ao player arrastar a barra de
@@ -12,12 +14,29 @@ import { enviarVideoComRange } from './video-stream.util';
  * outro download usa `response.download()`, que sempre manda o arquivo
  * inteiro). Testado com um arquivo pequeno real em disco, não mockado: o
  * que importa aqui é o `Content-Range` e os bytes exatos devolvidos.
+ *
+ * O vídeo é servido cifrado em repouso (AES-256-CTR, ver `file-encryption.util.ts`) —
+ * o fixture abaixo é gravado já cifrado, no mesmo formato que a escrita real produz
+ * ([IV 16 bytes][ciphertext]), e as asserções continuam comparando contra `CONTEUDO`
+ * em texto puro, porque é isso que a função devolve depois de decifrar.
  */
+
+const CHAVE_ANTERIOR = process.env.FILE_ENCRYPTION_KEY;
+process.env.FILE_ENCRYPTION_KEY = randomBytes(32).toString('base64');
+afterAll(() => { process.env.FILE_ENCRYPTION_KEY = CHAVE_ANTERIOR; });
 
 const PASTA = mkdtempSync(join(tmpdir(), 'video-stream-spec-'));
 const CONTEUDO = Buffer.from('0123456789'.repeat(10)); // 100 bytes, previsível byte a byte
 const ARQUIVO = join(PASTA, 'video.mp4');
-writeFileSync(ARQUIVO, CONTEUDO);
+
+function cifrarParaArquivoDeTeste(caminho: string, conteudo: Buffer) {
+  const iv = randomBytes(IV_LEN_CTR);
+  const chave = Buffer.from(process.env.FILE_ENCRYPTION_KEY!, 'base64');
+  const cipher = createCipheriv('aes-256-ctr', chave, iv);
+  const ciphertext = Buffer.concat([cipher.update(conteudo), cipher.final()]);
+  writeFileSync(caminho, Buffer.concat([iv, ciphertext]));
+}
+cifrarParaArquivoDeTeste(ARQUIVO, CONTEUDO);
 
 afterAll(() => rmSync(PASTA, { recursive: true, force: true }));
 

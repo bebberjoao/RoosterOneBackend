@@ -31,6 +31,10 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
   exit 1
 fi
 
+# pg_dump/pg_restore usam libpq puro, que rejeita "?schema=..." (parâmetro só
+# reconhecido pelo Prisma) com "invalid URI query parameter".
+DATABASE_URL="${DATABASE_URL%%\?*}"
+
 ALVO="$(echo "${DATABASE_URL}" | sed -E 's#(//[^:]+):[^@]+@#\1:***@#')"
 echo "Backup:  ${PASTA}"
 [[ -f "${PASTA}/manifesto.txt" ]] && { echo; cat "${PASTA}/manifesto.txt"; echo; }

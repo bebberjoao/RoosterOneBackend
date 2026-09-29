@@ -67,6 +67,7 @@ const ids = {
     confirmadaAula: '83000000-0000-4000-8000-000000000003',
     confirmadaWorkshop: '83000000-0000-4000-8000-000000000004',
     canceladaEvento: '83000000-0000-4000-8000-000000000005',
+    aulaAlgoritmos: '83000000-0000-4000-8000-000000000006',
   },
   assetCategories: {
     informatica: '90000000-0000-4000-8000-000000000001',
@@ -92,6 +93,7 @@ const ids = {
     professorCosta: '11000000-0000-4000-8000-000000000003',
     alunoJoao: '11000000-0000-4000-8000-000000000004',
     alunoMaria: '11000000-0000-4000-8000-000000000005',
+    alunoPedro: '11000000-0000-4000-8000-000000000006',
   },
   cursos: {
     engenhariaSoftware: '12000000-0000-4000-8000-000000000001',
@@ -103,24 +105,37 @@ const ids = {
   disciplinas: {
     algoritmos: '14000000-0000-4000-8000-000000000001',
     bancoDados: '14000000-0000-4000-8000-000000000002',
+    poo: '14000000-0000-4000-8000-000000000003',
   },
   professores: {
     lima: '15000000-0000-4000-8000-000000000001',
     costa: '15000000-0000-4000-8000-000000000002',
+    admin: '15000000-0000-4000-8000-000000000003',
   },
   alunos: {
     joao: '16000000-0000-4000-8000-000000000001',
     maria: '16000000-0000-4000-8000-000000000002',
+    admin: '16000000-0000-4000-8000-000000000003',
+    pedro: '16000000-0000-4000-8000-000000000004',
   },
   turmas: {
     algoritmosA: '17000000-0000-4000-8000-000000000001',
     bancoDadosA: '17000000-0000-4000-8000-000000000002',
+    pooA: '17000000-0000-4000-8000-000000000003',
   },
   itensAvaliativos: {
     provaAlgoritmos: '18000000-0000-4000-8000-000000000001',
+    provaBancoDados: '18000000-0000-4000-8000-000000000002',
+    provaPoo: '18000000-0000-4000-8000-000000000003',
   },
   atividades: {
     listaAlgoritmos: '19000000-0000-4000-8000-000000000001',
+    trabalhoPoo: '19000000-0000-4000-8000-000000000002',
+  },
+  documentosAcademicos: {
+    planoAlgoritmos: '24000000-0000-4000-8000-000000000001',
+    ementaBancoDados: '24000000-0000-4000-8000-000000000002',
+    regulamento: '24000000-0000-4000-8000-000000000003',
   },
   produtos: {
     apostila: '20000000-0000-4000-8000-000000000001',
@@ -132,6 +147,9 @@ const ids = {
   },
   descontos: {
     bolsaMerito: '22000000-0000-4000-8000-000000000001',
+  },
+  politicas: {
+    mensalidade: '23000000-0000-4000-8000-000000000001',
   },
 };
 
@@ -176,8 +194,11 @@ function permissionDefinitions(
     ['hub.setores.gerenciar-usuarios', 'Gerenciar usuários do setor', hubModulo, '/hub/setores', 'gerenciar-usuarios'],
     ['hub.acessos.acessar', 'Acessar Acessos e permissões', hubModulo, '/hub/acessos', 'acessar'],
     ['hub.acessos.gerenciar-permissoes', 'Gerenciar permissões', hubModulo, '/hub/acessos', 'gerenciar-permissoes'],
+    ['hub.acessos.relatorio-auditoria', 'Ver relatório de auditoria', hubModulo, '/hub/acessos', 'relatorio-auditoria'],
+    ['hub.acessos.relatorio-erros', 'Ver relatório de erros', hubModulo, '/hub/acessos', 'relatorio-erros'],
     ['hub.acessos.conceder', 'Conceder permissões a usuário', hubModulo, '/hub/acessos', 'conceder'],
     ['hub.acessos.revogar', 'Revogar permissões de usuário', hubModulo, '/hub/acessos', 'revogar'],
+    ['hub.configuracoes.acessar', 'Acessar Configurações do sistema', hubModulo, '/hub/configuracoes', 'acessar'],
     ['hub.dashboard.acessar', 'Acessar Rooster Hub', hubModulo, '/hub', 'acessar'],
 
     // Rooster Desk
@@ -317,6 +338,11 @@ function permissionDefinitions(
     ['finance.discounts.criar', 'Criar desconto', financeModulo, '/finance/discounts', 'criar'],
     ['finance.discounts.editar', 'Editar desconto', financeModulo, '/finance/discounts', 'editar'],
     ['finance.discounts.excluir', 'Excluir desconto', financeModulo, '/finance/discounts', 'excluir'],
+    // Regra de multa/juros por atraso, criada pelo próprio financeiro (RN043) — não é fixa no código.
+    ['finance.policies.acessar', 'Acessar Políticas de multa/juros', financeModulo, '/finance/policies', 'acessar'],
+    ['finance.policies.criar', 'Criar política de multa/juros', financeModulo, '/finance/policies', 'criar'],
+    ['finance.policies.editar', 'Editar política de multa/juros', financeModulo, '/finance/policies', 'editar'],
+    ['finance.policies.excluir', 'Excluir política de multa/juros', financeModulo, '/finance/policies', 'excluir'],
   ] as const;
 }
 
@@ -398,6 +424,7 @@ const financeStaffKeys = [
   'finance.nfe.acessar', 'finance.nfe.emitir', 'finance.nfe.exportar-xml',
   'finance.reports.acessar', 'finance.reports.exportar',
   'finance.discounts.acessar', 'finance.discounts.criar', 'finance.discounts.editar', 'finance.discounts.excluir',
+  'finance.policies.acessar', 'finance.policies.criar', 'finance.policies.editar', 'finance.policies.excluir',
 ];
 
 async function clearDatabase() {
@@ -407,6 +434,7 @@ async function clearDatabase() {
     prisma.descontoAluno.deleteMany(),
     prisma.desconto.deleteMany(),
     prisma.servico.deleteMany(),
+    prisma.politicaMultaJuros.deleteMany(),
     prisma.produto.deleteMany(),
     prisma.certificadoBoost.deleteMany(),
     prisma.progressoAula.deleteMany(),
@@ -603,6 +631,36 @@ async function main() {
     ],
   });
 
+  // Quarto chamado, já encerrado e avaliado — cobre o ciclo completo (histórico de
+  // status, anexo, mensagens interna/pública e avaliação) que os 3 primeiros não exercitam.
+  const ticketEncerrado = await prisma.ticket.create({
+    data: {
+      protocolo: 'TCK-0004', titulo: 'Solicitação de segunda via de crachá', descricao: 'Perdi meu crachá de acesso e preciso de uma segunda via com urgência.',
+      usuarioId: ids.users.solicitante, tecnicoId: ids.users.atendente, categoriaId: ids.categories.acesso, subcategoriaId: ids.subcategories.senha,
+      prioridadeId: '4', statusId: ids.statuses.encerrado,
+      criadoEm: new Date(Date.now() - 10 * 86400000), atualizadoEm: new Date(Date.now() - 8 * 86400000), encerradoEm: new Date(Date.now() - 8 * 86400000),
+    },
+  });
+  await prisma.historicoTicket.createMany({
+    data: [
+      { ticketId: ticketEncerrado.id, usuarioId: ids.users.atendente, campo: 'statusId', valorAntigo: ids.statuses.aberto, valorNovo: ids.statuses.atendimento, criadoEm: new Date(Date.now() - 9 * 86400000) },
+      { ticketId: ticketEncerrado.id, usuarioId: ids.users.atendente, campo: 'statusId', valorAntigo: ids.statuses.atendimento, valorNovo: ids.statuses.encerrado, criadoEm: new Date(Date.now() - 8 * 86400000) },
+    ],
+  });
+  await prisma.mensagemTicket.createMany({
+    data: [
+      { ticketId: ticketEncerrado.id, usuarioId: ids.users.solicitante, mensagem: 'Preciso muito disso hoje, é possível agilizar?', criadoEm: new Date(Date.now() - 9 * 86400000) },
+      { ticketId: ticketEncerrado.id, usuarioId: ids.users.atendente, mensagem: 'Já registrei o boletim de ocorrência do solicitante como anexo.', interno: true, criadoEm: new Date(Date.now() - 9 * 86400000) },
+      { ticketId: ticketEncerrado.id, usuarioId: ids.users.atendente, mensagem: 'Segunda via liberada, já pode retirar na secretaria.', criadoEm: new Date(Date.now() - 8 * 86400000) },
+    ],
+  });
+  await prisma.anexoTicket.create({
+    data: { ticketId: ticketEncerrado.id, usuarioId: ids.users.solicitante, nomeArquivo: 'comprovante-bo.pdf', caminho: 'seed-placeholder.pdf', tipo: 'application/pdf', tamanho: BigInt(20480), criadoEm: new Date(Date.now() - 9 * 86400000) },
+  });
+  await prisma.avaliacaoTicket.create({
+    data: { ticketId: ticketEncerrado.id, usuarioId: ids.users.solicitante, nota: 5, comentario: 'Atendimento rápido, resolveu no mesmo dia.', criadoEm: new Date(Date.now() - 8 * 86400000) },
+  });
+
   // =====================================================
   // Rooster Rooms — estrutura física e reservas de exemplo
   // =====================================================
@@ -743,6 +801,8 @@ async function main() {
   await grant(ids.academyUsers.alunoJoao, alunoKeys);
   await prisma.usuario.create({ data: { id: ids.academyUsers.alunoMaria, nome: 'Maria Santos', email: 'maria.santos@rooster.local', senhaHash: await senha('Aluno123!'), ativo: true } });
   await grant(ids.academyUsers.alunoMaria, alunoKeys);
+  await prisma.usuario.create({ data: { id: ids.academyUsers.alunoPedro, nome: 'Pedro Alves', email: 'pedro.alves@rooster.local', senhaHash: await senha('Aluno123!'), ativo: true } });
+  await grant(ids.academyUsers.alunoPedro, alunoKeys);
 
   await prisma.curso.createMany({
     data: [
@@ -759,6 +819,7 @@ async function main() {
     data: [
       { id: ids.disciplinas.algoritmos, codigo: 'ALG101', nome: 'Algoritmos e Estruturas de Dados', cursoId: ids.cursos.engenhariaSoftware, cargaHoraria: 80, status: 'ativa', criadoEm: new Date(), atualizadoEm: new Date() },
       { id: ids.disciplinas.bancoDados, codigo: 'BD101', nome: 'Banco de Dados', cursoId: ids.cursos.engenhariaSoftware, cargaHoraria: 60, status: 'ativa', criadoEm: new Date(), atualizadoEm: new Date() },
+      { id: ids.disciplinas.poo, codigo: 'POO101', nome: 'Programação Orientada a Objetos', cursoId: ids.cursos.engenhariaSoftware, cargaHoraria: 80, status: 'ativa', criadoEm: new Date(), atualizadoEm: new Date() },
     ],
   });
 
@@ -766,6 +827,9 @@ async function main() {
     data: [
       { id: ids.professores.lima, usuarioId: ids.academyUsers.professorLima, titulacao: 'Prof. Dr.', departamento: 'Ciência da Computação', cargaHorariaSemanal: 20, status: 'ativo', criadoEm: new Date(), atualizadoEm: new Date() },
       { id: ids.professores.costa, usuarioId: ids.academyUsers.professorCosta, titulacao: 'Profa. Ma.', departamento: 'Ciência da Computação', cargaHorariaSemanal: 16, status: 'ativo', criadoEm: new Date(), atualizadoEm: new Date() },
+      // Admin também como professor de verdade (cadastro em Professor + turma própria abaixo) —
+      // pedido explícito para poder testar a experiência de professor logado como admin.
+      { id: ids.professores.admin, usuarioId: ids.users.admin, titulacao: 'Prof. Dr.', departamento: 'Ciência da Computação', cargaHorariaSemanal: 8, status: 'ativo', criadoEm: new Date(), atualizadoEm: new Date() },
     ],
   });
 
@@ -773,6 +837,11 @@ async function main() {
     data: [
       { id: ids.alunos.joao, usuarioId: ids.academyUsers.alunoJoao, ra: '2026001', cursoId: ids.cursos.engenhariaSoftware, semestre: 3, situacao: 'ativo', criadoEm: new Date(), atualizadoEm: new Date() },
       { id: ids.alunos.maria, usuarioId: ids.academyUsers.alunoMaria, ra: '2026002', cursoId: ids.cursos.engenhariaSoftware, semestre: 3, situacao: 'ativo', criadoEm: new Date(), atualizadoEm: new Date() },
+      { id: ids.alunos.pedro, usuarioId: ids.academyUsers.alunoPedro, ra: '2026003', cursoId: ids.cursos.engenhariaSoftware, semestre: 3, situacao: 'ativo', criadoEm: new Date(), atualizadoEm: new Date() },
+      // Admin também como aluno de verdade (cadastro em Aluno + matrícula em turmas de outros
+      // professores abaixo) — pedido explícito para poder testar a experiência de aluno logado
+      // como admin, sem depender de nenhuma outra conta.
+      { id: ids.alunos.admin, usuarioId: ids.users.admin, ra: '2026004', cursoId: ids.cursos.engenhariaSoftware, semestre: 3, situacao: 'ativo', criadoEm: new Date(), atualizadoEm: new Date() },
     ],
   });
 
@@ -780,31 +849,77 @@ async function main() {
     data: [
       { id: ids.turmas.algoritmosA, codigo: 'ALG101-A', disciplinaId: ids.disciplinas.algoritmos, periodoLetivoId: ids.periodosLetivos.atual, professorId: ids.professores.lima, turno: 'Noturno', capacidade: 40, sala: 'Sala 101', horario: 'Seg/Qua 19:00-20:40', status: 'em-andamento', criadoEm: new Date(), atualizadoEm: new Date() },
       { id: ids.turmas.bancoDadosA, codigo: 'BD101-A', disciplinaId: ids.disciplinas.bancoDados, periodoLetivoId: ids.periodosLetivos.atual, professorId: ids.professores.costa, turno: 'Noturno', capacidade: 35, sala: 'Sala 102', horario: 'Ter/Qui 19:00-20:40', status: 'em-andamento', criadoEm: new Date(), atualizadoEm: new Date() },
+      { id: ids.turmas.pooA, codigo: 'POO101-A', disciplinaId: ids.disciplinas.poo, periodoLetivoId: ids.periodosLetivos.atual, professorId: ids.professores.admin, turno: 'Noturno', capacidade: 30, sala: 'Sala 102', horario: 'Sex 19:00-22:30', status: 'em-andamento', criadoEm: new Date(), atualizadoEm: new Date() },
     ],
+  });
+
+  // Vínculo Rooms <-> Academy: o professor reservou a sala PARA a própria turma (criado só
+  // depois da turma existir — Rooms roda antes de Academy neste script).
+  await prisma.reserva.create({
+    data: {
+      id: ids.reservations.aulaAlgoritmos, codigo: 'RES-0006', ambienteId: ids.rooms.sala101,
+      responsavelId: ids.academyUsers.professorLima, responsavel: 'Prof. Ricardo Lima', setor: 'Coordenação Acadêmica',
+      evento: 'Aula de reposição — Algoritmos (ALG101-A)', finalidade: 'aula',
+      turmaId: ids.turmas.algoritmosA,
+      data: diaFuturo(5), horarioInicio: '19:00', horarioFim: '20:40', participantes: 40,
+      status: 'confirmada', recorrencia: 'unica',
+      decididoPor: ids.users.admin, decididoEm: new Date(),
+      criadoEm: new Date(), atualizadoEm: new Date(),
+    },
   });
 
   // João só está matriculado em Algoritmos (turma do Prof. Lima); Maria só em Banco de Dados
   // (turma da Profa. Costa) — de propósito, para exercitar os casos negativos de escopo
-  // (aluno/professor de uma turma não pode ver dado da outra).
+  // (aluno/professor de uma turma não pode ver dado da outra). Pedro segue o mesmo padrão,
+  // isolado só na turma do admin (POO). O admin-aluno é o único caso que atravessa turmas de
+  // propósito, para poder testar a experiência de aluno em turmas de professores DE VERDADE.
   await prisma.matricula.createMany({
     data: [
       { alunoId: ids.alunos.joao, turmaId: ids.turmas.algoritmosA, status: 'ativa', criadoEm: new Date(), atualizadoEm: new Date() },
       { alunoId: ids.alunos.maria, turmaId: ids.turmas.bancoDadosA, status: 'ativa', criadoEm: new Date(), atualizadoEm: new Date() },
+      { alunoId: ids.alunos.pedro, turmaId: ids.turmas.pooA, status: 'ativa', criadoEm: new Date(), atualizadoEm: new Date() },
+      { alunoId: ids.alunos.admin, turmaId: ids.turmas.algoritmosA, status: 'ativa', criadoEm: new Date(), atualizadoEm: new Date() },
+      { alunoId: ids.alunos.admin, turmaId: ids.turmas.bancoDadosA, status: 'ativa', criadoEm: new Date(), atualizadoEm: new Date() },
     ],
   });
 
+  // Cobre as 4 presenças possíveis (presente | falta | atraso | justificado), espalhadas
+  // pelas 3 turmas.
   await prisma.registroFrequencia.createMany({
     data: [
       { turmaId: ids.turmas.algoritmosA, alunoId: ids.alunos.joao, data: new Date(Date.now() - 7 * 86400000), presenca: 'presente', registradoPorId: ids.academyUsers.professorLima, criadoEm: new Date() },
       { turmaId: ids.turmas.algoritmosA, alunoId: ids.alunos.joao, data: new Date(Date.now() - 2 * 86400000), presenca: 'falta', registradoPorId: ids.academyUsers.professorLima, criadoEm: new Date() },
+      { turmaId: ids.turmas.algoritmosA, alunoId: ids.alunos.admin, data: new Date(Date.now() - 7 * 86400000), presenca: 'justificado', registradoPorId: ids.academyUsers.professorLima, criadoEm: new Date() },
+      { turmaId: ids.turmas.bancoDadosA, alunoId: ids.alunos.maria, data: new Date(Date.now() - 7 * 86400000), presenca: 'presente', registradoPorId: ids.academyUsers.professorCosta, criadoEm: new Date() },
+      { turmaId: ids.turmas.bancoDadosA, alunoId: ids.alunos.admin, data: new Date(Date.now() - 7 * 86400000), presenca: 'atraso', registradoPorId: ids.academyUsers.professorCosta, criadoEm: new Date() },
+      { turmaId: ids.turmas.pooA, alunoId: ids.alunos.pedro, data: new Date(Date.now() - 3 * 86400000), presenca: 'presente', registradoPorId: ids.professores.admin, criadoEm: new Date() },
     ],
   });
 
   await prisma.itemAvaliativo.create({
     data: { id: ids.itensAvaliativos.provaAlgoritmos, turmaId: ids.turmas.algoritmosA, nome: 'Prova 1', peso: 0.6, notaMaxima: 10, origem: 'manual', criadoEm: new Date() },
   });
-  await prisma.nota.create({
-    data: { itemAvaliativoId: ids.itensAvaliativos.provaAlgoritmos, alunoId: ids.alunos.joao, valor: 8.5, lancadoPorId: ids.academyUsers.professorLima, atualizadoEm: new Date() },
+  await prisma.nota.createMany({
+    data: [
+      { itemAvaliativoId: ids.itensAvaliativos.provaAlgoritmos, alunoId: ids.alunos.joao, valor: 8.5, lancadoPorId: ids.academyUsers.professorLima, atualizadoEm: new Date() },
+      { itemAvaliativoId: ids.itensAvaliativos.provaAlgoritmos, alunoId: ids.alunos.admin, valor: 10, lancadoPorId: ids.academyUsers.professorLima, atualizadoEm: new Date() },
+    ],
+  });
+
+  await prisma.itemAvaliativo.create({
+    data: { id: ids.itensAvaliativos.provaBancoDados, turmaId: ids.turmas.bancoDadosA, nome: 'Prova 1', peso: 1, notaMaxima: 10, origem: 'manual', criadoEm: new Date() },
+  });
+  await prisma.nota.createMany({
+    data: [
+      { itemAvaliativoId: ids.itensAvaliativos.provaBancoDados, alunoId: ids.alunos.maria, valor: 9.0, lancadoPorId: ids.academyUsers.professorCosta, atualizadoEm: new Date() },
+      { itemAvaliativoId: ids.itensAvaliativos.provaBancoDados, alunoId: ids.alunos.admin, valor: 7.5, lancadoPorId: ids.academyUsers.professorCosta, atualizadoEm: new Date() },
+    ],
+  });
+
+  // Turma do admin como professor (POO): 1 item manual (Pedro sem nota ainda — pendência
+  // proposital, pra testar a tela "faltam lançar notas") + a atividade do Learn abaixo.
+  await prisma.itemAvaliativo.create({
+    data: { id: ids.itensAvaliativos.provaPoo, turmaId: ids.turmas.pooA, nome: 'Prova 1', peso: 0.5, notaMaxima: 10, origem: 'manual', criadoEm: new Date() },
   });
 
   // Atividade do Learn já publicada, com item avaliativo gerado (origem "learn") — mostra a
@@ -822,6 +937,77 @@ async function main() {
     data: { turmaId: ids.turmas.algoritmosA, nome: 'Lista 1 — Complexidade de algoritmos', peso: 0.4, notaMaxima: 10, origem: 'learn', atividadeId: ids.atividades.listaAlgoritmos, criadoEm: new Date() },
   });
 
+  // Entrega de João já corrigida (mostra o ciclo completo de correção do Learn) e do
+  // admin-aluno ainda pendente de correção (mostra a fila de correção do professor).
+  const entregaJoaoLista = await prisma.entrega.create({
+    data: {
+      atividadeId: ids.atividades.listaAlgoritmos, alunoId: ids.alunos.joao, status: 'corrigida',
+      texto: 'Segue em anexo a resolução dos 5 exercícios de complexidade assintótica.',
+      enviadoEm: new Date(Date.now() - 3 * 86400000), nota: 9.0, feedback: 'Muito bem, só a questão 4 poderia ter justificado melhor o Big-O.',
+      corrigidoPorId: ids.academyUsers.professorLima, corrigidoEm: new Date(Date.now() - 1 * 86400000),
+    },
+  });
+  await prisma.anexoEntrega.create({
+    data: { entregaId: entregaJoaoLista.id, nomeArquivo: 'lista1-joao.pdf', caminho: 'seed-placeholder.pdf', tipo: 'application/pdf', tamanho: BigInt(51200), criadoEm: new Date(Date.now() - 3 * 86400000) },
+  });
+  const entregaAdminLista = await prisma.entrega.create({
+    data: {
+      atividadeId: ids.atividades.listaAlgoritmos, alunoId: ids.alunos.admin, status: 'enviada',
+      texto: 'Resolução da lista 1, exercícios 1 a 5.',
+      enviadoEm: new Date(Date.now() - 6 * 3600000),
+    },
+  });
+  await prisma.anexoEntrega.create({
+    data: { entregaId: entregaAdminLista.id, nomeArquivo: 'lista1-admin.pdf', caminho: 'seed-placeholder.pdf', tipo: 'application/pdf', tamanho: BigInt(48200), criadoEm: new Date(Date.now() - 6 * 3600000) },
+  });
+
+  // Turma do admin como professor (POO): atividade do Learn com uma entrega corrigida (Pedro)
+  // e uma atrasada/sem envio (mostra o status "atrasada", que nenhuma outra turma exercita).
+  await prisma.atividade.create({
+    data: {
+      id: ids.atividades.trabalhoPoo, codigo: 'POO101-T1', titulo: 'Trabalho — Herança e Polimorfismo',
+      tipo: 'trabalho', turmaId: ids.turmas.pooA, professorId: ids.professores.admin,
+      status: 'publicada', peso: 0.5, notaMaxima: 10,
+      prazoEm: new Date(Date.now() - 1 * 86400000), permiteAtraso: false,
+      criadoEm: new Date(Date.now() - 10 * 86400000), publicadoEm: new Date(Date.now() - 10 * 86400000),
+    },
+  });
+  await prisma.itemAvaliativo.create({
+    data: { turmaId: ids.turmas.pooA, nome: 'Trabalho — Herança e Polimorfismo', peso: 0.5, notaMaxima: 10, origem: 'learn', atividadeId: ids.atividades.trabalhoPoo, criadoEm: new Date() },
+  });
+  const entregaPedroPoo = await prisma.entrega.create({
+    data: {
+      atividadeId: ids.atividades.trabalhoPoo, alunoId: ids.alunos.pedro, status: 'corrigida',
+      texto: 'Modelagem de classes com herança para o sistema de biblioteca proposto.',
+      enviadoEm: new Date(Date.now() - 3 * 86400000), nota: 8.0, feedback: 'Boa modelagem; faltou aplicar polimorfismo no método de empréstimo.',
+      corrigidoPorId: ids.professores.admin, corrigidoEm: new Date(Date.now() - 2 * 86400000),
+    },
+  });
+  await prisma.anexoEntrega.create({
+    data: { entregaId: entregaPedroPoo.id, nomeArquivo: 'trabalho-poo-pedro.pdf', caminho: 'seed-placeholder.pdf', tipo: 'application/pdf', tamanho: BigInt(61200), criadoEm: new Date(Date.now() - 3 * 86400000) },
+  });
+  await prisma.entrega.create({
+    data: { atividadeId: ids.atividades.trabalhoPoo, alunoId: ids.alunos.admin, status: 'atrasada' },
+  });
+
+  await prisma.documentoAcademico.createMany({
+    data: [
+      { id: ids.documentosAcademicos.planoAlgoritmos, nome: 'Plano de Ensino — Algoritmos e Estruturas de Dados', tipo: 'plano-de-ensino', disciplinaId: ids.disciplinas.algoritmos, autorId: ids.professores.lima, caminho: 'seed-placeholder.pdf', tamanho: BigInt(30720), criadoEm: new Date(), atualizadoEm: new Date() },
+      { id: ids.documentosAcademicos.ementaBancoDados, nome: 'Ementa — Banco de Dados', tipo: 'ementa', disciplinaId: ids.disciplinas.bancoDados, autorId: ids.professores.costa, caminho: 'seed-placeholder.pdf', tamanho: BigInt(20480), criadoEm: new Date(), atualizadoEm: new Date() },
+      { id: ids.documentosAcademicos.regulamento, nome: 'Regulamento Acadêmico 2026', tipo: 'institucional', autorId: ids.academyUsers.coordenador, caminho: 'seed-placeholder.pdf', tamanho: BigInt(102400), criadoEm: new Date(), atualizadoEm: new Date() },
+    ],
+  });
+
+  await prisma.notificacao.createMany({
+    data: [
+      { usuarioId: ids.users.admin, titulo: 'Entrega pendente de correção', mensagem: 'Pedro Alves enviou o Trabalho — Herança e Polimorfismo.', rota: '/learn/classes', lida: false, criadoEm: new Date(Date.now() - 2 * 86400000) },
+      { usuarioId: ids.users.admin, titulo: 'Chamado encerrado', mensagem: 'TCK-0004 foi encerrado e avaliado com nota 5.', rota: '/desk/tickets', lida: true, criadoEm: new Date(Date.now() - 8 * 86400000) },
+      { usuarioId: ids.academyUsers.alunoJoao, titulo: 'Sua entrega foi corrigida', mensagem: 'Lista 1 — Complexidade de algoritmos: nota 9.0.', rota: '/learn/student', lida: false, criadoEm: new Date(Date.now() - 1 * 86400000) },
+      { usuarioId: ids.academyUsers.alunoPedro, titulo: 'Seu trabalho foi corrigido', mensagem: 'Trabalho — Herança e Polimorfismo: nota 8.0.', rota: '/learn/student', lida: false, criadoEm: new Date(Date.now() - 2 * 86400000) },
+      { usuarioId: ids.users.solicitante, titulo: 'Chamado atualizado', mensagem: 'Seu chamado TCK-0004 foi encerrado.', rota: '/desk/tickets', lida: true, criadoEm: new Date(Date.now() - 8 * 86400000) },
+    ],
+  });
+
   await prisma.eventoCalendarioAcademico.create({
     data: { titulo: 'Início do semestre 2026.2', data: new Date('2026-08-03'), tipo: 'semestre', publico: 'Todos', criadoEm: new Date() },
   });
@@ -836,9 +1022,17 @@ async function main() {
       { id: ids.produtos.uniforme, codigo: 'UNI-014', nome: 'Uniforme oficial — Camiseta', categoria: 'Uniformes', descricao: 'Malha piquê com bordado institucional.', preco: 79.0, estoque: 128, estoqueMinimo: 40, unidade: 'un', ativo: true, criadoEm: new Date(), atualizadoEm: new Date() },
     ],
   });
+  await prisma.politicaMultaJuros.create({
+    data: {
+      id: ids.politicas.mensalidade, nome: 'Mensalidade — padrão institucional',
+      descricao: 'Multa de 2% + 0,033%/dia (~1%/mês), com 3 dias de carência.',
+      percentualMulta: 2, percentualJurosDia: 0.033, diasCarencia: 3, ativo: true,
+      criadoPorId: ids.users.financeiro, criadoEm: new Date(), atualizadoEm: new Date(),
+    },
+  });
   await prisma.servico.createMany({
     data: [
-      { id: ids.servicos.mensalidadeGraduacao, nome: 'Mensalidade — Graduação', descricao: 'Mensalidade padrão dos cursos de graduação.', preco: 1250.0, categoria: 'Mensalidade', frequencia: 'mensal', ativo: true, criadoEm: new Date(), atualizadoEm: new Date() },
+      { id: ids.servicos.mensalidadeGraduacao, nome: 'Mensalidade — Graduação', descricao: 'Mensalidade padrão dos cursos de graduação.', preco: 1250.0, categoria: 'Mensalidade', frequencia: 'mensal', ativo: true, politicaMultaJurosId: ids.politicas.mensalidade, criadoEm: new Date(), atualizadoEm: new Date() },
       { id: ids.servicos.segundaVia, nome: '2ª via de documento', descricao: 'Emissão de segunda via de documentos.', preco: 45.0, categoria: 'Taxa', frequencia: 'unico', ativo: true, criadoEm: new Date(), atualizadoEm: new Date() },
     ],
   });
@@ -899,6 +1093,31 @@ async function main() {
     },
   });
 
+  // Admin-aluno: cobre os 3 status ainda não exercitados por João/Maria (vencido, negociado,
+  // cancelado) — junto com "aberto"/"pago" acima, fecha todos os status possíveis de Cobranca.
+  await prisma.cobranca.create({
+    data: {
+      alunoId: ids.alunos.admin, tipo: 'mensalidade', descricao: 'Mensalidade — Graduação — 2026-06', competencia: '2026-06',
+      servicoId: ids.servicos.mensalidadeGraduacao, valorOriginal: 1250, valorDesconto: 0, multa: 25, juros: 12.5,
+      vencimento: new Date('2026-06-10'), status: 'vencido', criadoEm: new Date('2026-06-01'), atualizadoEm: new Date(),
+    },
+  });
+  await prisma.cobranca.create({
+    data: {
+      alunoId: ids.alunos.admin, tipo: 'mensalidade', descricao: 'Mensalidade — Graduação — 2026-05', competencia: '2026-05',
+      servicoId: ids.servicos.mensalidadeGraduacao, valorOriginal: 1250, valorDesconto: 0,
+      vencimento: new Date('2026-05-10'), status: 'negociado', negociadoEm: new Date('2026-05-15'),
+      criadoEm: new Date('2026-05-01'), atualizadoEm: new Date('2026-05-15'),
+    },
+  });
+  await prisma.cobranca.create({
+    data: {
+      alunoId: ids.alunos.admin, tipo: 'taxa', descricao: '2ª via de documento', servicoId: ids.servicos.segundaVia,
+      valorOriginal: 45, valorDesconto: 0, vencimento: new Date('2026-08-20'), status: 'cancelado',
+      motivoCancelamento: 'Solicitação duplicada.', criadoEm: new Date('2026-08-15'), atualizadoEm: new Date('2026-08-16'),
+    },
+  });
+
   // Compra de produto por João, já paga e com nota fiscal interna emitida.
   const cobrancaProduto = await prisma.cobranca.create({
     data: {
@@ -930,12 +1149,14 @@ async function main() {
     },
   });
   await prisma.cursoOrientadorBoost.create({ data: { cursoId: cursoBoost.id, professorId: ids.professores.lima, criadoEm: new Date() } });
+  // Admin também como orientador do curso Boost — pra testar a tela de conversas como admin.
+  await prisma.cursoOrientadorBoost.create({ data: { cursoId: cursoBoost.id, professorId: ids.professores.admin, criadoEm: new Date() } });
   const moduloBoost1 = await prisma.moduloBoost.create({ data: { cursoId: cursoBoost.id, titulo: 'Primeiros passos', ordem: 1 } });
   const moduloBoost2 = await prisma.moduloBoost.create({ data: { cursoId: cursoBoost.id, titulo: 'Estruturas de controle', ordem: 2 } });
   const aulaBoost1 = await prisma.aulaBoost.create({ data: { moduloId: moduloBoost1.id, titulo: 'O que é lógica de programação', ordem: 1, tipo: 'texto', conteudoTexto: 'Lógica de programação é a técnica de encadear pensamentos para atingir um objetivo definido.', duracaoMin: 15 } });
   const aulaBoost2 = await prisma.aulaBoost.create({ data: { moduloId: moduloBoost1.id, titulo: 'Variáveis e tipos de dados', ordem: 2, tipo: 'video', conteudoUrl: 'https://www.youtube.com/watch?v=exemplo1', duracaoMin: 20 } });
-  await prisma.aulaBoost.create({ data: { moduloId: moduloBoost2.id, titulo: 'Estruturas condicionais', ordem: 1, tipo: 'video', conteudoUrl: 'https://www.youtube.com/watch?v=exemplo2', duracaoMin: 25 } });
-  await prisma.aulaBoost.create({ data: { moduloId: moduloBoost2.id, titulo: 'Laços de repetição', ordem: 2, tipo: 'texto', conteudoTexto: 'Laços permitem repetir um bloco de instruções enquanto uma condição for verdadeira.', duracaoMin: 20 } });
+  const aulaBoost3 = await prisma.aulaBoost.create({ data: { moduloId: moduloBoost2.id, titulo: 'Estruturas condicionais', ordem: 1, tipo: 'video', conteudoUrl: 'https://www.youtube.com/watch?v=exemplo2', duracaoMin: 25 } });
+  const aulaBoost4 = await prisma.aulaBoost.create({ data: { moduloId: moduloBoost2.id, titulo: 'Laços de repetição', ordem: 2, tipo: 'texto', conteudoTexto: 'Laços permitem repetir um bloco de instruções enquanto uma condição for verdadeira.', duracaoMin: 20 } });
   await prisma.materialApoio.create({ data: { aulaId: aulaBoost1.id, nome: 'slides-introducao.pdf', caminho: 'seed-placeholder.pdf', tipo: 'application/pdf', tamanho: BigInt(102400), criadoEm: new Date() } });
 
   const matriculaBoost = await prisma.matriculaBoost.create({
@@ -957,20 +1178,59 @@ async function main() {
     data: { conversaId: conversaBoost.id, professorId: ids.professores.lima, mensagem: 'Boa pergunta! Veremos isso em detalhes na próxima aula.', criadoEm: new Date() },
   });
 
+  // Segundo aluno externo: concluiu o curso (100%, com certificado) — cobre o status
+  // "concluida" e a emissão de certificado, que Camila (acima, "ativa" a 50%) não exercita.
+  const boostAluno2 = await prisma.boostUsuario.create({
+    data: { nome: 'Rafael Torres', email: 'rafael.torres@example.com', senhaHash: await senha('Boost123!'), criadoEm: new Date(Date.now() - 25 * 86400000) },
+  });
+  const matriculaBoost2 = await prisma.matriculaBoost.create({
+    data: { boostUsuarioId: boostAluno2.id, cursoId: cursoBoost.id, status: 'concluida', progressoPct: 100, matriculadoEm: new Date(Date.now() - 20 * 86400000), concluidoEm: new Date(Date.now() - 2 * 86400000) },
+  });
+  await prisma.progressoAula.createMany({
+    data: [
+      { matriculaId: matriculaBoost2.id, aulaId: aulaBoost1.id, concluidoEm: new Date(Date.now() - 19 * 86400000) },
+      { matriculaId: matriculaBoost2.id, aulaId: aulaBoost2.id, concluidoEm: new Date(Date.now() - 15 * 86400000) },
+      { matriculaId: matriculaBoost2.id, aulaId: aulaBoost3.id, concluidoEm: new Date(Date.now() - 10 * 86400000) },
+      { matriculaId: matriculaBoost2.id, aulaId: aulaBoost4.id, concluidoEm: new Date(Date.now() - 2 * 86400000) },
+    ],
+  });
+  await prisma.certificadoBoost.create({
+    data: { matriculaId: matriculaBoost2.id, codigo: 'CERT-2026-0001', caminhoPdf: 'seed-placeholder.pdf', emitidoEm: new Date(Date.now() - 2 * 86400000) },
+  });
+
+  // Terceiro aluno externo: matrícula cancelada — cobre o último status possível de MatriculaBoost.
+  const boostAluno3 = await prisma.boostUsuario.create({
+    data: { nome: 'Bianca Alves', email: 'bianca.alves@example.com', senhaHash: await senha('Boost123!'), criadoEm: new Date(Date.now() - 15 * 86400000) },
+  });
+  await prisma.matriculaBoost.create({
+    data: { boostUsuarioId: boostAluno3.id, cursoId: cursoBoost.id, status: 'cancelada', progressoPct: 0, matriculadoEm: new Date(Date.now() - 15 * 86400000) },
+  });
+
+  // Conversa do admin (orientador) com Rafael — pra ter conversa em mais de um orientador.
+  const conversaBoostAdmin = await prisma.conversaBoost.create({
+    data: { cursoId: cursoBoost.id, boostUsuarioId: boostAluno2.id, criadoEm: new Date(Date.now() - 18 * 86400000), ultimaMensagemEm: new Date(Date.now() - 18 * 86400000) },
+  });
+  await prisma.mensagemBoost.create({
+    data: { conversaId: conversaBoostAdmin.id, boostUsuarioId: boostAluno2.id, mensagem: 'Obrigado pelo curso, já terminei todos os módulos!', criadoEm: new Date(Date.now() - 18 * 86400000) },
+  });
+
   console.log('Banco de desenvolvimento limpo e populado.');
   console.log('Usuários: ana.solicitante@rooster.local, bruno.atendente@rooster.local, carla.visualizadora@rooster.local');
   console.log('Senha de todos: Senha123');
   console.log('Administrador: admin@rooster.local / Admin123!');
   console.log('Coordenadores: coordenador.secretaria@rooster.local, coordenador.suporte@rooster.local, coordenador.coordenacao@rooster.local / Coordenador123!');
-  console.log('Rooms: 1 campus, 2 blocos, 5 ambientes e 5 reservas (2 em análise para aprovar/recusar).');
+  console.log('Rooms: 1 campus, 2 blocos, 5 ambientes e 6 reservas (2 em análise; 1 vinculada à turma ALG101-A).');
   console.log('Assets: 3 categorias, 3 setores, 6 patrimônios e 4 movimentações.');
   console.log('Academy/Learn/Student: coordenacao.academica@rooster.local / Coordenador123!');
   console.log('  Professores: ricardo.lima@rooster.local, fernanda.costa@rooster.local / Professor123!');
-  console.log('  Alunos: joao.pereira@rooster.local (turma ALG101-A), maria.santos@rooster.local (turma BD101-A) / Aluno123!');
-  console.log('Rooster Boost: orientador ricardo.lima@rooster.local / Professor123! (só conversas); gestão: coordenacao.academica@rooster.local e admin (curso "Fundamentos de Lógica de Programação")');
-  console.log('  Aluno externo (login próprio, fora do Hub): camila.externa@example.com / Boost123!');
+  console.log('  Alunos: joao.pereira@rooster.local (turma ALG101-A), maria.santos@rooster.local (turma BD101-A), pedro.alves@rooster.local (turma POO101-A) / Aluno123!');
+  console.log('  Admin também é Professor (turma POO101-A, POO101-T1 com entrega corrigida de Pedro) E Aluno (matriculado em ALG101-A e BD101-A, com notas/frequência/cobranças variadas) — admin@rooster.local / Admin123!');
+  console.log('Rooster Boost: orientadores ricardo.lima@rooster.local e admin (curso "Fundamentos de Lógica de Programação"); gestão: coordenacao.academica@rooster.local e admin.');
+  console.log('  Alunos externos (login próprio, fora do Hub) / Boost123!: camila.externa@example.com (ativa, 50%), rafael.torres@example.com (concluída, com certificado), bianca.alves@example.com (cancelada).');
   console.log('Rooster Finance: financeiro@rooster.local / Financeiro123!');
   console.log('  João (sem desconto): paga, vencida com boleto emitido e futura. Maria (bolsa 50%): paga e futura.');
+  console.log('  Admin (aluno): vencida (com multa/juros), negociada e cancelada — cobre todos os status de Cobranca.');
+  console.log('Desk: 4 chamados (aberto, em atendimento, resolvido, encerrado com histórico/anexo/mensagens/avaliação).');
 }
 
 main()

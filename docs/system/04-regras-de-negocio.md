@@ -1,6 +1,6 @@
 # Regras de Negócio — Rooster One
 
-Cada regra aponta o arquivo/método onde está implementada. Numeração própria desta reconstrução (RN001+), não reaproveita a numeração da documentação legada removida. RN001–RN018 cobrem Hub, Desk, Rooms e Assets; RN019–RN035 foram acrescentadas em setembro/2026, formalizando as regras de Academy, Learn, Finance e Boost que antes existiam só em prosa, mais a proteção do último administrador. RN036–RN038 cobrem o vídeo hospedado, o progresso real e a gestão de contas externas do Boost; RN039, a caixa de notificações; RN040–RN042, a gestão do Boost por permissão, a conversa com o orientador e o certificado por curso.
+Cada regra aponta o arquivo/método onde está implementada. Numeração própria desta reconstrução (RN001+), não reaproveita a numeração da documentação legada removida. RN001–RN018 cobrem Hub, Desk, Rooms e Assets; RN019–RN035 foram acrescentadas em setembro/2026, formalizando as regras de Academy, Learn, Finance e Boost que antes existiam só em prosa, mais a proteção do último administrador. RN036–RN038 cobrem o vídeo hospedado, o progresso real e a gestão de contas externas do Boost; RN039, a caixa de notificações; RN040–RN042, a gestão do Boost por permissão, a conversa com o orientador e o certificado por curso; RN043–RN044, acrescentadas no fim de setembro/2026, a política de multa/juros criável pelo financeiro e o vínculo de Reserva com Turma.
 
 ## RN001 — Administrador é definido por permissão, não por papel
 
@@ -267,3 +267,15 @@ Há uma `ConversaBoost` por (curso, aluno), criada na primeira consulta do aluno
 `emiteCertificado` desligado transforma o curso em **material de apoio**: a matrícula conclui em 100% normalmente, mas nenhum certificado é emitido. A configuração (chave, texto com `{aluno}`, `{curso}`, `{cargaHoraria}`, `{data}` e carga horária) tem ação própria, `certificado`, e **não** passa pelo PATCH genérico do curso — quem edita o curso não muda o certificado por tabela. Vale para quem conclui depois da mudança; certificados já emitidos não são reescritos.
 
 **Implementação**: `boost.service.ts::configurarCertificado`, `certificado-boost.service.ts` (`aplicarModelo`), `boost-portal.service.ts` (emissão condicionada a `emiteCertificado`).
+
+## RN043 — Multa/juros manuais sempre vencem sobre a política vinculada, e o cálculo por política nunca é persistido
+
+O financeiro cria as próprias regras de multa/juros (`PoliticaMultaJuros`: percentual de multa, percentual de juros por dia, dias de carência), vinculadas a um `Servico` (herdada por toda cobrança gerada a partir dele, ex.: mensalidade) ou diretamente a uma `Cobranca`. Se as colunas `multa`/`juros` da cobrança foram definidas manualmente (> 0), elas **sempre** vencem — a política vinculada é ignorada para aquela cobrança. Sem valor manual e com política vinculada, o valor devido é calculado dinamicamente a partir de `vencimento`/hoje/carência **na leitura**, nunca gravado na cobrança (mesma disciplina da RN030: "vencido" é sempre derivado) — editar a política depois muda o valor de toda cobrança em aberto que a usa, sem precisar migrar dado. Excluir uma política em uso (por serviço ou por cobrança) é bloqueado.
+
+**Implementação**: `finance.service.ts::valorDevido` (prioridade manual → cálculo por política → nenhum dos dois), `createPoliticaMultaJuros`/`removePoliticaMultaJuros`; migration `20260928090000_multa_juros_turma_auditoria_notificacao_rota`.
+
+## RN044 — Vínculo de Reserva com Turma é por posse do professor, ou por gestão ampla do Academy
+
+Ao criar uma reserva marcada como finalidade "aula", é possível vincular uma `Turma` (`Reserva.turmaId`, opcional). Quem tem `/academy/manage acessar` vincula qualquer turma; sem essa permissão ampla, só é possível vincular uma turma da qual o próprio usuário é o professor — vincular a turma de outro professor responde `403`. Não existe uma permissão de tela nova para isso: é a mesma regra de posse que já vale para o restante do Academy (RN021), aplicada a um campo opcional do formulário de reserva já existente.
+
+**Implementação**: `rooms.controller.ts::exigirTurmaValida`, `academy.service.ts::isTurmaDoProfessor`; migration `20260928090000_multa_juros_turma_auditoria_notificacao_rota`.

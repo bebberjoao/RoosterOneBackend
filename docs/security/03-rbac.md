@@ -129,6 +129,13 @@ Não há, no código, nenhuma proteção adicional contra remover a última pess
 
 O catálogo de permissões em si (`Permissao` — criar/editar/excluir *tipos* de permissão, não vínculos com usuário) é gerenciado em `src/roster-hub/permissoes/`, sob a mesma tela `/hub/acessos`, ações `gerenciar-permissoes` (criar/editar/excluir) e `acessar` (listar).
 
+Duas ações de relatório, também sob `/hub/acessos`, cada uma independente das demais (não implicam `gerenciar-permissoes`):
+
+| Ação | Rotas | Efeito |
+|---|---|---|
+| `relatorio-auditoria` | `GET /logs-auditoria/relatorio`, `GET /logs-auditoria/exportar` | Vê/exporta o relatório de `LogAuditoria` — ver `docs/backend/12-logs.md` |
+| `relatorio-erros` | `GET /logs-erro/relatorio`, `GET /logs-erro/exportar` | Vê/exporta o relatório de `LogErro` (rastreamento de erros >= 500) — ver `docs/backend/11-tratamento-erros.md` |
+
 ## Permissões do Rooster Academy / Rooster Learn / Rooster Student
 
 Além dos módulos já cobertos acima, o catálogo semeado (`prisma/seed-dev.ts`) inclui três novos módulos de permissão introduzidos com o Academy/Learn:
@@ -179,6 +186,15 @@ Todo o resto deste documento trata permissão como binária: ou o usuário pode 
 - **`solicitar-recorrente`**: essa sim é binária (pode ou não criar série via `POST /reservas/serie`), mas é **independente** de `solicitar` — ter uma não implica a outra. O catálogo trata as duas como concessões separadas de propósito, para dar liberdade de conceder só uma (ex.: alguém que pode reservar longe no tempo, mas sempre reserva único, sem recorrência).
 
 As duas ficam no grupo `roomsManagementKeys` do seed (não em `roomsSelfServiceKeys`), então por padrão só quem já tem perfil de coordenação as recebe — um solicitante comum (`roomsSelfServiceKeys`) fica com o comportamento restrito (15 dias, sem recorrência) mesmo tendo `solicitar`. Ver RN017/RN018 em `docs/system/04-regras-de-negocio.md`.
+
+### Vínculo Reserva↔Turma: posse, não permissão nova (setembro/2026)
+
+`Reserva.turmaId` (opcional) não tem uma permissão própria — é liberado por **posse**, checado em `RoomsController.exigirTurmaValida` (chamado por `createReserva`/`createReservaSerie` só quando `dto.turmaId` vem preenchido):
+
+1. Quem tem `Rooster Academy` / `/academy/manage` / `acessar` (gestão ampla) pode vincular **qualquer** turma.
+2. Senão, o usuário precisa ser **o professor da turma** (`AcademyService.isTurmaDoProfessor`) — vincular a turma de outro professor responde `403`.
+
+Não é uma permissão de tela nova porque não é uma tela nova: é um campo opcional dentro do formulário de reserva já existente, e a regra ("só posso vincular o que é meu, a menos que eu gerencie tudo") é a mesma que já vale para `/academy/manage` no restante do Academy — ver `docs/system/04-regras-de-negocio.md`.
 
 ## Rooster Boost — dois sistemas de login coexistindo
 
@@ -239,6 +255,7 @@ Catálogo semeado (`prisma/seed-dev.ts`), módulo `Rooster Finance`:
 | `/finance/nfe` | `acessar`, `emitir`, `exportar-xml` |
 | `/finance/reports` | `acessar`, `exportar` |
 | `/finance/discounts` | `acessar`, `criar`, `editar`, `excluir` |
+| `/finance/policies` | `acessar`, `criar`, `editar`, `excluir` — CRUD de `PoliticaMultaJuros`, criada pelo próprio financeiro (não um valor fixo no código) |
 
 Mais duas chaves no módulo `Rooster Student` (não Finance) pro portal do aluno: `/student/finance` / `acessar`, `/student/finance` / `baixar-boleto` — mesmo padrão de `Rooster Student` já usado pelo Academy/Learn (módulo de permissão sem controller próprio, servido pelo `FinanceController`).
 

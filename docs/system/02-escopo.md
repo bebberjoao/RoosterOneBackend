@@ -13,7 +13,7 @@ Controle de identidade e acesso da própria plataforma.
 - Vínculo usuário↔setor e usuário↔permissão (concessão/revogação direta, sem Perfil).
 - Consulta de acesso efetivo de um usuário (`GET /usuarios/:id/acesso`, `GET /usuarios/:id/acesso/verificar`).
 - Notificações internas: caixa pessoal por usuário (lida/não lida), geradas por Desk, Rooms e Finance, mais CRUD administrativo.
-- Sessões (CRUD — ver ressalva em "Parcialmente no escopo").
+- Sessões: `POST /auth/login` cria a sessão e devolve `refreshToken`; `POST /auth/refresh` renova com rotação (a sessão antiga é revogada a cada uso); `POST /auth/logout` revoga. CRUD administrativo em `/sessoes` além do fluxo real.
 - Log de auditoria: leitura via CRUD, escrita automática pelos próprios services do Hub (não exige chamada manual).
 
 ### Rooster Desk (`src/rooster-desk/`)
@@ -96,7 +96,6 @@ Cobranças ligadas a alunos reais do Academy, introduzido na migration `20260921
 
 ## Parcialmente no escopo
 
-- **Sessões (`/sessoes`)** — a tabela e o CRUD existem, mas o fluxo real de login (`POST /auth/login`) não cria nenhuma sessão nem usa o campo `refreshToken` da tabela. Na prática, hoje é uma tabela sem uso pelo restante do sistema.
 - **Anexo, histórico e avaliação de ticket via rota genérica (`/anexos-tickets`, `/historico-tickets`, `/avaliacoes-tickets`)** — coexistem com as rotas específicas por chamado (`/chamados/:id/anexos`, histórico embutido em `GET /chamados/:id`). As genéricas continuam expostas para uso administrativo direto, mas o fluxo real do produto passa pelas específicas.
 
 ## Fora do escopo — não implementado no backend

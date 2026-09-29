@@ -37,6 +37,10 @@ if (-not $env:DATABASE_URL) {
 }
 if (-not $env:DATABASE_URL) { Write-Error "DATABASE_URL nao definida." }
 
+# pg_dump/pg_restore usam libpq puro, que rejeita "?schema=..." (parametro so
+# reconhecido pelo Prisma) com "parametro da consulta de URI invalido".
+$env:DATABASE_URL = $env:DATABASE_URL -replace '\?.*$', ''
+
 if (-not (Get-Command pg_restore -ErrorAction SilentlyContinue)) {
     Write-Error "pg_restore nao encontrado no PATH. Acrescente a pasta bin do PostgreSQL."
 }

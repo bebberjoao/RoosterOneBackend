@@ -4,29 +4,29 @@ Itens reais, confirmados no código — inclui achados de correções feitas ao 
 
 ## Pendente
 
-### Tabela `Sessao` sem uso pelo fluxo real de login
-
-Existe CRUD completo de sessões (`/sessoes`), incluindo campo `refreshToken`, mas `POST /auth/login` nunca cria uma sessão nem usa esse campo. JWT não tem renovação — expira em 8h e força novo login.
-
-**Impacto**: tabela e endpoints mantidos sem função real no fluxo principal; qualquer um lendo o schema pode presumir, incorretamente, que existe renovação de sessão.
-
-**Evidência**: `usuarios.service.ts::login` (não referencia `Sessao`); `sessoes.controller.ts`.
-
 ### Cabeçalho `x-user-id` ainda liberado no CORS
 
 `src/main.ts` inclui `x-user-id` em `allowedHeaders` do CORS. Esse cabeçalho pertencia a um esquema de autenticação anterior (por id de usuário no header, sem JWT), que não é mais usado — a autenticação real hoje é 100% `Authorization: Bearer`.
 
 **Impacto**: baixo (não é usado por nenhuma rota), mas é sinal de configuração não revisada após a migração de esquema de autenticação.
 
-**Evidência**: `src/main.ts`.
+**Evidência**: `src/main.ts`. Confirmado ativamente sem uso durante o pentest interno de setembro/2026 (`docs/security/06-pentest-2026-09.md`).
 
-### Ausência de `.env.example`
+### Frontend sem biblioteca de validação de formulário
 
-Nenhum dos dois repositórios tem um arquivo de exemplo de variáveis de ambiente — quem clona o projeto do zero precisa descobrir as variáveis obrigatórias lendo o código (`JWT_SECRET`, `DATABASE_URL`, `VITE_API_URL`...).
+`react-hook-form`, `zod`, `@hookform/resolvers` e a cadeia que os usava (`components/ui/form.tsx`) foram removidos por não terem nenhum uso real (ver "Corrigida" abaixo) — hoje todo formulário do frontend é estado manual (`useState`) sem validação de schema no cliente, dependendo inteiramente da resposta de erro do `ValidationPipe` do backend para sinalizar campo inválido.
 
-**Impacto**: fricção de onboarding; risco de subir sem `JWT_SECRET` e só descobrir no erro de boot.
+**Impacto**: sem validação client-side, todo erro de formulário exige um round-trip à API para aparecer; mensagens de erro por campo (em vez de um erro genérico da requisição) dependem de cada tela tratar a resposta 400 manualmente.
 
-**Evidência**: ausência confirmada nos dois repositórios.
+**Evidência**: ausência de `react-hook-form`/`zod` em `package.json`; ver `docs/frontend/09-validacoes.md`.
+
+### ~~Tabela `Sessao` sem uso pelo fluxo real de login~~ — pago (setembro/2026)
+
+Era um achado real: existia CRUD completo de sessões (`/sessoes`), incluindo campo `refreshToken`, mas `POST /auth/login` nunca criava uma sessão nem usava esse campo. Corrigido junto com a implementação de refresh token de verdade (ver `docs/engineering/10-melhorias-futuras.md`): `POST /auth/login` agora cria a `Sessao` e devolve `refreshToken`; `POST /auth/refresh` troca por um par novo com rotação; `POST /auth/logout` revoga.
+
+### ~~Ausência de `.env.example`~~ — pago (setembro/2026)
+
+Nenhum dos dois repositórios tinha um arquivo de exemplo de variáveis de ambiente. Corrigido: `.env.example` em ambos, com todas as variáveis obrigatórias documentadas (`JWT_SECRET`, `DATABASE_URL`, `FILE_ENCRYPTION_KEY` no backend; `VITE_API_URL` no frontend).
 
 ### ~~Sem testes de frontend~~ — pago (setembro/2026)
 

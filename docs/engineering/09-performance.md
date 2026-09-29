@@ -2,6 +2,16 @@
 
 Nenhuma métrica de performance real (tempo de resposta, throughput, carga) foi medida ou está documentada no código — este documento é uma análise estática do que existe, não um resultado de benchmark.
 
+## Teste de carga (`scripts/load-test.mjs`)
+
+Existe um script leve, zero dependências (usa o `fetch` nativo do Node 18+), que loga uma vez e dispara
+concorrência configurável contra 5 cenários de leitura (`/health`, `/ambientes`, `/turmas`, `/chamados`,
+`/cobrancas`), medindo p50/p95/p99 e taxa de erro por cenário. **É um detector de regressão, não um
+benchmark de capacidade de produção**: útil para notar que uma mudança deixou uma rota sensivelmente mais
+lenta (rodando antes/depois localmente, ou como *gate* de CI com `P95_LIMIT_MS`/`ERROR_RATE_LIMIT`), não
+para dimensionar quantos usuários simultâneos o sistema aguenta. `npm run load-test` (`API_URL`,
+`LOGIN_EMAIL`/`LOGIN_SENHA`, `CONCURRENCY`, `REQUESTS` configuráveis por variável de ambiente).
+
 ## Paginação
 
 - **Implementado**: só a conversa de chamado (`GET /chamados/:id/mensagens`) é paginada, por cursor de data (`antes`), com limite entre 1 e 100 itens por página (padrão 30). `rooster-desk.service.ts::getMensagensChamado`.
@@ -19,6 +29,7 @@ Nenhuma métrica de performance real (tempo de resposta, throughput, carga) foi 
 - `Ticket(criadoEm)` — as duas variantes de listagem (`findAllTickets`/`findTicketsForUser`) sempre ordenam por `criadoEm desc`
 - `CategoriaTicket(setorId)` — coluna literalmente usada no `where` acima
 - `LogAuditoria(criadoEm)` — `findAll()` não tem nenhum `where`, só `orderBy: { criadoEm: 'desc' }`, numa tabela que cresce sem limite (todo login/CRUD/permissão grava uma linha)
+- `LogErro(criadoEm)` — mesmo padrão do `LogAuditoria`: tabela alimentada automaticamente (todo erro >= 500 vira uma linha, via `AllExceptionsFilter`) e sem `where` no relatório por padrão
 
 Ainda sem índice dedicado, porque nada no código hoje filtra diretamente por essas colunas (adicionar um índice sem uma consulta real que o use é só overhead de escrita sem benefício): `Ticket.statusId`/`Ticket.tecnicoId`/`Ticket.usuarioId` (a listagem sempre traz tudo do setor e filtra na tela, do lado do frontend), `Patrimonio.status`. Exceção real: a checagem de conflito de horário de reserva (`assertReservaDisponivel`) filtra por `ambienteId` + `data`, uma combinação sem índice composto — candidata genuína pra quando o volume de reservas por ambiente crescer.
 

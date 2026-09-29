@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { createWriteStream } from 'fs';
-import { join } from 'path';
 import { randomUUID } from 'crypto';
 import PDFDocument from 'pdfkit';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
 import { PASTAS } from '../common/storage.config';
+import { escreverDocumentoEncriptado } from '../common/file-encryption.util';
 
 export const CERTIFICADOS_DIR = PASTAS.certificadosBoost();
 
@@ -29,10 +28,8 @@ export class CertificadoBoostService {
     if (!matricula) throw new Error(`Matrícula ${matriculaId} não encontrada ao emitir certificado.`);
 
     const codigo = `RB-${new Date().getFullYear()}-${randomUUID().slice(0, 8).toUpperCase()}`;
-    const nomeArquivo = `${randomUUID()}.pdf`;
-    const caminhoCompleto = join(CERTIFICADOS_DIR, nomeArquivo);
 
-    await this.gerarPdf(caminhoCompleto, {
+    const buffer = await this.gerarPdf({
       alunoNome: matricula.boostUsuario.nome,
       cursoTitulo: matricula.curso.titulo,
       cargaHoraria: matricula.curso.cargaHoraria,
@@ -40,9 +37,10 @@ export class CertificadoBoostService {
       codigo,
       data: new Date(),
     });
+    const { filename } = escreverDocumentoEncriptado(CERTIFICADOS_DIR, 'certificado.pdf', buffer);
 
     return this.prisma.certificadoBoost.create({
-      data: { matriculaId, codigo, caminhoPdf: nomeArquivo, emitidoEm: new Date() },
+      data: { matriculaId, codigo, caminhoPdf: filename, emitidoEm: new Date() },
     });
   }
 
@@ -52,13 +50,14 @@ export class CertificadoBoostService {
   }
 
   private gerarPdf(
-    caminho: string,
     info: { alunoNome: string; cursoTitulo: string; cargaHoraria: number; textoPersonalizado?: string | null; codigo: string; data: Date },
-  ): Promise<void> {
+  ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ layout: 'landscape', size: 'A4', margin: 50 });
-      const stream = createWriteStream(caminho);
-      doc.pipe(stream);
+      const partes: Buffer[] = [];
+      doc.on('data', (chunk: Buffer) => partes.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(partes)));
+      doc.on('error', reject);
 
       const largura = doc.page.width;
       const altura = doc.page.height;
@@ -106,8 +105,6 @@ export class CertificadoBoostService {
         .text(`Código de verificação: ${info.codigo}`, 0, altura - 82, { align: 'center' });
 
       doc.end();
-      stream.on('finish', () => resolve());
-      stream.on('error', reject);
     });
   }
 }

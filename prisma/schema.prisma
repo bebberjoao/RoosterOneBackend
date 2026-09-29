@@ -24,6 +24,7 @@ model Usuario {
   notificacoes  Notificacao[]
   sessoes       Sessao[]
   logsAuditoria LogAuditoria[]
+  logsErro      LogErro[]
   ticketsCriados Ticket[] @relation("TicketSolicitante")
   ticketsTecnico Ticket[] @relation("TicketTecnico")
   mensagensTickets MensagemTicket[]
@@ -36,6 +37,7 @@ model Usuario {
   redefinicoesSenha RedefinicaoSenha[]
   professorAcademico Professor?
   alunoAcademico     Aluno?
+  politicasMultaJurosCriadas PoliticaMultaJuros[]
 
   @@map("usuarios")
 }
@@ -127,6 +129,7 @@ model Notificacao {
   usuarioId   String? @map("usuario_id") @db.Uuid
   titulo      String? @db.VarChar(150)
   mensagem    String?
+  rota        String? @db.VarChar(200)
   lida        Boolean @default(false)
   criadoEm    DateTime? @map("criado_em") @db.Timestamp()
 
@@ -165,6 +168,22 @@ model LogAuditoria {
 
   @@index([criadoEm])
   @@map("logs_auditoria")
+}
+
+model LogErro {
+  id          String    @id @default(uuid()) @db.Uuid
+  usuarioId   String?   @map("usuario_id") @db.Uuid
+  metodo      String?   @db.VarChar(10)
+  rota        String?   @db.VarChar(300)
+  statusCode  Int       @map("status_code")
+  mensagem    String
+  stack       String?
+  criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+
+  usuario     Usuario?  @relation(fields: [usuarioId], references: [id])
+
+  @@index([criadoEm])
+  @@map("logs_erro")
 }
 
 model CategoriaTicket {
@@ -422,6 +441,8 @@ model Reserva {
   horarioFim    String    @map("horario_fim") @db.VarChar(20)
   participantes Int       @default(1)
   status        String    @default("analise") @db.VarChar(20)
+  // Preenchido quando a reserva é para uma aula: o professor vincula uma das próprias turmas ao criar.
+  turmaId       String?   @map("turma_id") @db.Uuid
   recorrencia   String    @default("unica") @db.VarChar(20)
   serieId       String?   @map("serie_id") @db.Uuid
   serieTotal    Int?      @map("serie_total")
@@ -433,10 +454,12 @@ model Reserva {
   atualizadoEm  DateTime? @map("atualizado_em") @db.Timestamp()
 
   ambiente  Ambiente @relation(fields: [ambienteId], references: [id], onDelete: Restrict)
+  turma     Turma?   @relation(fields: [turmaId], references: [id])
   mensagens ReservaMensagem[]
   historico ReservaHistorico[]
 
   @@index([serieId])
+  @@index([turmaId])
   @@map("reservas")
 }
 
@@ -663,6 +686,7 @@ model Turma {
   frequencias      RegistroFrequencia[]
   itensAvaliativos ItemAvaliativo[]
   atividades       Atividade[]
+  reservasVinculadas Reserva[]
 
   @@unique([codigo, periodoLetivoId])
   @@map("turmas")
@@ -1070,9 +1094,12 @@ model Servico {
   categoria    String?   @db.VarChar(80)
   frequencia   String    @default("unico") @db.VarChar(20) // unico | mensal | anual | semestral
   ativo        Boolean   @default(true)
+  // Política de multa/juros padrão para cobranças geradas a partir deste serviço (ex.: mensalidade).
+  politicaMultaJurosId String? @map("politica_multa_juros_id") @db.Uuid
   criadoEm     DateTime? @map("criado_em") @db.Timestamp()
   atualizadoEm DateTime? @map("atualizado_em") @db.Timestamp()
 
+  politicaMultaJuros PoliticaMultaJuros? @relation(fields: [politicaMultaJurosId], references: [id])
   cobrancas Cobranca[]
 
   @@map("servicos_financeiros")
@@ -1111,6 +1138,28 @@ model DescontoAluno {
   @@map("descontos_alunos")
 }
 
+// Regra de multa/juros por atraso, criada pelo próprio financeiro (RN043) — não é global fixo no
+// código. Vinculada a um Serviço (aplica-se às cobranças geradas a partir dele, ex.: mensalidade)
+// e/ou diretamente a uma Cobrança específica.
+model PoliticaMultaJuros {
+  id                 String    @id @default(uuid()) @db.Uuid
+  nome               String    @db.VarChar(150)
+  descricao          String?
+  percentualMulta    Decimal   @default(0) @map("percentual_multa") @db.Decimal(5, 2) // multa única, % sobre o valor devido
+  percentualJurosDia Decimal   @default(0) @map("percentual_juros_dia") @db.Decimal(5, 3) // juros de mora, % ao dia de atraso
+  diasCarencia       Int       @default(0) @map("dias_carencia") // dias de atraso tolerados antes de aplicar
+  ativo              Boolean   @default(true)
+  criadoPorId        String?   @map("criado_por_id") @db.Uuid
+  criadoEm           DateTime? @map("criado_em") @db.Timestamp()
+  atualizadoEm       DateTime? @map("atualizado_em") @db.Timestamp()
+
+  criadoPor Usuario?   @relation(fields: [criadoPorId], references: [id])
+  servicos  Servico[]
+  cobrancas Cobranca[]
+
+  @@map("politicas_multa_juros")
+}
+
 model Cobranca {
   id                 String    @id @default(uuid()) @db.Uuid
   alunoId            String    @map("aluno_id") @db.Uuid
@@ -1124,6 +1173,9 @@ model Cobranca {
   valorDesconto      Decimal   @default(0) @map("valor_desconto") @db.Decimal(10, 2)
   multa              Decimal   @default(0) @db.Decimal(10, 2)
   juros              Decimal   @default(0) @db.Decimal(10, 2)
+  // Se setada, multa/juros são calculados dinamicamente a partir do vencimento (RN043) — as colunas
+  // acima continuam existindo para valor MANUAL, que sempre tem prioridade sobre a política.
+  politicaMultaJurosId String?  @map("politica_multa_juros_id") @db.Uuid
   valorPago          Decimal?  @map("valor_pago") @db.Decimal(10, 2)
   vencimento         DateTime  @db.Date
   status             String    @default("aberto") @db.VarChar(20) // aberto | pago | vencido | negociado | cancelado | processando
@@ -1142,6 +1194,7 @@ model Cobranca {
   produto    Produto?    @relation(fields: [produtoId], references: [id])
   servico    Servico?    @relation(fields: [servicoId], references: [id])
   desconto   Desconto?   @relation(fields: [descontoId], references: [id])
+  politicaMultaJuros PoliticaMultaJuros? @relation(fields: [politicaMultaJurosId], references: [id])
   notaFiscal NotaFiscal?
 
   @@index([alunoId])

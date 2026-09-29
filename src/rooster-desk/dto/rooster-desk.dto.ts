@@ -148,14 +148,14 @@ export class CreateAnexoTicketDto {
   @ApiPropertyOptional({ example: 'print-erro-portal.png', description: 'Nome original do arquivo enviado' })
   @IsOptional() @IsString() @Length(1, 255) nomeArquivo?: string;
 
-  @ApiPropertyOptional({ example: 'uploads/tickets/2026/09/print-erro-portal.png', description: 'Caminho onde o arquivo foi armazenado no servidor' })
-  @IsOptional() @IsString() caminho?: string;
-
-  @ApiPropertyOptional({ example: 'image/png', description: 'Tipo/mime do arquivo anexado' })
-  @IsOptional() @IsString() @Length(1, 80) tipo?: string;
-
-  @ApiPropertyOptional({ example: 204800, description: 'Tamanho do arquivo em bytes' })
-  @IsOptional() @IsInt() tamanho?: number;
+  // `caminho`/`tipo`/`tamanho` NÃO são aceitos aqui de propósito (achado de segurança,
+  // setembro/2026): o único jeito legítimo de um anexo apontar para um arquivo em disco é
+  // `POST /chamados/:id/anexos` (multipart, `RoosterDeskService.createAnexoChamado`), que
+  // sempre gera o nome do arquivo no servidor. Aceitar `caminho` livre aqui permitia a
+  // qualquer usuário com a permissão `anexar` criar um `AnexoTicket` apontando para o
+  // arquivo de outro anexo (de um ticket ao qual ele não tem acesso) e baixá-lo através de
+  // um ticket próprio — IDOR via path traversal armazenado, sem precisar de nenhum outro
+  // achado. `UpdateAnexoTicketDto` herda esta mesma restrição por ser `PartialType` deste DTO.
 }
 export class UpdateAnexoTicketDto extends PartialType(CreateAnexoTicketDto) {}
 
