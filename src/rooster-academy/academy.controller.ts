@@ -8,6 +8,7 @@ import { memoryStorage } from 'multer';
 import { join } from 'path';
 import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { escreverDocumentoEncriptado, lerDocumentoDescriptografado } from '../common/file-encryption.util';
+import { exigirConteudoCompativel } from '../common/assinatura-arquivo';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
@@ -21,7 +22,7 @@ import {
   UpdateTurmaDto,
 } from './dto/academy.dto';
 import { FindAlunosQueryDto, FindTurmasQueryDto } from './dto/find-academy-query.dto';
-import { PASTAS, MIMETYPES_DOCUMENTO, criarFiltroMimetype } from '../common/storage.config';
+import { PASTAS, MIMETYPES_DOCUMENTO, OPCOES_UPLOAD, criarFiltroMimetype } from '../common/storage.config';
 
 const MODULO = 'Rooster Academy';
 const TELA_MANAGE = '/academy/manage';
@@ -267,6 +268,7 @@ export class AcademyController {
   @ApiOperation({ summary: 'Envia um documento acadêmico (até 15MB)' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('arquivo', {
+    ...OPCOES_UPLOAD,
     storage: memoryStorage(),
     limits: { fileSize: MAX_DOC_BYTES },
     fileFilter: criarFiltroMimetype(MIMETYPES_DOCUMENTO),
@@ -274,6 +276,7 @@ export class AcademyController {
   async uploadDocumento(@Req() request: Request, @Body() meta: CreateDocumentoAcademicoMetaDto, @UploadedFile() arquivo?: Express.Multer.File) {
     if (!arquivo) throw new BadRequestException('Nenhum arquivo enviado, ou formato não aceito (campo "arquivo").');
     const usuarioId = (request.user as AuthedUser).id;
+    exigirConteudoCompativel(arquivo);
     const { filename } = escreverDocumentoEncriptado(UPLOADS_DIR, arquivo.originalname, arquivo.buffer);
     const arquivoEncriptado = { originalname: arquivo.originalname, filename, mimetype: arquivo.mimetype, size: arquivo.size };
     const podeGerenciar = await this.usuariosService.hasPermission(usuarioId, MODULO, TELA_MANAGE, 'gerenciar-disciplinas');
@@ -303,8 +306,7 @@ export class AcademyController {
     await this.exigirLeituraDocumentos((request.user as AuthedUser).id);
     const documento = await this.academyService.findOneDocumento(id);
     if (!documento.caminho) throw new BadRequestException('Arquivo não encontrado.');
-    const nome = documento.nome.replace(/["\\]/g, '_');
-    response.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
+    response.attachment(documento.nome);
     return response.type(documento.caminho).send(lerDocumentoDescriptografado(join(UPLOADS_DIR, documento.caminho)));
   }
 

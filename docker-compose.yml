@@ -52,6 +52,11 @@ services:
       FILE_ENCRYPTION_KEY: ${FILE_ENCRYPTION_KEY:?defina FILE_ENCRYPTION_KEY no .env antes de subir}
       PORT: 3000
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8080}
+      # A imagem define NODE_ENV=production, que restringe o CORS às origens configuradas
+      # (a de FRONTEND_URL e as de CORS_ORIGINS) e desabilita o Swagger. Neste ambiente de
+      # avaliação, o Swagger permanece disponível por padrão.
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
     ports:
       - "3000:3000"
     volumes:

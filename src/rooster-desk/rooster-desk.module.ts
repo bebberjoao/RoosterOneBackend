@@ -5,6 +5,7 @@ import { RoosterDeskController } from './rooster-desk.controller';
 import { RoosterDeskService } from './rooster-desk.service';
 import { MensagensGateway } from './mensagens.gateway';
 import { UsuariosModule } from '../roster-hub/usuarios/usuarios.module';
+import { NotificacoesModule } from '../roster-hub/notificacoes/notificacoes.module';
 import { jwtModuleOptions } from '../auth/jwt-config';
 import { PermissionGuard } from '../auth/permission.guard';
 
@@ -12,6 +13,7 @@ import { PermissionGuard } from '../auth/permission.guard';
   imports: [
     PrismaModule,
     UsuariosModule,
+    NotificacoesModule,
     JwtModule.register(jwtModuleOptions()),
   ],
   controllers: [RoosterDeskController],

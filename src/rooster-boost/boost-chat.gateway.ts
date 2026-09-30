@@ -14,6 +14,7 @@ import { PrismaService } from '../roster-hub/shared/prisma.service';
 import { AcademyService } from '../rooster-academy/academy.service';
 import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
 import { BoostService } from './boost.service';
+import { validarOrigemCors } from '../common/cors';
 
 type Principal = { tipo: 'hub'; usuarioId: string } | { tipo: 'boost'; boostUsuarioId: string };
 
@@ -33,13 +34,8 @@ const MODULO = 'Rooster Boost';
 @WebSocketGateway({
   namespace: '/boost',
   cors: {
-    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-      if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Origem não permitida pelo CORS.'));
-      }
-    },
+    // Mesmo critério do CORS REST (main.ts), definido em um único lugar.
+    origin: validarOrigemCors,
     credentials: true,
   },
 })

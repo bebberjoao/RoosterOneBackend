@@ -23,9 +23,9 @@ if [[ ! -f "${PASTA}/banco.dump" ]]; then
   exit 1
 fi
 
-if [[ -z "${DATABASE_URL:-}" && -f "${RAIZ}/.env" ]]; then
-  set -a; . "${RAIZ}/.env"; set +a
-fi
+# shellcheck source=pastas-upload.sh
+source "${RAIZ}/scripts/pastas-upload.sh"
+carregar_env "${RAIZ}"
 if [[ -z "${DATABASE_URL:-}" ]]; then
   echo "ERRO: DATABASE_URL não definida." >&2
   exit 1
@@ -40,7 +40,8 @@ echo "Backup:  ${PASTA}"
 [[ -f "${PASTA}/manifesto.txt" ]] && { echo; cat "${PASTA}/manifesto.txt"; echo; }
 echo "DESTINO: ${ALVO}"
 echo
-echo "Isto APAGA os dados atuais desse banco e de uploads/."
+echo "Isto APAGA os dados atuais desse banco e das pastas de arquivos:"
+resolver_pastas_upload "${RAIZ}" | cut -f2 | sed 's/^/  /'
 
 if [[ "${CONFIRMAR:-}" != "sim" ]]; then
   read -r -p "Digite 'restaurar' para continuar: " resposta
@@ -53,11 +54,22 @@ echo "--> Restaurando banco"
 pg_restore --clean --if-exists --no-owner --no-acl --dbname="${DATABASE_URL}" "${PASTA}/banco.dump"
 
 if [[ -f "${PASTA}/uploads.tar.gz" ]]; then
-  echo "--> Restaurando uploads/"
-  rm -rf "${RAIZ}/uploads"
-  tar -xzf "${PASTA}/uploads.tar.gz" -C "${RAIZ}"
+  # Cada uploads/<subpasta>/ do arquivo volta para a pasta onde a aplicação
+  # deste servidor grava aquele tipo de arquivo — que pode diferir da pasta do
+  # servidor de origem, se houver redirecionamento por variável. Backups
+  # anteriores usam o mesmo layout, portanto continuam restauráveis.
+  echo "--> Restaurando arquivos"
+  MEMBROS="$(tar -tzf "${PASTA}/uploads.tar.gz")"
+  while IFS=$'\t' read -r subpasta caminho; do
+    mkdir -p "${caminho}"
+    find "${caminho}" -mindepth 1 -delete
+    if grep -q "^uploads/${subpasta}/." <<< "${MEMBROS}"; then
+      tar -xzf "${PASTA}/uploads.tar.gz" -C "${caminho}" --strip-components=2 --wildcards "uploads/${subpasta}/*"
+      echo "    ${subpasta}: $(find "${caminho}" -type f | wc -l | tr -d ' ') arquivo(s)"
+    fi
+  done < <(resolver_pastas_upload "${RAIZ}")
 else
-  echo "--> Backup não tinha uploads.tar.gz; uploads/ mantido como está"
+  echo "--> Backup não tinha uploads.tar.gz; pastas de arquivos mantidas como estão"
 fi
 
 echo

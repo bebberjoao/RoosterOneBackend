@@ -1,10 +1,13 @@
-import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, readFileSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { Readable } from 'stream';
 import { createCipheriv, randomBytes } from 'crypto';
+import { BadRequestException } from '@nestjs/common';
+import type { Request } from 'express';
 import {
   chaveMestraDeArquivos, escreverDocumentoEncriptado, lerDocumentoDescriptografado,
-  streamVideoDescriptografado, tamanhoPlaintextVideo, IV_LEN_CTR,
+  storageVideoEncriptado, streamVideoDescriptografado, tamanhoPlaintextVideo, IV_LEN_CTR,
 } from './file-encryption.util';
 
 /**
@@ -148,5 +151,53 @@ describe('vídeo (AES-256-CTR, com Range)', () => {
     const caminho = escreverVideoDeTeste('video-grande.bin', grande);
     const trecho = await lerTrecho(caminho, 20, 39); // atravessa blocos 1, 2 e 3
     expect(trecho.equals(grande.subarray(20, 40))).toBe(true);
+  });
+});
+
+describe('storageVideoEncriptado (verificação de assinatura durante o upload)', () => {
+  type Resultado = { erro: Error | null; info?: Partial<Express.Multer.File> };
+
+  /** Executa o motor de armazenamento com o conteúdo fatiado em pedaços pequenos, como chega da rede. */
+  function enviar(pasta: string, conteudo: Buffer, mimetype: string): Promise<Resultado> {
+    const pedacos: Buffer[] = [];
+    for (let i = 0; i < conteudo.length; i += 5) pedacos.push(conteudo.subarray(i, i + 5));
+    const arquivo = { originalname: 'aula.mp4', mimetype, stream: Readable.from(pedacos, { objectMode: false }) } as unknown as Express.Multer.File;
+    return new Promise((resolve) => {
+      storageVideoEncriptado(() => pasta)._handleFile({} as Request, arquivo, (erro, info) => resolve({ erro: erro ?? null, info }));
+    });
+  }
+
+  function pastaVazia(nome: string): string {
+    const pasta = join(PASTA, nome);
+    if (!existsSync(pasta)) mkdirSync(pasta);
+    return pasta;
+  }
+
+  it('aceita MP4 válido, com o cabeçalho distribuído em vários pedaços, e grava conteúdo decifrável', async () => {
+    const pasta = pastaVazia('upload-valido');
+    const video = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypmp42'), randomBytes(40)]);
+    const { erro, info } = await enviar(pasta, video, 'video/mp4');
+
+    expect(erro).toBeNull();
+    expect(info?.size).toBe(video.length);
+    const partes: Buffer[] = [];
+    for await (const chunk of streamVideoDescriptografado(join(pasta, info!.filename!), 0, video.length - 1)) partes.push(chunk as Buffer);
+    expect(Buffer.concat(partes).equals(video)).toBe(true);
+  });
+
+  it('recusa conteúdo que não é vídeo, com 400, e não deixa arquivo parcial no disco', async () => {
+    const pasta = pastaVazia('upload-invalido');
+    const { erro } = await enviar(pasta, Buffer.from('conteudo-fake-de-video'.repeat(10)), 'video/mp4');
+
+    expect(erro).toBeInstanceOf(BadRequestException);
+    expect(readdirSync(pasta)).toHaveLength(0);
+  });
+
+  it('recusa arquivo menor que o cabeçalho mínimo quando a assinatura não confere', async () => {
+    const pasta = pastaVazia('upload-curto');
+    const { erro } = await enviar(pasta, Buffer.from('curto'), 'video/webm');
+
+    expect(erro).toBeInstanceOf(BadRequestException);
+    expect(readdirSync(pasta)).toHaveLength(0);
   });
 });

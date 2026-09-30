@@ -3,6 +3,8 @@ import { createReadStream, createWriteStream, readFileSync, readSync, openSync, 
 import { extname, join } from 'path';
 import { Transform, type Readable } from 'stream';
 import type { StorageEngine } from 'multer';
+import { BadRequestException } from '@nestjs/common';
+import { conteudoCorrespondeAoTipo, mensagemConteudoIncompativel } from './assinatura-arquivo';
 
 /**
  * Criptografia em repouso de todo arquivo que o sistema grava em disco: anexo de chamado,
@@ -90,11 +92,50 @@ export function lerDocumentoDescriptografado(caminho: string): Buffer {
 
 // ===================== Vídeo (CTR, streaming, seekable) =====================
 
+/** Bytes iniciais retidos antes de liberar o fluxo: suficientes para as assinaturas de MP4, MOV e WebM. */
+const BYTES_CABECALHO_VIDEO = 12;
+
+/**
+ * Transform que retém os primeiros bytes do upload até poder conferir a assinatura binária
+ * contra o mimetype declarado (`assinatura-arquivo.ts`) e, a partir daí, repassa tudo sem
+ * alteração. Conteúdo incompatível encerra o fluxo com `BadRequestException` (HTTP 400).
+ */
+function verificadorDeCabecalho(mimetype: string, aoContar: (bytes: number) => void): Transform {
+  let retido = Buffer.alloc(0);
+  let verificado = false;
+  const verificar = (): Error | null =>
+    conteudoCorrespondeAoTipo(retido, mimetype) ? null : new BadRequestException(mensagemConteudoIncompativel(mimetype));
+
+  return new Transform({
+    transform(chunk: Buffer, _enc, cb) {
+      aoContar(chunk.length);
+      if (verificado) return cb(null, chunk);
+      retido = Buffer.concat([retido, chunk]);
+      if (retido.length < BYTES_CABECALHO_VIDEO) return cb();
+      verificado = true;
+      const erro = verificar();
+      if (erro) return cb(erro);
+      const liberar = retido;
+      retido = Buffer.alloc(0);
+      cb(null, liberar);
+    },
+    flush(cb) {
+      if (verificado) return cb();
+      verificado = true;
+      const erro = verificar();
+      if (erro) return cb(erro);
+      cb(null, retido);
+    },
+  });
+}
+
 /**
  * Multer `StorageEngine` customizado — mesmo ponto de extensão que `diskStorage`/
  * `memoryStorage` implementam por baixo. Único caso que continua streaming direto pro
  * disco (nunca bufferiza em memória): vídeo vai até 2GB. `fileFilter`/`limits` do
  * `FileInterceptor` continuam funcionando iguais, são aplicados antes da storage engine.
+ * A assinatura binária do conteúdo é conferida nos primeiros bytes recebidos; em caso de
+ * falha, o arquivo parcial é removido e o restante do upload é descartado.
  */
 export function storageVideoEncriptado(destino: () => string): StorageEngine {
   return {
@@ -107,16 +148,27 @@ export function storageVideoEncriptado(destino: () => string): StorageEngine {
         const destinoStream = createWriteStream(caminho);
 
         let tamanho = 0;
-        file.stream.on('data', (chunk: Buffer) => { tamanho += chunk.length; });
+        const verificador = verificadorDeCabecalho(file.mimetype, (bytes) => { tamanho += bytes; });
 
         destinoStream.write(iv);
-        file.stream.pipe(cipher).pipe(destinoStream);
+        file.stream.pipe(verificador).pipe(cipher).pipe(destinoStream);
 
-        const falhar = (error: Error) => callback(error);
+        let encerrado = false;
+        const falhar = (error: Error) => {
+          if (encerrado) return;
+          encerrado = true;
+          file.stream.unpipe(verificador);
+          file.stream.resume();
+          destinoStream.destroy();
+          unlink(caminho, () => callback(error));
+        };
         file.stream.on('error', falhar);
+        verificador.on('error', falhar);
         cipher.on('error', falhar);
         destinoStream.on('error', falhar);
         destinoStream.on('finish', () => {
+          if (encerrado) return;
+          encerrado = true;
           callback(null, { filename: nomeFinal, path: caminho, size: tamanho } as Partial<Express.Multer.File>);
         });
       } catch (error) {

@@ -460,6 +460,8 @@ model Reserva {
 
   @@index([serieId])
   @@index([turmaId])
+  // Checagem de conflito de horário (`RoomsService.assertReservaDisponivel`) filtra por ambiente + data.
+  @@index([ambienteId, data])
   @@map("reservas")
 }
 

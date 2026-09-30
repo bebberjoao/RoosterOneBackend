@@ -662,6 +662,28 @@ describe('Full API e2e tests', () => {
       .expect(200);
     expect(patchRes.body.titulo).toBe('Acesso atualizado');
 
+    // Atribuição: quem atribui e o técnico precisam pertencer ao setor do chamado
+    // (`RoosterDeskService.canManageTicket`); o técnico atribuído recebe notificação.
+    const adminDesk = await prisma.usuario.findFirst({ where: { email: 'admin.teste@example.com' } });
+    for (const usuarioId of [adminDesk!.id, userRes.body.id]) {
+      await request(app.getHttpServer())
+        .post('/v1/usuarios-setores')
+        .set('Authorization', authHeader)
+        .send({ usuarioId, setorId: setorRes.body.id })
+        .expect(201);
+    }
+    await request(app.getHttpServer())
+      .patch(`/v1/chamados/${ticketId}/atribuir`)
+      .set('Authorization', authHeader)
+      .send({ tecnicoId: userRes.body.id })
+      .expect(200);
+    const avisoAtribuicao = await prisma.notificacao.findFirst({
+      where: { usuarioId: userRes.body.id, titulo: 'Chamado atribuído a você' },
+    });
+    expect(avisoAtribuicao).not.toBeNull();
+    expect(avisoAtribuicao!.rota).toBe(`/desk/tickets/${ticketId}`);
+    expect(avisoAtribuicao!.mensagem).toContain('TCK-000001');
+
     const mensagemRes = await request(app.getHttpServer())
       .post(`/v1/chamados/${ticketId}/mensagens`)
       .set('Authorization', authHeader)
@@ -684,6 +706,15 @@ describe('Full API e2e tests', () => {
       .attach('arquivo', Buffer.from('MZ...'), { filename: 'suspeito.exe', contentType: 'application/x-msdownload' })
       .expect(400);
 
+    // Mimetype permitido, mas conteúdo incompatível (executável declarado como PNG — cenário do
+    // pentest interno): recusado pela verificação de assinatura binária, também com 400.
+    const executavelDisfarcado = await request(app.getHttpServer())
+      .post(`/v1/chamados/${ticketId}/anexos`)
+      .set('Authorization', authHeader)
+      .attach('arquivo', Buffer.from([0x4d, 0x5a, 0x90, 0x00, 0x03, 0x00, 0x00, 0x00]), { filename: 'imagem.png', contentType: 'image/png' })
+      .expect(400);
+    expect(executavelDisfarcado.body.message).toMatch(/não corresponde ao tipo declarado/);
+
     const anexosListRes = await request(app.getHttpServer())
       .get(`/v1/chamados/${ticketId}/anexos`)
       .set('Authorization', authHeader)
@@ -695,6 +726,22 @@ describe('Full API e2e tests', () => {
       .set('Authorization', authHeader)
       .expect(200);
     expect(downloadRes.text).toBe('conteúdo de teste');
+
+    // Nome de arquivo com caracteres fora do ASCII/Latin-1 (travessão, acento): o cabeçalho
+    // Content-Disposition precisa usar a codificação da RFC 6266 (filename*=UTF-8''...), senão
+    // o Node recusa o cabeçalho e o download termina em HTTP 500.
+    const anexoNaoAscii = await request(app.getHttpServer())
+      .post(`/v1/chamados/${ticketId}/anexos`)
+      .set('Authorization', authHeader)
+      .attach('arquivo', Buffer.from('relatório'), { filename: 'Relatório — final.txt', contentType: 'text/plain' })
+      .expect(201);
+    // Nome gravado íntegro (o busboy decodificava o nome multipart como Latin-1 por padrão).
+    expect(anexoNaoAscii.body.nomeArquivo).toBe('Relatório — final.txt');
+    const downloadNaoAscii = await request(app.getHttpServer())
+      .get(`/v1/chamados/${ticketId}/anexos/${anexoNaoAscii.body.id}/arquivo`)
+      .set('Authorization', authHeader)
+      .expect(200);
+    expect(downloadNaoAscii.headers['content-disposition']).toContain("filename*=UTF-8''Relat%C3%B3rio%20%E2%80%94%20final.txt");
 
     // Prova de que o arquivo está cifrado em repouso, não só que a API continua funcionando:
     // lê o arquivo cru direto do disco (nunca pela API) e confere que o texto original não
@@ -1943,11 +1990,12 @@ describe('Full API e2e tests', () => {
     it('Vídeo hospedado: instrutor envia, recusa mimetype errado, e o player consegue arrastar a barra (Range)', async () => {
       const cenario = await montarCenarioBoost();
 
-      // formato aceito
+      // formato aceito — o conteúdo precisa ter a assinatura binária de MP4 (caixa `ftyp`)
+      const videoMp4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypmp42'), Buffer.from('conteudo-de-video'.repeat(10))]);
       const uploadRes = await request(app.getHttpServer())
         .post(`/v1/aulas-boost/${cenario.aula.id}/video`)
         .set('Authorization', cenario.gestor.header)
-        .attach('arquivo', Buffer.from('conteudo-fake-de-video'.repeat(10)), 'aula.mp4')
+        .attach('arquivo', videoMp4, 'aula.mp4')
         .expect(201);
       expect(uploadRes.body.tipo).toBe('video');
       expect(uploadRes.body.videoArquivo).toBeTruthy();
@@ -1958,6 +2006,13 @@ describe('Full API e2e tests', () => {
         .post(`/v1/aulas-boost/${cenario.aula.id}/video`)
         .set('Authorization', cenario.gestor.header)
         .attach('arquivo', Buffer.from('não é vídeo'), 'notas.txt')
+        .expect(400);
+
+      // mimetype de vídeo declarado, mas conteúdo sem assinatura de vídeo — recusado durante o upload
+      await request(app.getHttpServer())
+        .post(`/v1/aulas-boost/${cenario.aula.id}/video`)
+        .set('Authorization', cenario.gestor.header)
+        .attach('arquivo', Buffer.from('conteudo-fake-de-video'.repeat(10)), 'falso.mp4')
         .expect(400);
 
       // professor de outro curso não pode enviar vídeo aqui

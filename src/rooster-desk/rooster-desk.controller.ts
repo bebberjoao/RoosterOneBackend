@@ -9,6 +9,7 @@ import { join } from 'path';
 import { ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { PaginacaoQueryDto } from '../common/pagination';
 import { escreverDocumentoEncriptado, lerDocumentoDescriptografado } from '../common/file-encryption.util';
+import { exigirConteudoCompativel } from '../common/assinatura-arquivo';
 import {
   CreateAnexoTicketDto, CreateAvaliacaoTicketDto, CreateCategoriaTicketDto,
   CreateHistoricoTicketDto, CreateMensagemChamadoDto, CreatePrioridadeTicketDto,
@@ -21,9 +22,10 @@ import {
 import { RoosterDeskService } from './rooster-desk.service';
 import { MensagensGateway } from './mensagens.gateway';
 import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
+import { NotificacoesService } from '../roster-hub/notificacoes/notificacoes.service';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
-import { PASTAS, MIMETYPES_DOCUMENTO, criarFiltroMimetype } from '../common/storage.config';
+import { PASTAS, MIMETYPES_DOCUMENTO, OPCOES_UPLOAD, criarFiltroMimetype } from '../common/storage.config';
 
 const MODULO = 'Rooster Desk';
 const TELA_TICKETS = '/desk/tickets';
@@ -41,6 +43,7 @@ export class RoosterDeskController {
     private readonly service: RoosterDeskService,
     private readonly usuariosService: UsuariosService,
     private readonly mensagensGateway: MensagensGateway,
+    private readonly notificacoes: NotificacoesService,
   ) {}
 
   @Post('chamados-categorias')
@@ -316,6 +319,16 @@ export class RoosterDeskController {
     if (dto.tecnicoId !== undefined && dto.tecnicoId !== current.tecnicoId) {
       const novo = dto.tecnicoId ? await this.usuariosService.findOne(dto.tecnicoId) : null;
       entradas.push({ campo: 'tecnico', valorAntigo: current.tecnico?.nome, valorNovo: novo?.nome });
+      // Aviso ao técnico que passou a ser responsável; não é emitido quando o próprio autor da
+      // alteração assume o chamado.
+      if (dto.tecnicoId && dto.tecnicoId !== usuarioId) {
+        await this.notificacoes.notificar(
+          dto.tecnicoId,
+          'Chamado atribuído a você',
+          `${current.protocolo ? `${current.protocolo} — ` : ''}${current.titulo}`,
+          `/desk/tickets/${ticketId}`,
+        );
+      }
     }
 
     for (const entrada of entradas) {
@@ -384,6 +397,7 @@ export class RoosterDeskController {
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
     FileInterceptor('arquivo', {
+      ...OPCOES_UPLOAD,
       storage: memoryStorage(),
       limits: { fileSize: MAX_ANEXO_BYTES },
       fileFilter: criarFiltroMimetype(MIMETYPES_DOCUMENTO),
@@ -395,6 +409,7 @@ export class RoosterDeskController {
     @UploadedFile() arquivo?: Express.Multer.File,
   ) {
     if (!arquivo) throw new BadRequestException('Nenhum arquivo enviado, ou formato não aceito (campo "arquivo").');
+    exigirConteudoCompativel(arquivo);
     const { filename } = escreverDocumentoEncriptado(UPLOADS_DIR, arquivo.originalname, arquivo.buffer);
     const usuarioId = (request.user as { id: string }).id;
     const isAdmin = await this.usuariosService.isAdmin(usuarioId);
@@ -416,8 +431,7 @@ export class RoosterDeskController {
     const isAdmin = await this.usuariosService.isAdmin(usuarioId);
     const anexo = await this.service.getAnexoParaDownload(id, anexoId, usuarioId, isAdmin);
     if (!anexo.caminho) throw new NotFoundException('Arquivo não encontrado.');
-    const nome = (anexo.nomeArquivo ?? anexo.caminho).replace(/["\\]/g, '_');
-    response.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
+    response.attachment(anexo.nomeArquivo ?? anexo.caminho);
     return response.type(anexo.caminho).send(lerDocumentoDescriptografado(join(UPLOADS_DIR, anexo.caminho)));
   }
 

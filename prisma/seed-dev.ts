@@ -1,8 +1,39 @@
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import PDFDocument from 'pdfkit';
+import { escreverDocumentoEncriptadoComNome } from '../src/common/file-encryption.util';
+import { PASTAS } from '../src/common/storage.config';
 
 const prisma = new PrismaClient();
 const SALT_ROUNDS = 10;
+
+/** PDF de demonstração, gerado em memória (mesma biblioteca usada por certificado e nota fiscal). */
+function pdfDemonstracao(titulo: string, descricao: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: 'A4', margin: 56 });
+    const partes: Buffer[] = [];
+    doc.on('data', (parte: Buffer) => partes.push(parte));
+    doc.on('end', () => resolve(Buffer.concat(partes)));
+    doc.on('error', reject);
+    doc.fontSize(18).text(titulo);
+    doc.moveDown().fontSize(11).text(descricao);
+    doc.moveDown().fontSize(9).fillColor('#666666').text('Documento de demonstração gerado pelo seed de desenvolvimento do Rooster One.');
+    doc.end();
+  });
+}
+
+/**
+ * Grava um documento de demonstração cifrado, com o mesmo formato dos arquivos enviados pela
+ * aplicação, para que o download dos registros semeados funcione. O nome é determinístico
+ * (`seed-<chave>.pdf`): reexecutar o seed sobrescreve o arquivo em vez de acumular cópias.
+ */
+async function arquivoDemonstracao(pasta: string, chave: string, titulo: string, descricao: string) {
+  const pdf = await pdfDemonstracao(titulo, descricao);
+  const caminho = `seed-${chave}.pdf`;
+  escreverDocumentoEncriptadoComNome(pasta, caminho, pdf);
+  return { caminho, tamanho: BigInt(pdf.length) };
+}
 
 const ids = {
   users: {
@@ -654,8 +685,9 @@ async function main() {
       { ticketId: ticketEncerrado.id, usuarioId: ids.users.atendente, mensagem: 'Segunda via liberada, já pode retirar na secretaria.', criadoEm: new Date(Date.now() - 8 * 86400000) },
     ],
   });
+  const arquivoAnexoTicket = await arquivoDemonstracao(PASTAS.anexosTickets(), 'anexo-tck-0004', 'Boletim de ocorrência', 'Comprovante anexado ao chamado TCK-0004 (segunda via de crachá).');
   await prisma.anexoTicket.create({
-    data: { ticketId: ticketEncerrado.id, usuarioId: ids.users.solicitante, nomeArquivo: 'comprovante-bo.pdf', caminho: 'seed-placeholder.pdf', tipo: 'application/pdf', tamanho: BigInt(20480), criadoEm: new Date(Date.now() - 9 * 86400000) },
+    data: { ticketId: ticketEncerrado.id, usuarioId: ids.users.solicitante, nomeArquivo: 'comprovante-bo.pdf', caminho: arquivoAnexoTicket.caminho, tipo: 'application/pdf', tamanho: arquivoAnexoTicket.tamanho, criadoEm: new Date(Date.now() - 9 * 86400000) },
   });
   await prisma.avaliacaoTicket.create({
     data: { ticketId: ticketEncerrado.id, usuarioId: ids.users.solicitante, nota: 5, comentario: 'Atendimento rápido, resolveu no mesmo dia.', criadoEm: new Date(Date.now() - 8 * 86400000) },
@@ -892,7 +924,7 @@ async function main() {
       { turmaId: ids.turmas.algoritmosA, alunoId: ids.alunos.admin, data: new Date(Date.now() - 7 * 86400000), presenca: 'justificado', registradoPorId: ids.academyUsers.professorLima, criadoEm: new Date() },
       { turmaId: ids.turmas.bancoDadosA, alunoId: ids.alunos.maria, data: new Date(Date.now() - 7 * 86400000), presenca: 'presente', registradoPorId: ids.academyUsers.professorCosta, criadoEm: new Date() },
       { turmaId: ids.turmas.bancoDadosA, alunoId: ids.alunos.admin, data: new Date(Date.now() - 7 * 86400000), presenca: 'atraso', registradoPorId: ids.academyUsers.professorCosta, criadoEm: new Date() },
-      { turmaId: ids.turmas.pooA, alunoId: ids.alunos.pedro, data: new Date(Date.now() - 3 * 86400000), presenca: 'presente', registradoPorId: ids.professores.admin, criadoEm: new Date() },
+      { turmaId: ids.turmas.pooA, alunoId: ids.alunos.pedro, data: new Date(Date.now() - 3 * 86400000), presenca: 'presente', registradoPorId: ids.users.admin, criadoEm: new Date() },
     ],
   });
 
@@ -947,8 +979,9 @@ async function main() {
       corrigidoPorId: ids.academyUsers.professorLima, corrigidoEm: new Date(Date.now() - 1 * 86400000),
     },
   });
+  const arquivoListaJoao = await arquivoDemonstracao(PASTAS.anexosEntregas(), 'entrega-lista1-joao', 'Lista 1 — Complexidade de algoritmos', 'Entrega de João Pereira na turma ALG101-A.');
   await prisma.anexoEntrega.create({
-    data: { entregaId: entregaJoaoLista.id, nomeArquivo: 'lista1-joao.pdf', caminho: 'seed-placeholder.pdf', tipo: 'application/pdf', tamanho: BigInt(51200), criadoEm: new Date(Date.now() - 3 * 86400000) },
+    data: { entregaId: entregaJoaoLista.id, nomeArquivo: 'lista1-joao.pdf', caminho: arquivoListaJoao.caminho, tipo: 'application/pdf', tamanho: arquivoListaJoao.tamanho, criadoEm: new Date(Date.now() - 3 * 86400000) },
   });
   const entregaAdminLista = await prisma.entrega.create({
     data: {
@@ -957,8 +990,9 @@ async function main() {
       enviadoEm: new Date(Date.now() - 6 * 3600000),
     },
   });
+  const arquivoListaAdmin = await arquivoDemonstracao(PASTAS.anexosEntregas(), 'entrega-lista1-admin', 'Lista 1 — Complexidade de algoritmos', 'Entrega do Administrador (cadastro de aluno) na turma ALG101-A.');
   await prisma.anexoEntrega.create({
-    data: { entregaId: entregaAdminLista.id, nomeArquivo: 'lista1-admin.pdf', caminho: 'seed-placeholder.pdf', tipo: 'application/pdf', tamanho: BigInt(48200), criadoEm: new Date(Date.now() - 6 * 3600000) },
+    data: { entregaId: entregaAdminLista.id, nomeArquivo: 'lista1-admin.pdf', caminho: arquivoListaAdmin.caminho, tipo: 'application/pdf', tamanho: arquivoListaAdmin.tamanho, criadoEm: new Date(Date.now() - 6 * 3600000) },
   });
 
   // Turma do admin como professor (POO): atividade do Learn com uma entrega corrigida (Pedro)
@@ -980,21 +1014,28 @@ async function main() {
       atividadeId: ids.atividades.trabalhoPoo, alunoId: ids.alunos.pedro, status: 'corrigida',
       texto: 'Modelagem de classes com herança para o sistema de biblioteca proposto.',
       enviadoEm: new Date(Date.now() - 3 * 86400000), nota: 8.0, feedback: 'Boa modelagem; faltou aplicar polimorfismo no método de empréstimo.',
-      corrigidoPorId: ids.professores.admin, corrigidoEm: new Date(Date.now() - 2 * 86400000),
+      corrigidoPorId: ids.users.admin, corrigidoEm: new Date(Date.now() - 2 * 86400000),
     },
   });
+  const arquivoTrabalhoPedro = await arquivoDemonstracao(PASTAS.anexosEntregas(), 'entrega-poo-pedro', 'Trabalho — Herança e Polimorfismo', 'Entrega de Pedro Alves na turma POO101-A.');
   await prisma.anexoEntrega.create({
-    data: { entregaId: entregaPedroPoo.id, nomeArquivo: 'trabalho-poo-pedro.pdf', caminho: 'seed-placeholder.pdf', tipo: 'application/pdf', tamanho: BigInt(61200), criadoEm: new Date(Date.now() - 3 * 86400000) },
+    data: { entregaId: entregaPedroPoo.id, nomeArquivo: 'trabalho-poo-pedro.pdf', caminho: arquivoTrabalhoPedro.caminho, tipo: 'application/pdf', tamanho: arquivoTrabalhoPedro.tamanho, criadoEm: new Date(Date.now() - 3 * 86400000) },
   });
   await prisma.entrega.create({
     data: { atividadeId: ids.atividades.trabalhoPoo, alunoId: ids.alunos.admin, status: 'atrasada' },
   });
 
+  const pastaDocumentos = PASTAS.documentosAcademicos();
+  const arquivoPlano = await arquivoDemonstracao(pastaDocumentos, 'documento-plano-alg101', 'Plano de Ensino — Algoritmos e Estruturas de Dados', 'Disciplina ALG101, período letivo 2026.2.');
+  const arquivoEmenta = await arquivoDemonstracao(pastaDocumentos, 'documento-ementa-bd101', 'Ementa — Banco de Dados', 'Disciplina BD101, período letivo 2026.2.');
+  const arquivoRegulamento = await arquivoDemonstracao(pastaDocumentos, 'documento-regulamento-2026', 'Regulamento Acadêmico 2026', 'Documento institucional, válido para todos os cursos.');
+  // `nome` é o nome original do arquivo enviado e `autorId` o id de usuário (Usuario), como na
+  // gravação feita pela aplicação.
   await prisma.documentoAcademico.createMany({
     data: [
-      { id: ids.documentosAcademicos.planoAlgoritmos, nome: 'Plano de Ensino — Algoritmos e Estruturas de Dados', tipo: 'plano-de-ensino', disciplinaId: ids.disciplinas.algoritmos, autorId: ids.professores.lima, caminho: 'seed-placeholder.pdf', tamanho: BigInt(30720), criadoEm: new Date(), atualizadoEm: new Date() },
-      { id: ids.documentosAcademicos.ementaBancoDados, nome: 'Ementa — Banco de Dados', tipo: 'ementa', disciplinaId: ids.disciplinas.bancoDados, autorId: ids.professores.costa, caminho: 'seed-placeholder.pdf', tamanho: BigInt(20480), criadoEm: new Date(), atualizadoEm: new Date() },
-      { id: ids.documentosAcademicos.regulamento, nome: 'Regulamento Acadêmico 2026', tipo: 'institucional', autorId: ids.academyUsers.coordenador, caminho: 'seed-placeholder.pdf', tamanho: BigInt(102400), criadoEm: new Date(), atualizadoEm: new Date() },
+      { id: ids.documentosAcademicos.planoAlgoritmos, nome: 'Plano de Ensino — Algoritmos e Estruturas de Dados.pdf', tipo: 'plano-de-ensino', disciplinaId: ids.disciplinas.algoritmos, autorId: ids.academyUsers.professorLima, caminho: arquivoPlano.caminho, tamanho: arquivoPlano.tamanho, criadoEm: new Date(), atualizadoEm: new Date() },
+      { id: ids.documentosAcademicos.ementaBancoDados, nome: 'Ementa — Banco de Dados.pdf', tipo: 'ementa', disciplinaId: ids.disciplinas.bancoDados, autorId: ids.academyUsers.professorCosta, caminho: arquivoEmenta.caminho, tamanho: arquivoEmenta.tamanho, criadoEm: new Date(), atualizadoEm: new Date() },
+      { id: ids.documentosAcademicos.regulamento, nome: 'Regulamento Acadêmico 2026.pdf', tipo: 'institucional', autorId: ids.academyUsers.coordenador, caminho: arquivoRegulamento.caminho, tamanho: arquivoRegulamento.tamanho, criadoEm: new Date(), atualizadoEm: new Date() },
     ],
   });
 
@@ -1126,10 +1167,18 @@ async function main() {
       formaPagamento: 'pix', pagoEm: new Date('2026-07-12'), criadoEm: new Date('2026-07-12'), atualizadoEm: new Date('2026-07-12'),
     },
   });
+  // PDF e XML compartilham a mesma base de nome: o download do XML deriva o nome a partir do PDF.
+  const pastaNotas = PASTAS.notasFiscais();
+  const arquivoNota = await arquivoDemonstracao(pastaNotas, 'nfp-2026-0001', 'Nota Fiscal NFP-2026-0001', 'Apostila de Algoritmos — R$ 89,90 — João Pereira.');
+  escreverDocumentoEncriptadoComNome(
+    pastaNotas,
+    arquivoNota.caminho.replace(/\.pdf$/, '.xml'),
+    Buffer.from('<?xml version="1.0" encoding="UTF-8"?>\n<notaFiscal numero="NFP-2026-0001" tipo="produto"><valor>89.90</valor><tomador>João Pereira</tomador></notaFiscal>\n', 'utf-8'),
+  );
   await prisma.notaFiscal.create({
     data: {
       numero: 'NFP-2026-0001', tipo: 'produto', cobrancaId: cobrancaProduto.id,
-      caminhoPdf: 'seed-placeholder.pdf', status: 'emitida', emitidoEm: new Date('2026-07-12'),
+      caminhoPdf: arquivoNota.caminho, status: 'emitida', emitidoEm: new Date('2026-07-12'),
     },
   });
 
@@ -1157,7 +1206,8 @@ async function main() {
   const aulaBoost2 = await prisma.aulaBoost.create({ data: { moduloId: moduloBoost1.id, titulo: 'Variáveis e tipos de dados', ordem: 2, tipo: 'video', conteudoUrl: 'https://www.youtube.com/watch?v=exemplo1', duracaoMin: 20 } });
   const aulaBoost3 = await prisma.aulaBoost.create({ data: { moduloId: moduloBoost2.id, titulo: 'Estruturas condicionais', ordem: 1, tipo: 'video', conteudoUrl: 'https://www.youtube.com/watch?v=exemplo2', duracaoMin: 25 } });
   const aulaBoost4 = await prisma.aulaBoost.create({ data: { moduloId: moduloBoost2.id, titulo: 'Laços de repetição', ordem: 2, tipo: 'texto', conteudoTexto: 'Laços permitem repetir um bloco de instruções enquanto uma condição for verdadeira.', duracaoMin: 20 } });
-  await prisma.materialApoio.create({ data: { aulaId: aulaBoost1.id, nome: 'slides-introducao.pdf', caminho: 'seed-placeholder.pdf', tipo: 'application/pdf', tamanho: BigInt(102400), criadoEm: new Date() } });
+  const arquivoMaterial = await arquivoDemonstracao(PASTAS.materiaisBoost(), 'material-slides-introducao', 'Slides — O que é lógica de programação', 'Material de apoio da aula 1 do curso Fundamentos de Lógica de Programação.');
+  await prisma.materialApoio.create({ data: { aulaId: aulaBoost1.id, nome: 'slides-introducao.pdf', caminho: arquivoMaterial.caminho, tipo: 'application/pdf', tamanho: arquivoMaterial.tamanho, criadoEm: new Date() } });
 
   const matriculaBoost = await prisma.matriculaBoost.create({
     data: { boostUsuarioId: boostAluno.id, cursoId: cursoBoost.id, status: 'ativa', progressoPct: 50, matriculadoEm: new Date() },
@@ -1194,8 +1244,9 @@ async function main() {
       { matriculaId: matriculaBoost2.id, aulaId: aulaBoost4.id, concluidoEm: new Date(Date.now() - 2 * 86400000) },
     ],
   });
+  const arquivoCertificado = await arquivoDemonstracao(PASTAS.certificadosBoost(), 'certificado-cert-2026-0001', 'Certificado de conclusão', 'Rafael Torres concluiu o curso Fundamentos de Lógica de Programação (20 horas). Código de verificação: CERT-2026-0001.');
   await prisma.certificadoBoost.create({
-    data: { matriculaId: matriculaBoost2.id, codigo: 'CERT-2026-0001', caminhoPdf: 'seed-placeholder.pdf', emitidoEm: new Date(Date.now() - 2 * 86400000) },
+    data: { matriculaId: matriculaBoost2.id, codigo: 'CERT-2026-0001', caminhoPdf: arquivoCertificado.caminho, emitidoEm: new Date(Date.now() - 2 * 86400000) },
   });
 
   // Terceiro aluno externo: matrícula cancelada — cobre o último status possível de MatriculaBoost.

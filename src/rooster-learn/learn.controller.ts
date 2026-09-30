@@ -13,8 +13,9 @@ import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
 import { AcademyService } from '../rooster-academy/academy.service';
 import { LearnService } from './learn.service';
 import { CorrigirEntregaDto, CreateAtividadeDto, EnviarEntregaDto, UpdateAtividadeDto } from './dto/learn.dto';
-import { PASTAS, MIMETYPES_DOCUMENTO, criarFiltroMimetype } from '../common/storage.config';
+import { PASTAS, MIMETYPES_DOCUMENTO, OPCOES_UPLOAD, criarFiltroMimetype } from '../common/storage.config';
 import { escreverDocumentoEncriptado, lerDocumentoDescriptografado } from '../common/file-encryption.util';
+import { exigirConteudoCompativel } from '../common/assinatura-arquivo';
 
 const MODULO = 'Rooster Learn';
 const TELA_CLASSES = '/learn/classes';
@@ -137,6 +138,7 @@ export class LearnController {
   @ApiOperation({ summary: 'Anexa um arquivo (até 15MB) à própria entrega' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('arquivo', {
+    ...OPCOES_UPLOAD,
     storage: memoryStorage(),
     limits: { fileSize: MAX_ANEXO_BYTES },
     fileFilter: criarFiltroMimetype(MIMETYPES_DOCUMENTO),
@@ -147,6 +149,7 @@ export class LearnController {
     if (!(await this.learnService.isEntregaDoAluno(entregaId, aluno.id))) {
       throw new ForbiddenException('Esta entrega não pertence ao aluno autenticado.');
     }
+    exigirConteudoCompativel(arquivo);
     const { filename } = escreverDocumentoEncriptado(UPLOADS_DIR, arquivo.originalname, arquivo.buffer);
     return this.learnService.createAnexoEntrega(entregaId, {
       originalname: arquivo.originalname, filename, mimetype: arquivo.mimetype, size: arquivo.size,
@@ -163,8 +166,7 @@ export class LearnController {
     if (!souDono) await this.exigirDonoOuGestor(usuarioId, entrega.turmaId, 'corrigir');
     const anexo = await this.learnService.getAnexoParaDownload(entregaId, anexoId);
     if (!anexo.caminho) throw new BadRequestException('Arquivo não encontrado.');
-    const nome = (anexo.nomeArquivo ?? anexo.caminho).replace(/["\\]/g, '_');
-    response.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
+    response.attachment(anexo.nomeArquivo ?? anexo.caminho);
     return response.type(anexo.caminho).send(lerDocumentoDescriptografado(join(UPLOADS_DIR, anexo.caminho)));
   }
 

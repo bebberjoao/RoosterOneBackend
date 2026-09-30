@@ -13,6 +13,7 @@ import { Server, Socket } from 'socket.io';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
 import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
 import { RoosterDeskService } from './rooster-desk.service';
+import { validarOrigemCors } from '../common/cors';
 
 /**
  * Camada de push da conversa do Desk. O REST (`/chamados/:id/mensagens`)
@@ -24,14 +25,8 @@ import { RoosterDeskService } from './rooster-desk.service';
 @WebSocketGateway({
   namespace: '/desk',
   cors: {
-    // Mesmo critério do CORS REST (main.ts): qualquer porta local, dev only.
-    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-      if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Origem não permitida pelo CORS.'));
-      }
-    },
+    // Mesmo critério do CORS REST (main.ts), definido em um único lugar.
+    origin: validarOrigemCors,
     credentials: true,
   },
 })

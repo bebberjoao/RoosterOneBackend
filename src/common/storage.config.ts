@@ -80,6 +80,13 @@ export const MIMETYPES_DOCUMENTO = [
   'image/webp',
 ];
 
+/**
+ * Opções comuns a todo `FileInterceptor`. `defParamCharset: 'utf8'` faz o busboy decodificar o
+ * nome do arquivo multipart como UTF-8; o padrão (`latin1`) gravava nomes acentuados — comuns
+ * em português — corrompidos no banco (ex.: "Relatório.pdf" como "RelatÃ³rio.pdf").
+ */
+export const OPCOES_UPLOAD = { defParamCharset: 'utf8' } as const;
+
 /** Fábrica de `fileFilter` do multer a partir de uma lista de mimetypes aceitos. */
 export function criarFiltroMimetype(permitidos: readonly string[]) {
   return (_req: Request, file: Express.Multer.File, cb: (error: Error | null, aceitar: boolean) => void) => {

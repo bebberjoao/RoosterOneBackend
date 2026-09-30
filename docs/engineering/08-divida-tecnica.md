@@ -1,63 +1,165 @@
 # Dívida Técnica — Rooster One
 
-Itens reais, confirmados no código — inclui achados de correções feitas ao longo do desenvolvimento (a dívida já corrigida é citada como "corrigido" com a mudança que resolveu, para efeito de histórico) e o que ainda está pendente.
+Este registro reúne itens de dívida técnica confirmados no código-fonte: os pendentes e os já
+corrigidos. Os itens corrigidos são mantidos, com a descrição da solução adotada, porque o mesmo padrão
+de defeito pode reaparecer em código semelhante ainda não revisado.
 
 ## Pendente
 
-### Cabeçalho `x-user-id` ainda liberado no CORS
-
-`src/main.ts` inclui `x-user-id` em `allowedHeaders` do CORS. Esse cabeçalho pertencia a um esquema de autenticação anterior (por id de usuário no header, sem JWT), que não é mais usado — a autenticação real hoje é 100% `Authorization: Bearer`.
-
-**Impacto**: baixo (não é usado por nenhuma rota), mas é sinal de configuração não revisada após a migração de esquema de autenticação.
-
-**Evidência**: `src/main.ts`. Confirmado ativamente sem uso durante o pentest interno de setembro/2026 (`docs/security/06-pentest-2026-09.md`).
-
 ### Frontend sem biblioteca de validação de formulário
 
-`react-hook-form`, `zod`, `@hookform/resolvers` e a cadeia que os usava (`components/ui/form.tsx`) foram removidos por não terem nenhum uso real (ver "Corrigida" abaixo) — hoje todo formulário do frontend é estado manual (`useState`) sem validação de schema no cliente, dependendo inteiramente da resposta de erro do `ValidationPipe` do backend para sinalizar campo inválido.
+As bibliotecas `react-hook-form`, `zod` e `@hookform/resolvers`, bem como o componente que as utilizava
+(`components/ui/form.tsx`), foram removidas por não terem uso (ver seção de itens corrigidos). Os
+formulários do frontend mantêm estado local (`useState`) sem validação de esquema no cliente e dependem
+da resposta de erro do `ValidationPipe` do backend para sinalizar campos inválidos.
 
-**Impacto**: sem validação client-side, todo erro de formulário exige um round-trip à API para aparecer; mensagens de erro por campo (em vez de um erro genérico da requisição) dependem de cada tela tratar a resposta 400 manualmente.
+**Impacto**: todo erro de formulário exige uma requisição à API para ser exibido; a apresentação do erro
+por campo, e não como erro genérico da requisição, depende de cada tela tratar a resposta `400`.
 
-**Evidência**: ausência de `react-hook-form`/`zod` em `package.json`; ver `docs/frontend/09-validacoes.md`.
+**Evidência**: ausência de `react-hook-form` e `zod` em `package.json`; ver `docs/frontend/09-validacoes.md`.
 
-### ~~Tabela `Sessao` sem uso pelo fluxo real de login~~ — pago (setembro/2026)
+### Arquivos enviados armazenados em disco local
 
-Era um achado real: existia CRUD completo de sessões (`/sessoes`), incluindo campo `refreshToken`, mas `POST /auth/login` nunca criava uma sessão nem usava esse campo. Corrigido junto com a implementação de refresh token de verdade (ver `docs/engineering/10-melhorias-futuras.md`): `POST /auth/login` agora cria a `Sessao` e devolve `refreshToken`; `POST /auth/refresh` troca por um par novo com rotação; `POST /auth/logout` revoga.
+Os arquivos enviados (anexos, documentos, materiais, vídeos, certificados e notas fiscais) permanecem em
+disco local, cifrados em repouso e em pastas configuráveis por variável de ambiente
+(`src/common/storage.config.ts`). Não há armazenamento em serviço de objetos externo.
 
-### ~~Ausência de `.env.example`~~ — pago (setembro/2026)
+**Impacto**: em ambiente sem volume persistente, uma nova implantação elimina os arquivos. O
+`docker-compose.yml` declara volume persistente para `uploads/`; em instalação nativa, a pasta reside no
+disco do servidor e está coberta pelos scripts de backup.
 
-Nenhum dos dois repositórios tinha um arquivo de exemplo de variáveis de ambiente. Corrigido: `.env.example` em ambos, com todas as variáveis obrigatórias documentadas (`JWT_SECRET`, `DATABASE_URL`, `FILE_ENCRYPTION_KEY` no backend; `VITE_API_URL` no frontend).
+**Evidência**: `src/common/storage.config.ts`; `docs/operations/06-backup-e-recuperacao.md`.
 
-### ~~Sem testes de frontend~~ — pago (setembro/2026)
+### ~~Cabeçalho `x-user-id` liberado no CORS~~ — resolvido (30/09/2026)
 
-Havia zero framework de teste no frontend, e toda verificação de interface era manual. Agora há **Vitest + Testing Library + jsdom** (`vitest.config.ts`, `npm test`), com 48 testes cobrindo a lógica pura da agenda de reservas (detecção de conflito, geração de períodos), o contrato do cliente HTTP (prefixo `/v1`, renovação de sessão, tratamento de erro) e o componente de tabela usado por praticamente toda tela de gestão.
+`src/main.ts` incluía `x-user-id` em `allowedHeaders`, cabeçalho de um esquema de autenticação anterior
+(identificação por cabeçalho, sem JWT) sem nenhum uso — a autenticação é integralmente feita por
+`Authorization: Bearer`. O cabeçalho foi removido na mesma revisão que centralizou o critério de origem
+do CORS em `src/common/cors.ts`.
 
-Continua **não havendo teste de jornada em navegador** (Playwright/Cypress): o que existe cobre lógica e componente isolado, não o fluxo completo de tela. Ver `14-estrategia-de-testes.md`.
+### ~~Tabela `Sessao` sem uso pelo fluxo de login~~ — resolvido (setembro/2026)
 
-### ~~Sem testes unitários no backend~~ — pago (setembro/2026)
+Existia CRUD completo de sessões (`/sessoes`), com campo `refreshToken`, mas `POST /auth/login` não criava
+sessão. Resolvido com a implementação do refresh token (ver `docs/engineering/10-melhorias-futuras.md`):
+o login cria a `Sessao` e devolve o `refreshToken`; `POST /auth/refresh` emite um novo par com rotação;
+`POST /auth/logout` revoga a sessão.
 
-Só existia a suíte e2e. Agora há uma suíte unitária separada (`jest-unit.json`, `npm test`, 28 testes em `src/**/*.spec.ts`), cobrindo lógica pura e decisões que não precisam de banco: helpers de paginação, mascaramento de segredo em log e a regra do último administrador (com Prisma substituído por dublê).
+### ~~Ausência de `.env.example`~~ — resolvido (setembro/2026)
 
-A cobertura unitária é **deliberadamente seletiva**, não ampla: a maior parte da regra crítica deste sistema é regra de *acesso*, que só se prova de ponta a ponta (guard + controller + service + banco) — e essa é a função da suíte e2e. O unitário cobre o que o e2e não alcança bem: lógica pura e ramos de erro difíceis de provocar de fora.
+Nenhum dos repositórios possuía arquivo de exemplo de variáveis de ambiente. Ambos passaram a tê-lo, com
+todas as variáveis documentadas.
 
-### Upload de anexo em disco local, sem armazenamento externo
+### ~~Ausência de testes de frontend~~ — resolvido (setembro/2026)
 
-Arquivos de anexo de chamado ficam em `uploads/anexos-tickets/` no próprio servidor. Sem volume persistente configurado, um redeploy apaga os arquivos.
+Não havia framework de testes no frontend. Foram adotados Vitest, Testing Library e jsdom
+(`vitest.config.ts`, `npm test`), com testes da lógica da agenda de reservas, do contrato do cliente HTTP
+e do componente de tabela usado pelas telas de gestão. Permanece a ausência de teste de jornada em
+navegador (Playwright ou Cypress). Ver `14-estrategia-de-testes.md`.
 
-**Impacto**: risco de perda de anexo em ambiente sem disco persistente.
+### ~~Ausência de testes unitários no backend~~ — resolvido (setembro/2026)
 
-**Evidência**: `src/rooster-desk/rooster-desk.controller.ts` (`diskStorage`).
+Existia apenas a suíte e2e. Foi criada uma suíte unitária separada (`jest-unit.json`, `npm test`). A
+cobertura unitária é deliberadamente seletiva: a maior parte das regras críticas do sistema é de controle
+de acesso, cuja comprovação exige o fluxo completo (guard, controller, service e banco), função da suíte
+e2e. A suíte unitária cobre lógica pura e ramos de erro de difícil reprodução por requisição.
 
 ## Corrigida durante o desenvolvimento (histórico)
 
-Itens que eram dívida/bug real e foram corrigidos ao longo da implementação das funcionalidades mais recentes — citados aqui porque o padrão do bug pode se repetir em código semelhante ainda não revisado.
+### Revisão de 30/09/2026
 
-- **Serialização de `BigInt` quebrava a resposta de chamados com anexo real**: `AnexoTicket.tamanho` é `BigInt` no schema (Postgres `Int` não é seguro para tamanho de arquivo em bytes), e `JSON.stringify` não serializa `BigInt` por padrão — qualquer chamado com um anexo de tamanho real retornava erro 500 em `GET /chamados/:id`. Corrigido com serialização explícita (`Number(tamanho)`) antes de responder. Ponto de atenção: qualquer novo campo `BigInt` no schema precisa do mesmo cuidado.
-- **Resposta de `POST /patrimonio-movimentacoes` não era o formato que o frontend esperava**: o endpoint é transacional e devolve `{ movimentacao, patrimonio }`, mas o service genérico de frontend (`mapResource`) tratava a resposta como se fosse a movimentação "achatada" — todo registro de movimentação aparecia com campos `undefined` na tela, mesmo gravando certo no banco. Corrigido com um caminho de leitura dedicado que desembrulha a resposta antes de traduzir os campos.
-- **`encerradoEm` do chamado dependia do cliente mandar a data certa**: o DTO aceitava `encerradoEm` no corpo, mas nada no frontend real enviava esse campo — na prática, chamados fechados nunca tinham data de encerramento registrada. Corrigido: o valor passou a ser derivado automaticamente da transição de status.
-- **Acoplamento entre o seletor de "Visão" (demo) e a resolução de permissão real no frontend**: `hub/permission-context.tsx` resolvia a permissão efetiva comparando o **nome da persona escolhida no RoleSwitcher** (`role-context.tsx`) contra usuários reais do Hub, em vez de usar a sessão de fato autenticada — a UI podia mostrar/esconder elemento com base numa persona de demonstração, não necessariamente alinhada com quem estava logado de verdade. Corrigido: `PermissionProvider` passou a ler `session.permissoes` diretamente (a sessão real), com a Visão de demonstração virando uma camada adicional (E lógico, nunca substituindo). Efeito colateral do mesmo achado, corrigido em seguida: várias telas (`academy.attendance.tsx`, `academy.grades.tsx`, `academy.index.tsx`, `learn.classes.tsx`, `learn.index.tsx`) ainda usavam a Visão (não a permissão real) pra decidir *o que buscar* da API (`{minhas:true}` vs. lista completa), não só *o que mostrar* — um professor de verdade cuja Visão estivesse em "admin" (valor padrão) tomava 403 do backend. Corrigido pra usar `useCan("/academy/manage", "acessar")` nessas cinco telas. Ver `docs/frontend/08-autorizacao.md` (repo frontend) pro detalhamento completo dos três sistemas de "quem eu sou" que coexistem hoje. **Resolvido em definitivo (setembro/2026)**: o seletor manual de "Visão" (RoleSwitcher) foi **removido** e o perfil de interface passou a ser deduzido das permissões reais (`deriveRole`), com o nome do usuário logado no lugar das personas fictícias — não há mais camada de demonstração nem risco de divergência com a sessão.
-- **Aliases EN duplicando toda a superfície de rota do Desk, dois deles com bypass real de permissão**: `rooster-desk.controller.ts` tinha, para boa parte dos recursos (`chamados`, categorias, subcategorias, status, prioridades), um segundo path em inglês (`/tickets`, `/categorias-tickets`, `/status-tickets`...) implementado como método separado que só delegava pro método em português — nunca usado pelo frontend real (confirmado: `ticket.service.ts`/`desk-category.service.ts` só chamam `/chamados*`), mas ainda registrado e alcançável por qualquer cliente HTTP direto. Pior: quando o método original era protegido só pelo decorator `@RequirePermission` (não por checagem manual no corpo), o alias **não herdava o decorator** — decorators não se propagam por chamada de método em JS/Nest — e o `PermissionGuard` liberava a rota pra qualquer usuário autenticado, sem checar a permissão que a rota PT exigia (`GET /categorias-tickets`, `GET/POST/PATCH/DELETE /status-tickets`, `GET /prioridades-tickets`, `DELETE /tickets/:id`). Corrigido: os ~22 métodos `*Alias` foram removidos, junto com o único path canônico ausente que só existia na forma alias (`POST /prioridades-tickets` virou `POST /chamados-prioridades`, alinhando com o padrão dos outros recursos). `CreatePrioridadeTicketDto`/`UpdatePrioridadeTicketDto` também estavam órfãs — o handler de criar/atualizar prioridade usava `CreateCategoriaTicketDto`/`UpdateCategoriaTicketDto` com `as any` por engano; corrigido para usar as DTOs certas (o `as any` mascarava a diferença de campos entre os dois DTOs, então a validação e o Swagger de `/chamados-prioridades` estavam documentando/validando campos errados). `test/app.e2e-spec.ts`, que testava contra os paths alias, foi migrado para os paths canônicos.
-- **Remover o Passport quebrou o tipo de `request.user` em 7 controllers (89 erros de compilação)**: `passport`, `passport-jwt`, `@nestjs/passport` e `@types/passport-jwt` foram removidos do `package.json` por não terem nenhum uso real (a verificação do JWT sempre foi manual em `src/auth/jwt-auth.guard.ts`). O que não estava evidente: `@types/passport-jwt` arrasta `@types/passport`, que declara globalmente `Express.Request.user` — e os controllers dependiam **dessa augmentação acidental** para tipar os 89 usos de `request.user`. O erro não apareceu de imediato por causa do cache incremental do TypeScript (`dist/tsconfig.tsbuildinfo`); só surgiu numa compilação limpa posterior. Corrigido com uma declaração própria (`src/types/express.d.ts`) que assume o contrato explicitamente, documentando quem preenche o campo (`JwtAuthGuard` com o `Usuario` do Hub, `BoostJwtAuthGuard` com o `BoostUsuario`). **Lição**: antes de remover uma dependência "sem uso", verificar se ela não fornece augmentação de tipo global — e rodar `tsc` com o cache incremental apagado, porque o cache mascara justamente esse tipo de quebra.
-- **Documentação desalinhada do código após a entrada de Boost e Finance**: duas auditorias dedicadas (uma por repositório, setembro/2026) compararam toda a árvore `docs/` contra o código real e encontraram divergências acumuladas — várias delas de gravidade alta, do tipo que induz o leitor ao erro. No backend: `backend/01-arquitetura.md` afirmava que `src/mail/` **não existia** (existe, com `nodemailer`), listava só 5 imports no `AppModule` (são 10) e citava `passport-jwt` (removido); `backend/04-controllers.md` afirmava que a tabela de auditoria só era populada manualmente (é automática, via `AuditoriaService`), descrevia as rotas alias do Desk como existentes (removidas) e cobria só 4 dos 9 módulos; `database/01-arquitetura.md` dizia "27 models" e `database/02-entidades.md` dizia "45" e "54" no mesmo arquivo (são 60); `database/03-relacionamentos.md` não tinha nenhuma menção ao Finance; `system/03-funcionalidades.md` dizia que Finance e Boost não tinham backend; `api/01-visao-geral.md` falava em 12 controllers (são 18) e não listava as rotas públicas do portal Boost. No frontend: `02-estrutura.md` (o mais desatualizado, 9 achados) listava arquivos já removidos na limpeza de código morto, `03-paginas-e-rotas.md` e `06-integracao-api.md` afirmavam que Boost e Finance ainda eram mock, `08-autorizacao.md` falava em ~9 arquivos `permissions.ts` (são 3), e nenhum documento mencionava o command palette global nem os toasts. Todos os achados de gravidade alta e média foram corrigidos, e as seções de funcionalidades de Boost e Finance (RF-B01..B10 e RF-F01..F10) foram escritas do zero. **Lição**: a política de "documentação como parte da tarefa" não se sustenta sozinha em fase de desenvolvimento rápido — divergência acumulada só aparece com auditoria periódica comparando documento contra código, e o padrão dominante do erro foi sempre o mesmo: afirmações de ausência ("não existe", "não tem backend", "não identificado") escritas quando eram verdadeiras e nunca revisadas depois que deixaram de ser.
-- **Frontend: ~30 arquivos de dado mock órfão, dois serviços mock nunca ligados a nenhuma tela, e uma segunda árvore de documentação morta**: varredura dedicada (agente de auditoria + verificação manual, setembro/2026). Confirmado por grep de importador real (não só "não referenciado no README") antes de cada exclusão: `src/mock/index.ts` e `src/mock/modules.ts` (barril e manifesto de rotas nunca importados, o segundo já citando rotas que não existem mais); `services/mock-api/user.service.ts` e `notification.service.ts` (nenhuma tela os importa — `student.notifications.tsx` usa dado de `student/mock-data.ts` direto); `mock/database/index.ts` e os arquivos que só ele e os dois services mortos consumiam (`users`, `notifications`, `attendance`, `enrollments`, `lessonContents`, `academyDocs`, `calendarEvents`, `classes`, `disciplines`, `grades`, `students`, `teachers`, `boostCategories`, `boostCourses`, `boostEnrollments`, `certificates`, `instructors`, `videos`, `activities`, `submissions`); `components/rooster/{academy,boost,learn}/mock-data.ts` inteiros (cada um tinha exatamente um pedaço ainda vivo, preservado à parte: `EVENT_TONE`/`EVENT_LABEL` do Academy viraram `academy/event-labels.ts`; `ACTIVITIES`/`QUESTIONS` do Learn — usados pelo construtor de formulários local `learn/forms-store.ts`, que o agente de auditoria **não** detectou como consumidor por usar import relativo `./mock-data` — viraram `learn/forms-seed.ts`; o Boost não tinha nada vivo, mas `boost/badges.tsx`, órfão e nunca importado por ninguém, dependia dele e foi removido junto); `components/rooster/rooms/mock-data.ts` reduzido de 420 linhas para só os `type`s (os arrays de seed e os helpers de data duplicavam, byte a byte, o que já existia em `rooms/labels.ts`, o arquivo que as telas reais de fato importam); `components/rooster/finance/finance-nav.tsx` (subnav nunca renderizada, substituída pelo sidebar principal). Dependências sem nenhum uso real removidas do `package.json`: `react-hook-form`, `zod`, `@hookform/resolvers`, `date-fns` (a cadeia inteira só existia para alimentar `components/ui/form.tsx`, também removido, que nenhuma tela instanciava — consistente com o achado já documentado em `docs/frontend/09-validacoes.md`). **Lição**: dois achados do agente de auditoria (zero importadores de `boost/mock-data.ts` e `learn/mock-data.ts`) estavam incompletos — `boost/badges.tsx` e `learn/forms-store.ts` importavam via caminho relativo (`./mock-data`), que o grep do agente (por caminho absoluto) não pegou; `npx tsc --noEmit` rodado depois de cada exclusão pegou os dois casos antes de virarem regressão. Na mesma limpeza, uma segunda árvore de documentação (backend) inteira e desatualizada foi removida (30 arquivos: `docs/banco/`, `docs/modulos/`, `docs/adr/`, `docs/arquitetura/`, `docs/checklist/`, `docs/fluxos/`, `docs/regras-negocio/` + 7 soltos na raiz) — o próprio `docs/README.md` já afirmava que ela tinha sido removida (não tinha).
-- **Três pastas inteiras sobrando do RBAC antigo baseado em "Perfil"** (`src/roster-hub/perfis/`, `perfis-permissoes/`, `usuarios-perfis/`): quando o RBAC foi achatado (permissão direta por usuário, sem entidade `Perfil` intermediária — commit `ac52939c`), esses três módulos — que implementavam CRUD de `Perfil`/`PerfilPermissao`/`UsuarioPerfil` — não foram apagados. Não estavam registrados em nenhum `*.module.ts` (não alcançáveis a partir de `AppModule`) e referenciavam models que não existem mais no `schema.prisma`, então já estavam type-broken há tempo — só não quebravam `tsc --noEmit` por causa do cache incremental (`dist/tsconfig.tsbuildinfo`), que nunca invalidou a checagem desses arquivos até uma reinstalação de `node_modules` forçar regeneração completa do Prisma Client. Um arquivo de teste (`test/rooms-reservas.e2e-spec.ts`) também dependia desse esquema morto (`prisma.perfil.create`/`prisma.usuarioPerfil.create` no próprio `beforeAll`) — corrigido junto, pro padrão real de concessão direta de permissão. Removido por completo; confirmado sem nenhuma outra referência antes de apagar.
+Defeitos identificados durante a revisão do roadmap, com a correção aplicada:
+
+- **Download com nome de arquivo não-ASCII terminava em HTTP 500.** Ao substituir `response.download()`
+  pela leitura com decifragem (criptografia em repouso), o cabeçalho `Content-Disposition` passou a ser
+  montado manualmente com o nome original do arquivo. O Node.js recusa cabeçalho com caracteres fora do
+  Latin-1 (travessão, aspas tipográficas, emoji), e o download falhava; nomes acentuados, embora aceitos,
+  chegavam corrompidos ao navegador. Corrigido com `response.attachment(nome)`, que gera o cabeçalho
+  conforme a RFC 6266 (`filename*=UTF-8''...`), nos cinco pontos que usam o nome original. Coberto por
+  teste e2e com nome não-ASCII.
+- **Nome de arquivo com acentuação gravado corrompido no upload.** O busboy, usado pelo multer, decodifica
+  o nome do arquivo multipart como Latin-1 por padrão; "Relatório.pdf" era gravado como "RelatÃ³rio.pdf".
+  Corrigido com a opção `defParamCharset: 'utf8'`, aplicada a todos os `FileInterceptor` por meio da
+  constante `OPCOES_UPLOAD` (`src/common/storage.config.ts`).
+- **Upload de vídeo e de material do Boost autorizado somente após o recebimento do arquivo.** A permissão
+  era verificada dentro do handler, depois de o interceptor já ter recebido e gravado o arquivo (até 2 GB
+  no caso do vídeo). Um usuário autenticado sem permissão conseguia transmitir o arquivo inteiro, recebia
+  `403` e o arquivo permanecia no disco. Corrigido com `@RequirePermission` nas duas rotas, avaliado pelo
+  guard antes do interceptor.
+- **Origem recusada pelo CORS resultava em HTTP 500.** O callback de origem repassava um `Error` ao
+  middleware, que encerrava a pré-verificação como falha do servidor. Corrigido: a origem recusada é
+  sinalizada sem erro, e o navegador bloqueia a resposta pela ausência de `Access-Control-Allow-Origin`.
+- **Simulado de recuperação incompatível com o Windows PowerShell 5.1.** `scripts/recovery-drill.ps1`
+  utilizava `Join-Path` com vários segmentos, recurso disponível apenas no PowerShell 7; no Windows Server,
+  que traz o Windows PowerShell 5.1, o simulado falhava sempre que havia anexo a verificar. Corrigido com
+  chamadas aninhadas.
+- **Pastas de arquivos redirecionadas fora do backup.** Os scripts de backup arquivavam somente
+  `<projeto>/uploads`; pastas redirecionadas por variável de ambiente (por exemplo, vídeos em outro disco)
+  eram omitidas sem aviso. Corrigido com a resolução de cada pasta pela mesma regra da aplicação, em
+  PowerShell e em bash, com compatibilidade para backups no formato anterior.
+- **Pasta de backups sem exclusão no controle de versão.** O destino padrão dos backups (`./backups`)
+  fica dentro do repositório e não constava do `.gitignore`; um dump do banco poderia ser versionado por
+  engano. Incluído no `.gitignore`.
+- **Seed de desenvolvimento com arquivos inexistentes e autoria incorreta.** Os registros de demonstração
+  apontavam para um arquivo fictício (`seed-placeholder.pdf`), e todo download desses registros falhava;
+  além disso, campos de autoria (`registradoPorId`, `corrigidoPorId`, `autorId`) recebiam o id do cadastro
+  de professor, enquanto a aplicação grava o id do usuário. O seed passou a gerar PDFs reais cifrados, com
+  nome determinístico, e a usar o id de usuário nesses campos.
+- **Teste unitário gravando na pasta `uploads/` real.** `storage.config.spec.ts` criava uma pasta de teste
+  dentro de `uploads/` a cada execução, depois incluída nos backups. O teste passou a remover o que cria.
+
+### Revisões anteriores
+
+- **Serialização de `BigInt` na resposta de chamados com anexo.** `AnexoTicket.tamanho` é `BigInt` no
+  schema, e `JSON.stringify` não serializa esse tipo; todo chamado com anexo retornava `500` em
+  `GET /chamados/:id`. Corrigido com conversão explícita (`Number(tamanho)`) antes da resposta. Todo novo
+  campo `BigInt` exige o mesmo tratamento.
+- **Formato da resposta de `POST /patrimonio-movimentacoes` divergente do esperado pelo frontend.** O
+  endpoint, transacional, devolve `{ movimentacao, patrimonio }`, mas o serviço genérico do frontend
+  (`mapResource`) tratava a resposta como a movimentação isolada, e os registros eram exibidos com campos
+  indefinidos, embora gravados corretamente. Corrigido com um caminho de leitura dedicado.
+- **Data de encerramento do chamado dependente do cliente.** O DTO aceitava `encerradoEm` no corpo da
+  requisição, mas o frontend não enviava o campo, e os chamados encerrados ficavam sem data de
+  encerramento. Corrigido: o valor passou a ser derivado da transição de status.
+- **Seletor de "Visão" de demonstração acoplado à resolução de permissão real no frontend.**
+  `hub/permission-context.tsx` resolvia a permissão efetiva a partir da persona selecionada no RoleSwitcher,
+  e não da sessão autenticada; cinco telas (`academy.attendance.tsx`, `academy.grades.tsx`,
+  `academy.index.tsx`, `learn.classes.tsx`, `learn.index.tsx`) decidiam inclusive qual consulta enviar à API
+  com base na persona, o que gerava `403` para professores reais. Corrigido em duas etapas: primeiro, o
+  `PermissionProvider` passou a ler `session.permissoes`; depois, o seletor foi removido, e o perfil de
+  interface passou a ser deduzido das permissões reais (`deriveRole`). Ver `docs/frontend/08-autorizacao.md`.
+- **Rotas duplicadas em inglês no Desk, duas delas sem verificação de permissão.**
+  `rooster-desk.controller.ts` mantinha, para vários recursos, um segundo caminho em inglês implementado
+  como método que delegava ao método original. Esses métodos não herdavam o decorator `@RequirePermission`
+  (decorators não se propagam por chamada de método), e o `PermissionGuard` liberava as rotas a qualquer
+  usuário autenticado (`GET /categorias-tickets`, `GET/POST/PATCH/DELETE /status-tickets`,
+  `GET /prioridades-tickets`, `DELETE /tickets/:id`). Corrigido com a remoção dos cerca de 22 métodos
+  duplicados; `POST /prioridades-tickets` passou a `POST /chamados-prioridades`. Na mesma correção, o handler
+  de prioridade deixou de usar os DTOs de categoria (mascarados por `as any`), que validavam e documentavam
+  campos incorretos. Os testes e2e foram migrados para os caminhos canônicos.
+- **Remoção do Passport com quebra da tipagem de `request.user` (89 erros de compilação).** As
+  dependências do Passport foram removidas por não terem uso (a verificação do JWT é feita em
+  `src/auth/jwt-auth.guard.ts`), mas `@types/passport-jwt` fornecia, indiretamente, a declaração global de
+  `Express.Request.user` da qual os controllers dependiam. O cache incremental do TypeScript
+  (`dist/tsconfig.tsbuildinfo`) ocultou o erro até uma compilação limpa. Corrigido com declaração própria
+  (`src/types/express.d.ts`). **Lição**: antes de remover uma dependência considerada sem uso, verificar se ela
+  fornece declaração de tipo global, e compilar com o cache incremental apagado.
+- **Documentação divergente do código após a inclusão de Boost e Finance.** Duas auditorias (uma por
+  repositório, setembro/2026) confrontaram a documentação com o código e encontraram divergências de
+  gravidade alta: afirmações de inexistência de componentes que existiam (`src/mail/`), contagens incorretas
+  de módulos, models e controllers, rotas removidas descritas como existentes e módulos com backend
+  descritos como simulados. Todas as divergências de gravidade alta e média foram corrigidas, e as
+  especificações funcionais de Boost e Finance (RF-B01 a RF-B10 e RF-F01 a RF-F10) foram redigidas.
+  **Lição**: a divergência acumulada só é detectada por auditoria periódica; o padrão dominante foi o de
+  afirmações de ausência escritas quando verdadeiras e não revisadas depois de deixarem de sê-lo.
+- **Dados simulados sem uso, serviços simulados desconectados e documentação obsoleta.** Varredura de
+  setembro/2026 removeu cerca de 30 arquivos de dados simulados sem importador, dois serviços simulados
+  sem tela consumidora, componentes órfãos e as dependências sem uso (`react-hook-form`, `zod`,
+  `@hookform/resolvers`, `date-fns`). Cada exclusão foi precedida de busca por importadores e seguida de
+  `npx tsc --noEmit`, que identificou dois consumidores não detectados pela busca inicial, por usarem
+  importação relativa. Na mesma limpeza, uma segunda árvore de documentação obsoleta do backend (30
+  arquivos) foi removida.
+- **Módulos remanescentes do RBAC baseado em "Perfil".** Após a adoção da concessão direta de permissão
+  por usuário, as pastas `src/roster-hub/perfis/`, `perfis-permissoes/` e `usuarios-perfis/` permaneceram no
+  código, fora de qualquer módulo registrado e referenciando models inexistentes; o cache incremental do
+  TypeScript ocultava os erros de tipo. Um teste (`test/rooms-reservas.e2e-spec.ts`) também dependia desse
+  esquema. Os módulos foram removidos e o teste foi ajustado para a concessão direta de permissão.

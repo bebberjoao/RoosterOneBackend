@@ -15,8 +15,9 @@ import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
 import { AcademyService } from '../rooster-academy/academy.service';
 import { BoostService } from './boost.service';
 import { BoostChatGateway } from './boost-chat.gateway';
-import { PASTAS, MIMETYPES_DOCUMENTO, criarFiltroMimetype } from '../common/storage.config';
+import { PASTAS, MIMETYPES_DOCUMENTO, OPCOES_UPLOAD, criarFiltroMimetype } from '../common/storage.config';
 import { escreverDocumentoEncriptado, lerDocumentoDescriptografado, storageVideoEncriptado } from '../common/file-encryption.util';
+import { exigirConteudoCompativel } from '../common/assinatura-arquivo';
 import { PaginacaoQueryDto } from '../common/pagination';
 import { enviarVideoComRange } from '../common/video-stream.util';
 import { emitirTokenDeStream, validarTokenDeStream } from '../common/stream-token.util';
@@ -156,9 +157,12 @@ export class BoostController {
 
   // ===================== Material de apoio =====================
   @Post('aulas-boost/:id/materiais')
+  // Mesmo motivo do upload de vídeo: autorização antes de o arquivo ser recebido em memória.
+  @RequirePermission(MODULO, TELA_MANAGE, 'gerenciar-conteudo')
   @ApiOperation({ summary: 'Envia um material de apoio (até 25MB) para a aula' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('arquivo', {
+    ...OPCOES_UPLOAD,
     storage: memoryStorage(),
     limits: { fileSize: MAX_MATERIAL_BYTES },
     fileFilter: criarFiltroMimetype(MIMETYPES_DOCUMENTO),
@@ -167,6 +171,7 @@ export class BoostController {
     if (!arquivo) throw new BadRequestException('Nenhum arquivo enviado, ou formato não aceito (campo "arquivo").');
     const cursoId = await this.boostService.cursoIdDaAula(aulaId);
     await this.exigirPermissao((request.user as AuthedUser).id, 'gerenciar-conteudo');
+    exigirConteudoCompativel(arquivo);
     const { filename } = escreverDocumentoEncriptado(MATERIAIS_DIR, arquivo.originalname, arquivo.buffer);
     return this.boostService.createMaterial(aulaId, {
       originalname: arquivo.originalname, filename, mimetype: arquivo.mimetype, size: arquivo.size,
@@ -186,16 +191,20 @@ export class BoostController {
     const cursoId = await this.boostService.cursoIdDoMaterial(id);
     await this.exigirPermissao((request.user as AuthedUser).id, 'gerenciar-conteudo');
     const material = await this.boostService.findOneMaterial(id);
-    const nome = material.nome.replace(/["\\]/g, '_');
-    response.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
+    response.attachment(material.nome);
     return response.type(material.caminho).send(lerDocumentoDescriptografado(join(MATERIAIS_DIR, material.caminho)));
   }
 
   // ===================== Vídeo hospedado =====================
   @Post('aulas-boost/:id/video')
+  // A permissão é exigida também pelo guard, que executa antes do interceptor de upload: sem
+  // isso, um usuário sem permissão conseguia transmitir o arquivo inteiro (até 2GB) para o
+  // disco antes de receber 403, e o arquivo permanecia gravado.
+  @RequirePermission(MODULO, TELA_MANAGE, 'gerenciar-conteudo')
   @ApiOperation({ summary: 'Envia o vídeo hospedado da aula (até 2GB; mp4, webm ou mov)' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('arquivo', {
+    ...OPCOES_UPLOAD,
     storage: storageVideoEncriptado(() => VIDEOS_DIR),
     limits: { fileSize: MAX_VIDEO_BYTES },
     fileFilter: (_req, file, cb) => cb(null, MIMETYPES_VIDEO.includes(file.mimetype)),

@@ -35,6 +35,9 @@ describe('resolverPastaUpload', () => {
   it('usa <cwd>/uploads/<subpasta> quando nada é configurado', () => {
     const caminho = resolverPastaUpload('assunto-teste');
     expect(caminho).toBe(join(process.cwd(), 'uploads', 'assunto-teste'));
+    // A resolução cria a pasta dentro do uploads/ real do projeto; o teste remove o que criou
+    // para não deixar resíduo que depois seria incluído em backup.
+    rmSync(caminho, { recursive: true, force: true });
   });
 
   it('respeita a raiz configurada em UPLOADS_DIR', () => {

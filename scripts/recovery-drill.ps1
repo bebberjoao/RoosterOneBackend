@@ -1,23 +1,25 @@
-# Simulado de recuperação do Rooster One: restaura um backup de verdade
-# (gerado por backup.ps1) num banco DESCARTÁVEL, confere que as tabelas
-# principais vieram populadas e que um arquivo referenciado no banco existe
-# de fato no zip de uploads — e depois apaga tudo. NUNCA toca no banco nem
-# na pasta uploads/ reais: por isso pode ser reexecutado com segurança e
-# agendado (ex.: Agendador de Tarefas semanal), diferente de restore.ps1.
+# Simulado de recuperação do Rooster One: restaura um backup real (gerado por
+# backup.ps1) em um banco DESCARTÁVEL, confere que as tabelas principais
+# foram restauradas, que um arquivo referenciado no banco existe no zip de
+# uploads e que esse arquivo é decifrável com a FILE_ENCRYPTION_KEY
+# configurada — e, ao final, remove tudo o que criou. NUNCA altera o banco
+# nem a pasta uploads/ reais: pode ser reexecutado com segurança e agendado
+# (ex.: Agendador de Tarefas, semanalmente), diferentemente de restore.ps1.
 #
-# Existe porque um backup que nunca foi restaurado não é um backup de
-# verdade — restore.ps1 exige confirmação e sobrescreve dados reais, então
-# na prática só roda numa emergência. Este script é o jeito de provar,
-# rotineiramente, que os backups gerados são restauráveis.
+# Justificativa: um backup nunca restaurado não tem sua recuperabilidade
+# comprovada. restore.ps1 exige confirmação e sobrescreve dados reais, sendo
+# executado apenas em emergência; este script comprova rotineiramente que os
+# backups gerados são restauráveis e legíveis com a chave em uso.
 #
 # Uso:
 #   .\scripts\recovery-drill.ps1 -Pasta .\backups\20260928-090000
-#   .\scripts\recovery-drill.ps1 -Pasta .\backups\20260928-090000 -ManterBanco   # não limpa, pra inspecionar
+#   .\scripts\recovery-drill.ps1 -Pasta .\backups\20260928-090000 -ManterBanco   # preserva o banco para inspeção
 #
 # Requer createdb/pg_restore/psql/dropdb no PATH (mesma instalação do
-# PostgreSQL usada por backup.ps1/restore.ps1) e DATABASE_URL no ambiente ou
-# em .env — usada só para descobrir host/porta/usuário do SERVIDOR; o nome
-# do banco de dentro dela nunca é tocado.
+# PostgreSQL usada por backup.ps1/restore.ps1), Node.js com o build da
+# aplicação em dist/ (npm run build), e DATABASE_URL/FILE_ENCRYPTION_KEY no
+# ambiente ou em .env. DATABASE_URL é usada apenas para obter host, porta e
+# usuário do SERVIDOR; o banco nela indicado nunca é acessado.
 
 [CmdletBinding()]
 param(
@@ -32,7 +34,7 @@ if (-not (Test-Path $Pasta)) { Write-Error "Pasta de backup nao encontrada: $Pas
 $arquivoDump = Join-Path $Pasta 'banco.dump'
 if (-not (Test-Path $arquivoDump)) { Write-Error "$arquivoDump nao encontrado." }
 
-if (-not $env:DATABASE_URL) {
+if (-not $env:DATABASE_URL -or -not $env:FILE_ENCRYPTION_KEY) {
     $arquivoEnv = Join-Path $Raiz '.env'
     if (Test-Path $arquivoEnv) {
         Get-Content $arquivoEnv | ForEach-Object {
@@ -53,6 +55,10 @@ foreach ($cmd in 'createdb', 'pg_restore', 'psql', 'dropdb') {
         Write-Error "$cmd nao encontrado no PATH. Acrescente a pasta bin do PostgreSQL."
     }
 }
+if (-not (Get-Command 'node' -ErrorAction SilentlyContinue)) {
+    Write-Error "node nao encontrado no PATH (necessario para verificar a decifragem dos arquivos)."
+}
+$VerificadorCifra = Join-Path $PSScriptRoot 'verificar-arquivo-cifrado.js'
 
 if ($env:DATABASE_URL -notmatch '^postgres(?:ql)?://([^:]+):([^@]+)@([^:/]+):(\d+)/') {
     Write-Error "DATABASE_URL nao esta no formato esperado (postgresql://usuario:senha@host:porta/banco)."
@@ -99,15 +105,29 @@ try {
     if (-not (Test-Path $arquivoUploads)) {
         Write-Output "  [PULADO] backup nao tem uploads.zip"
     } else {
-        $amostraRaw = & psql -h $PgHost -p $PgPort -U $PgUser -d $BancoDrill -t -A -c "SELECT caminho FROM anexos_tickets WHERE caminho IS NOT NULL LIMIT 1" 2>$null
+        # O anexo mais recente é o candidato mais provável a ter sido gravado já com
+        # criptografia em repouso (arquivos anteriores a ela permanecem em texto puro).
+        $amostraRaw = & psql -h $PgHost -p $PgPort -U $PgUser -d $BancoDrill -t -A -c "SELECT caminho FROM anexos_tickets WHERE caminho IS NOT NULL ORDER BY criado_em DESC NULLS LAST LIMIT 1" 2>$null
         $amostra = "$amostraRaw".Trim()
         if (-not $amostra) {
             Write-Output "  [PULADO] nenhum anexo de chamado no banco restaurado"
         } else {
             Expand-Archive -Path $arquivoUploads -DestinationPath $PastaUploadsDrill -Force
-            $caminhoEsperado = Join-Path $PastaUploadsDrill 'uploads' 'anexos-tickets' $amostra
+            # Join-Path aninhado: a forma com vários segmentos só existe a partir do PowerShell 7,
+            # e o Windows Server traz o Windows PowerShell 5.1 por padrão.
+            $caminhoEsperado = Join-Path (Join-Path (Join-Path $PastaUploadsDrill 'uploads') 'anexos-tickets') $amostra
             if (Test-Path $caminhoEsperado) {
                 Write-Output "  [OK]    anexo '$amostra' referenciado no banco existe no zip de uploads"
+
+                Write-Output ""
+                Write-Output "==> Conferindo decifragem com a FILE_ENCRYPTION_KEY configurada"
+                $saidaVerificador = & node $VerificadorCifra $caminhoEsperado 2>&1
+                if ($LASTEXITCODE -eq 0) {
+                    Write-Output "  [OK]    $saidaVerificador"
+                } else {
+                    Write-Output "  [FALHA] $saidaVerificador"
+                    $falhas += 'decifragem-uploads'
+                }
             } else {
                 Write-Output "  [FALHA] anexo '$amostra' referenciado no banco NAO existe no zip de uploads"
                 $falhas += 'sincronia-uploads'
@@ -117,7 +137,7 @@ try {
 
     Write-Output ""
     if ($falhas.Count -eq 0) {
-        Write-Output "==> Simulado OK: backup em '$Pasta' e restauravel e consistente."
+        Write-Output "==> Simulado OK: backup em '$Pasta' e restauravel, consistente e legivel com a chave configurada."
         $sucesso = $true
     } else {
         Write-Output "==> Simulado FALHOU: $($falhas -join ', ')"

@@ -155,8 +155,7 @@ export class BoostPortalController {
   @ApiOperation({ summary: 'Baixa um material de apoio — só o aluno matriculado no curso da aula' })
   async downloadMaterial(@Req() request: Request, @Res() response: Response, @Param('id') id: string) {
     const material = await this.boostPortalService.findMaterialParaDownload(id, (request.user as AuthedBoostUser).id);
-    const nome = material.nome.replace(/["\\]/g, '_');
-    response.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
+    response.attachment(material.nome);
     return response.type(material.caminho).send(lerDocumentoDescriptografado(join(MATERIAIS_DIR, material.caminho)));
   }
 

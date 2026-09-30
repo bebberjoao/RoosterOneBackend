@@ -5,8 +5,12 @@
 #
 # São as DUAS metades do estado. Só o dump do PostgreSQL não basta: anexo de
 # chamado, documento academico, certificado e nota fiscal sao arquivos em
-# uploads/, e o banco guarda apenas o caminho. Restaurar um sem o outro
+# disco, e o banco guarda apenas o nome do arquivo. Restaurar um sem o outro
 # produz registro apontando para arquivo que nao existe.
+#
+# As pastas de arquivos sao resolvidas pela mesma regra da aplicação
+# (scripts/pastas-upload.ps1): pastas redirecionadas por variavel de ambiente
+# para outro disco (ex.: BOOST_VIDEOS_DIR) tambem entram no backup.
 #
 # Uso:
 #   .\scripts\backup.ps1
@@ -23,21 +27,22 @@ param(
 $ErrorActionPreference = 'Stop'
 $Raiz = Split-Path -Parent $PSScriptRoot
 
-# Carrega .env se DATABASE_URL nao veio do ambiente.
-if (-not $env:DATABASE_URL) {
-    $arquivoEnv = Join-Path $Raiz '.env'
-    if (Test-Path $arquivoEnv) {
-        Get-Content $arquivoEnv | ForEach-Object {
-            if ($_ -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$') {
-                $nome = $Matches[1]
-                $valor = $Matches[2].Trim('"').Trim("'")
-                if (-not [Environment]::GetEnvironmentVariable($nome)) {
-                    Set-Item -Path "Env:$nome" -Value $valor
-                }
+# Carrega .env sem sobrescrever o que já veio do ambiente — mesmo comportamento
+# da aplicação (dotenv). Além de DATABASE_URL, o .env pode redirecionar as
+# pastas de arquivos (UPLOADS_DIR, BOOST_VIDEOS_DIR etc.), que o backup precisa conhecer.
+$arquivoEnv = Join-Path $Raiz '.env'
+if (Test-Path $arquivoEnv) {
+    Get-Content $arquivoEnv | ForEach-Object {
+        if ($_ -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$') {
+            $nome = $Matches[1]
+            $valor = $Matches[2].Trim('"').Trim("'")
+            if (-not [Environment]::GetEnvironmentVariable($nome)) {
+                Set-Item -Path "Env:$nome" -Value $valor
             }
         }
     }
 }
+. (Join-Path $PSScriptRoot 'pastas-upload.ps1')
 
 if (-not $env:DATABASE_URL) {
     Write-Error "DATABASE_URL nao definida (nem no ambiente, nem em .env)."
@@ -65,12 +70,36 @@ $arquivoDump = Join-Path $Pasta 'banco.dump'
 if ($LASTEXITCODE -ne 0) { Write-Error "pg_dump falhou (codigo $LASTEXITCODE)." }
 
 # --- Arquivos ---
-$pastaUploads = Join-Path $Raiz 'uploads'
-if (Test-Path $pastaUploads) {
-    Write-Output "--> Arquivos (uploads/)"
-    Compress-Archive -Path $pastaUploads -DestinationPath (Join-Path $Pasta 'uploads.zip') -Force
-} else {
-    Write-Output "--> uploads/ nao existe ainda; nada a arquivar"
+# Cada tipo de arquivo é arquivado a partir da pasta onde a aplicação de fato o
+# grava (inclusive pastas redirecionadas para outro disco), sob o nome canônico
+# uploads/<subpasta>/ dentro do zip. Usa a API ZipArchive do .NET em vez de
+# Compress-Archive: grava separador '/' conforme a especificação ZIP e não tem o
+# limite de 2 GB por arquivo do Compress-Archive do Windows PowerShell 5.1.
+Write-Output "--> Arquivos"
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$arquivoZip = Join-Path $Pasta 'uploads.zip'
+$resumoPastas = @()
+$zip = [System.IO.Compression.ZipFile]::Open($arquivoZip, [System.IO.Compression.ZipArchiveMode]::Create)
+try {
+    foreach ($pastaTipo in (Resolve-PastasUpload -Raiz $Raiz)) {
+        if (-not (Test-Path $pastaTipo.Caminho)) {
+            $resumoPastas += "  $($pastaTipo.Subpasta): (inexistente) $($pastaTipo.Caminho)"
+            continue
+        }
+        $base = (Resolve-Path $pastaTipo.Caminho).Path.TrimEnd('\', '/')
+        $arquivos = @(Get-ChildItem -Path $base -Recurse -File)
+        foreach ($arquivo in $arquivos) {
+            $relativo = $arquivo.FullName.Substring($base.Length + 1).Replace('\', '/')
+            [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+                $zip, $arquivo.FullName, "uploads/$($pastaTipo.Subpasta)/$relativo",
+                [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null
+        }
+        $resumoPastas += "  $($pastaTipo.Subpasta): $($arquivos.Count) arquivo(s) de $base"
+        Write-Output "    $($pastaTipo.Subpasta): $($arquivos.Count) arquivo(s)"
+    }
+} finally {
+    $zip.Dispose()
 }
 
 # --- Manifesto ---
@@ -81,15 +110,15 @@ $pastaMigrations = Join-Path $Raiz 'prisma/migrations'
 $ultimaMigration = if (Test-Path $pastaMigrations) {
     (Get-ChildItem $pastaMigrations -Directory | Where-Object { $_.Name -match '^\d' } | Sort-Object Name | Select-Object -Last 1).Name
 } else { '(nenhuma)' }
-$temUploads = Test-Path (Join-Path $Pasta 'uploads.zip')
-
 @"
 Rooster One - backup
 Data:        $(Get-Date -Format 'o')
 Host:        $env:COMPUTERNAME
 Banco:       $bancoMascarado
 Migration:   $ultimaMigration
-Conteudo:    banco.dump$(if ($temUploads) { ', uploads.zip' })
+Conteudo:    banco.dump, uploads.zip
+Pastas de origem:
+$($resumoPastas -join "`r`n")
 "@ | Set-Content -Path (Join-Path $Pasta 'manifesto.txt') -Encoding utf8
 
 Write-Output "==> Concluido:"
