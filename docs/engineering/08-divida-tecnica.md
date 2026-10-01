@@ -78,6 +78,17 @@ e2e. A suíte unitária cobre lógica pura e ramos de erro de difícil reproduç
 
 ## Corrigida durante o desenvolvimento (histórico)
 
+### Revisão de 01/10/2026
+
+Defeitos identificados durante a revisão integral da documentação, ao confrontar o texto com o código:
+
+- **Troca de senha sem revogação das sessões.** A redefinição de senha (por token ou pelo administrador) atualizava
+  o hash, mas mantinha os refresh tokens em aberto; em caso de conta comprometida, a sessão do invasor continuaria
+  renovável por até 30 dias. A redefinição e a desativação passaram a revogar todas as sessões do usuário
+  (`revogarSessoesQuery`, `usuarios.service.ts`), com teste e2e.
+- **Violação de unicidade respondida como erro interno** e **auditoria do Hub com o usuário afetado como autor**:
+  descritas na seção "Pendente" (itens resolvidos) e no `CHANGELOG.md`.
+
 ### Revisão de 30/09/2026
 
 Defeitos identificados durante a revisão do roadmap, com a correção aplicada:

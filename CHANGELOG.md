@@ -152,6 +152,10 @@ estão indicadas; as demais não alteram o banco de dados.
 
 ### Segurança
 
+- **Revogação das sessões na troca de senha e na desativação** (01/10/2026). A redefinição de senha (por
+  recuperação ou pelo administrador) não revogava os refresh tokens em aberto; uma sessão obtida indevidamente
+  continuava a renovar o acesso por até 30 dias após a troca de senha. A redefinição e a desativação do usuário
+  passaram a revogar todas as sessões do usuário. Coberto por teste e2e.
 - **Autorização antes do recebimento de arquivo** (30/09/2026). O envio de vídeo e de material do Boost verificava a
   permissão somente depois que o interceptor de upload já havia recebido o arquivo; um usuário autenticado sem
   permissão podia transmitir até 2 GB, receber `403` e deixar o arquivo gravado. As duas rotas passaram a declarar
