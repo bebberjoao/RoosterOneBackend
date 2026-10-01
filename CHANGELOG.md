@@ -25,6 +25,12 @@ estão indicadas; as demais não alteram o banco de dados.
 
 ### Adicionado
 
+- **Central de documentos do aluno integrada à API** (30/09/2026; alteração no frontend, sem migration). A tela
+  `/student/documents`, antes alimentada por dados simulados, lista os documentos institucionais e os documentos das
+  disciplinas em que o aluno está matriculado (`GET /documentos-academicos`, filtrado pelas matrículas de
+  `GET /me/turmas`) e realiza o download pelo endpoint protegido existente
+  (`GET /documentos-academicos/:id/arquivo`). A busca global do portal deixou de
+  indexar a lista simulada e passou a oferecer acesso direto à central.
 - **Verificação do conteúdo real dos arquivos enviados** (30/09/2026). `src/common/assinatura-arquivo.ts` confere
   a assinatura binária inicial de cada arquivo contra o mimetype declarado (PDF, formatos Office, ZIP, imagens,
   texto e vídeos MP4, QuickTime e WebM). Documentos são verificados em memória, antes da gravação; o vídeo, nos
