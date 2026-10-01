@@ -11,9 +11,9 @@ logs; nos demais ambientes, utiliza-se o formato legível padrão do NestJS.
 O `Logger` é instanciado (`new Logger(...)`) nos seguintes arquivos:
 
 - `src/main.ts`: aviso de inicialização em produção sem origem de CORS configurada.
-- `src/mail/mail.service.ts`: registra em nível `warn` o conteúdo do e-mail (inclusive links, como o de redefinição
-  de senha) quando `SMTP_HOST` não está configurado, em lugar do envio. Constitui o principal meio de observação do
-  fluxo de e-mail em desenvolvimento.
+- `src/mail/mail.service.ts`: quando `SMTP_HOST` não está configurado, registra em nível `warn` o conteúdo do e-mail,
+  com os tokens dos links mascarados, em lugar do envio; constitui o principal meio de observação do fluxo de e-mail
+  em desenvolvimento. Em produção sem SMTP, registra apenas a falha de configuração, sem o conteúdo.
 - `src/rooster-desk/mensagens.gateway.ts` e `src/rooster-boost/boost-chat.gateway.ts`: eventos de conexão e
   desconexão dos WebSockets (nível `debug`).
 - `src/roster-hub/shared/auditoria.service.ts`: registra em nível `error` a falha na gravação de auditoria, que não

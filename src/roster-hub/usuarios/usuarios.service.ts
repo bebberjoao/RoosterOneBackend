@@ -335,6 +335,11 @@ export class UsuariosService {
         data,
         select: USUARIO_SAFE_SELECT,
       });
+      // Senha redefinida pelo administrador ou usuário desativado: as sessões em
+      // aberto são encerradas, e a renovação exige novo login.
+      if (updateUsuarioDto.senhaHash || updateUsuarioDto.ativo === false) {
+        await this.revogarSessoesQuery(id);
+      }
       await this.auditoria.registrar({
         usuarioId: atorId ?? id,
         modulo: 'Rooster Hub',
@@ -432,6 +437,9 @@ export class UsuariosService {
         where: { id: registro.id },
         data: { usadoEm: new Date() },
       }),
+      // A troca de senha encerra as sessões existentes: um refresh token obtido
+      // indevidamente deixaria de renovar o acesso apenas ao expirar (30 dias).
+      this.revogarSessoesQuery(registro.usuarioId),
     ]);
 
     await this.auditoria.registrar({
@@ -456,6 +464,11 @@ export class UsuariosService {
   // =====================================================
   // Métodos Auxiliares privados
   // =====================================================
+
+  /** Revoga todas as sessões (refresh tokens) em aberto do usuário. */
+  private revogarSessoesQuery(usuarioId: string) {
+    return this.prisma.sessao.updateMany({ where: { usuarioId, revogada: false }, data: { revogada: true } });
+  }
 
   private handleError(error: unknown, action: string): never {
     return traduzirErroPrisma(error, action);

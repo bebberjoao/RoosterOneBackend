@@ -1,43 +1,56 @@
 # Autenticação
 
-Este documento descreve, com base no código atual do backend (`RoosterOneBackend-main`), o fluxo de autenticação por JWT e o fluxo de redefinição de senha por e-mail.
+Este documento descreve, com base no código vigente do backend (`RoosterOneBackend-main`), a autenticação por JWT,
+a renovação de sessão e a redefinição de senha por e-mail (revisão de 01/10/2026).
 
 ## Visão geral
 
-O Rooster One usa autenticação stateless por **JSON Web Token (JWT)**. Não há sessão de servidor, não há cookie de sessão e não há refresh token — o cliente guarda um único token de acesso e o reenvia em todas as chamadas autenticadas via header `Authorization: Bearer <token>`.
+O Rooster One utiliza **JSON Web Token (JWT)** de curta duração para autenticar as requisições, combinado com
+**refresh token** de longa duração, armazenado no servidor apenas como hash, para a renovação da sessão. Não há
+cookie de sessão: o cliente reenvia o access token em todas as chamadas autenticadas pelo cabeçalho
+`Authorization: Bearer <token>`.
 
 Arquivos relevantes:
 
-- `src/auth/jwt-auth.guard.ts` — guard global que valida o token em toda requisição.
-- `src/auth/jwt-config.ts` — configuração do `JwtModule` (segredo e expiração).
-- `src/auth/auth.module.ts` — registra o guard como `APP_GUARD` (global, aplicado a toda a aplicação).
-- `src/auth/public.decorator.ts` — decorator `@Public()` para marcar rotas isentas do guard.
-- `src/roster-hub/usuarios/usuarios.controller.ts` — `AuthController`, com as rotas `POST /auth/login`, `POST /auth/esqueci-senha`, `POST /auth/redefinir-senha`.
-- `src/roster-hub/usuarios/usuarios.service.ts` — regra de negócio de login, hash de senha e redefinição de senha.
+- `src/auth/jwt-auth.guard.ts`: guard global que valida o token em todas as requisições;
+- `src/auth/jwt-config.ts`: configuração do `JwtModule` (segredo e validade);
+- `src/auth/auth.module.ts`: registro do guard como `APP_GUARD` (global) e da limitação de requisições;
+- `src/auth/public.decorator.ts`: decorator `@Public()`, que isenta rotas do guard;
+- `src/roster-hub/usuarios/usuarios.controller.ts`: `AuthController`, com `POST /auth/login`, `/auth/refresh`,
+  `/auth/logout`, `/auth/esqueci-senha` e `/auth/redefinir-senha`;
+- `src/roster-hub/usuarios/usuarios.service.ts`: regras de login, sessão, hash de senha e redefinição de senha.
 
 ## Login (`POST /auth/login`)
 
-1. O cliente envia `{ email, senha }` (validado por `LoginDto`: `email` precisa ser um e-mail válido; `senha` é string de 1 a 255 caracteres — não há checagem de formato/força aqui, só de presença).
-2. `UsuariosService.login()` busca o usuário por `email` (`prisma.usuario.findUnique`).
-3. A senha informada é comparada com `usuario.senhaHash` via `bcrypt.compare()`. A validação exige, na mesma condição, que o usuário exista **e** esteja `ativo`:
+1. O cliente envia `{ email, senha }`, validado por `LoginDto` (`email` em formato válido; `senha` com 1 a 255
+   caracteres, sem verificação de formato, apenas de presença).
+2. `UsuariosService.login()` consulta o usuário por `email`.
+3. A senha é comparada com `usuario.senhaHash` por `bcrypt.compare()`. A validação exige, na mesma condição, que o
+   usuário exista **e** esteja ativo:
    ```ts
    const valido = usuario && usuario.ativo && (await bcrypt.compare(senha, usuario.senhaHash));
    ```
-4. Se inválido (usuário inexistente, inativo, ou senha errada), a API responde `401 Unauthorized` com a mensagem genérica `"Login ou senha inválidos."` — o mesmo erro tanto para "e-mail não existe" quanto para "senha errada", o que evita enumeração de contas por essa via. Antes de lançar o erro, é gravado um evento de auditoria `login_falhou` (com `usuarioId` nulo se o e-mail não existir).
-5. Se válido, o serviço:
-   - Atualiza `ultimoLogin` do usuário.
-   - Grava evento de auditoria `login_sucesso` (com IP e User-Agent da requisição, capturados no controller e repassados ao service).
-   - Retorna `{ usuario: { id, nome, email }, acesso, accessToken }`, onde `acesso` é o resultado de `getAccess()` (permissões e módulos do usuário) e `accessToken` é o JWT assinado.
+4. Em caso de falha (usuário inexistente, inativo ou senha incorreta), a resposta é `401 Unauthorized`, com a
+   mensagem genérica `"Login ou senha inválidos."`, idêntica para e-mail inexistente e para senha incorreta, o que
+   impede a enumeração de contas por essa via. Antes da exceção, é registrado o evento de auditoria `login_falhou`
+   (com `usuarioId` nulo quando o e-mail não existe).
+5. Em caso de sucesso, o serviço:
+   - atualiza `ultimoLogin`;
+   - cria a sessão de refresh token (seção "Renovação de sessão");
+   - registra o evento `login_sucesso`, com o endereço IP e o agente de usuário da requisição;
+   - devolve `{ usuario: { id, nome, email }, acesso, accessToken, refreshToken }`, em que `acesso` é o resultado de
+     `getAccess()` (permissões e módulos do usuário).
 
-**Dado sensível não exposto no login:** a resposta de login devolve só `id`, `nome`, `email` do usuário — não devolve `senhaHash`. (Isso contrasta com outros endpoints de usuário — ver `05-analise-de-seguranca.md`.)
+A resposta do login devolve apenas `id`, `nome` e `email` do usuário, sem `senhaHash`. As rotas de autenticação são
+`@Public()` e possuem limite de requisições próprio (8 por minuto por endereço IP nas rotas de login, recuperação,
+redefinição e renovação).
 
-A rota é marcada `@Public()`, ou seja, está isenta do `JwtAuthGuard` global (não faz sentido exigir um token para obter um token).
-
-## Emissão e validação do token
+## Emissão e validação do access token
 
 ### Segredo (`JWT_SECRET`)
 
-`src/auth/jwt-config.ts` exige a variável de ambiente `JWT_SECRET` e **lança uma exceção na inicialização da aplicação** se ela não estiver definida — não existe nenhum valor padrão/hardcoded:
+`src/auth/jwt-config.ts` exige a variável de ambiente `JWT_SECRET` e **lança exceção na inicialização** quando ela
+não está definida; não há valor padrão no código:
 
 ```ts
 const secret = process.env.JWT_SECRET;
@@ -46,89 +59,146 @@ if (!secret) {
 }
 ```
 
-Isso significa que a aplicação **recusa subir** (falha no boot) em qualquer ambiente onde `JWT_SECRET` não esteja configurado, o que evita o erro comum de assinar tokens com um segredo público conhecido (algum valor de exemplo do framework, por exemplo).
+A aplicação, portanto, **não é iniciada** em ambiente sem `JWT_SECRET`, o que impede a assinatura de tokens com
+segredo de exemplo publicamente conhecido.
 
-### Expiração
+### Validade
 
-O token é assinado com `signOptions: { expiresIn: '8h' }` (mesmo arquivo `jwt-config.ts`). Ou seja, todo `accessToken` emitido em `login()` expira 8 horas após a emissão. Não há mecanismo de refresh token, refresh silencioso ou renovação automática no backend — expirado o token, o usuário precisa fazer login de novo. O payload assinado é `{ sub: usuario.id, email: usuario.email }` (sem outros dados sensíveis, sem permissões embutidas no token).
+O token é assinado com `signOptions: { expiresIn: '8h' }`. O payload é `{ sub: usuario.id, email: usuario.email }`,
+sem dados sensíveis nem permissões embutidas; as permissões são consultadas no banco a cada requisição.
 
 ### Verificação em cada requisição (`JwtAuthGuard`)
 
-`JwtAuthGuard` é registrado como `APP_GUARD` em `AuthModule`, portanto roda em **toda rota da aplicação**, por padrão, a menos que a rota (ou controller) esteja marcada com `@Public()`. Fluxo do guard, em `canActivate()`:
+O `JwtAuthGuard` é registrado como `APP_GUARD` em `AuthModule` e executado em **todas as rotas**, exceto as
+marcadas com `@Public()`. Fluxo de `canActivate()`:
 
-1. Se a rota tem `@Public()`, deixa passar sem checar nada.
-2. Caso contrário, exige header `Authorization` no formato `Bearer <token>`. Se ausente ou mal formado, `401 Unauthorized — "Token JWT não informado."`.
-3. Verifica a assinatura/expiração do JWT com `jwt.verifyAsync()`.
-4. **Reconsulta o usuário no banco a cada requisição** (`prisma.usuario.findUnique({ where: { id: payload.sub } })`) e checa `usuario.ativo`. Se o usuário não existe mais ou foi desativado, `401 Unauthorized — "Usuário inválido ou inativo."`, mesmo que o token em si ainda seja criptograficamente válido e não tenha expirado.
-5. Qualquer falha nesse processo (token inválido, expirado, usuário inativo/excluído) cai no mesmo `catch` e responde `401` com `"Token JWT inválido ou expirado."`.
-6. Se tudo passa, `request.user` recebe o registro completo do usuário (o objeto Prisma inteiro, incluindo `senhaHash`) — ver observação de segurança abaixo.
+1. Rota com `@Public()`: autorizada sem verificação.
+2. Nos demais casos, exige o cabeçalho `Authorization` no formato `Bearer <token>`; na ausência ou em formato
+   inválido, `401 Unauthorized — "Token JWT não informado."`.
+3. Verifica assinatura e validade com `jwt.verifyAsync()`.
+4. **Consulta o usuário no banco a cada requisição** e verifica `usuario.ativo`. Usuário inexistente ou desativado é
+   recusado, ainda que o token seja criptograficamente válido e não expirado.
+5. Toda falha nas etapas 3 e 4 resulta em `401`, com `"Token JWT inválido ou expirado."`.
+6. Em caso de sucesso, `request.user` recebe o registro do usuário obtido pelo Prisma.
 
-**Implicação prática:** como o guard reconsulta o banco a cada chamada, desativar ou excluir um usuário no meio de uma sessão de 8h derruba o acesso dele imediatamente na próxima requisição — não é preciso esperar o token expirar nem existe uma lista de revogação (blocklist) separada; a própria consulta ao usuário já cumpre esse papel.
+**Implicação**: como o guard consulta o banco a cada requisição, a desativação ou a exclusão de um usuário encerra
+seu acesso na requisição seguinte, sem aguardar a expiração do token e sem lista de revogação separada.
 
-**Observação de segurança:** `request.user` carrega o registro completo do usuário retornado pelo Prisma, incluindo o campo `senhaHash` (o hash bcrypt da senha). Isso não vaza para o cliente por si só — depende do que cada controller faz com `request.user` — mas é um dado sensível trafegando dentro do processo em todas as requisições autenticadas. Ver `05-analise-de-seguranca.md` para os pontos onde esse mesmo padrão (devolver o registro do Prisma sem filtrar campos) efetivamente resulta em `senhaHash` indo para a resposta HTTP.
+**Observação de segurança**: `request.user` contém o registro completo do usuário, inclusive `senhaHash`. O dado não
+é enviado ao cliente por si só, pois os controllers utilizam apenas o `id`, e todas as respostas que incluem usuário
+utilizam seleção explícita de campos (`USUARIO_SAFE_SELECT`); permanece, contudo, como dado sensível disponível no
+processo durante a requisição (ver `05-analise-de-seguranca.md`).
 
-### Onde o token é armazenado (lado cliente)
+## Renovação de sessão (refresh token)
 
-Confirmado no frontend (`RoosterOneFrontEnd-main/src/services/hub/session.ts`): o `accessToken` é guardado em `localStorage` (`rooster.session.token`), para sobreviver a um F5. Não é usado cookie `httpOnly`. Isso é uma decisão de arquitetura do SPA, não do backend, mas é relevante para avaliação de risco: um token em `localStorage` é acessível a qualquer script executado no contexto da página (exposição a XSS no frontend), diferente de um cookie `httpOnly`, que não é.
+- No login, é gerado um token aleatório de 32 bytes (64 caracteres hexadecimais); a tabela `sessoes` armazena
+  apenas o seu hash SHA-256, com validade de 30 dias (`expiraEm`), endereço IP e agente de usuário.
+- `POST /auth/refresh` valida o token, revoga a sessão utilizada e cria nova sessão (**rotação**). Se um refresh
+  token obtido indevidamente for utilizado, o uso seguinte do token legítimo encontra a sessão revogada e falha, o
+  que torna o incidente perceptível.
+- A renovação revalida `usuario.ativo`.
+- `POST /auth/logout` revoga a sessão informada, de forma idempotente.
+- **A troca de senha, por recuperação ou por administrador, e a desativação do usuário revogam todas as sessões em
+  aberto** (desde 01/10/2026), de modo que nenhum refresh token anterior continue a renovar o acesso.
+- Toda falha de renovação resulta em `401 "Sessão inválida ou expirada."`, sem distinção da causa.
+- Eventos de auditoria: `sessao_renovada` e `logout`.
+
+O access token já emitido não é revogado, por se tratar de JWT sem estado; permanece válido até a expiração (no
+máximo 8 horas), salvo desativação do usuário, verificada a cada requisição.
+
+### Armazenamento no cliente
+
+No frontend (`RoosterOneFrontEnd-main/src/services/hub/session.ts`), os tokens são armazenados em `localStorage`,
+para persistirem após o recarregamento da página; não é utilizado cookie `httpOnly`. Trata-se de decisão de
+arquitetura do frontend, relevante para a avaliação de risco: o token em `localStorage` é acessível a qualquer script
+executado no contexto da página (exposição a XSS), ao contrário do cookie `httpOnly`.
 
 ## Hash de senha
 
-- Biblioteca: `bcryptjs` (pure-JS, não a versão nativa `bcrypt`).
-- Fator de custo: `SALT_ROUNDS = 10`, constante em `src/roster-hub/usuarios/usuarios.service.ts:18`.
-- Usado em três pontos: criação de usuário (`create()`), atualização de usuário quando `senhaHash` é enviado no DTO (`update()`), e redefinição de senha via token (`resetPasswordWithToken()`). Em todos os casos a senha em texto puro nunca é persistida — só o hash bcrypt.
-- Comparação de senha no login usa `bcrypt.compare()`, que é resistente a timing attack na comparação do hash em si (o bcrypt já lida com isso internamente).
+- Biblioteca: `bcryptjs` (implementação em JavaScript, e não a versão nativa `bcrypt`).
+- Fator de custo: `SALT_ROUNDS = 10` (`src/roster-hub/usuarios/usuarios.service.ts`).
+- Utilizado na criação de usuário (`create()`), na atualização com `senhaHash` no DTO (`update()`), na redefinição
+  por token (`resetPasswordWithToken()`) e no cadastro do portal do Boost. A senha em texto claro nunca é
+  persistida.
+- A comparação no login utiliza `bcrypt.compare()`, resistente a ataque de temporização na comparação do hash.
+- Tamanho mínimo de **8 caracteres** em todos os fluxos que definem senha (criação, redefinição e cadastro do
+  Boost), sem regra de composição.
 
-Nota sobre nomenclatura: o campo/DTO se chama `senhaHash` mesmo quando recebe a senha em texto puro do cliente (por exemplo em `CreateUsuarioDto.senhaHash`) — o nome é enganoso (sugere que o cliente já manda um hash), mas o código sempre aplica `bcrypt.hash()` sobre o valor recebido antes de gravar. Vale considerar renomear esse campo para `senha` em uma revisão futura, para reduzir a chance de alguém (cliente ou integração) mandar de fato um hash pré-computado por engano.
+Observação de nomenclatura: o campo do DTO denomina-se `senhaHash` mesmo quando recebe a senha em texto claro (por
+exemplo, `CreateUsuarioDto.senhaHash`). O nome sugere o envio de hash pelo cliente, mas o código sempre aplica
+`bcrypt.hash()` ao valor recebido antes da gravação. Recomenda-se a renomeação para `senha` em revisão futura.
 
-## Redefinição de senha (fluxo "esqueci minha senha")
+## Redefinição de senha (recuperação por e-mail)
 
-Rotas: `POST /auth/esqueci-senha` e `POST /auth/redefinir-senha`, ambas `@Public()`. Implementação em `UsuariosService.requestPasswordReset()` e `resetPasswordWithToken()`.
+Rotas: `POST /auth/esqueci-senha` e `POST /auth/redefinir-senha`, ambas `@Public()`, implementadas em
+`UsuariosService.requestPasswordReset()` e `resetPasswordWithToken()`.
 
-### Passo 1 — Solicitação (`POST /auth/esqueci-senha`)
+### Etapa 1 — Solicitação (`POST /auth/esqueci-senha`)
 
-1. Recebe `{ email }` (`EsqueciSenhaDto`, só valida `@IsEmail()`).
-2. Busca o usuário por e-mail. **Se o usuário não existe ou está inativo, a função retorna silenciosamente** (`return;`), sem lançar erro.
+1. Recebe `{ email }` (`EsqueciSenhaDto`, com validação `@IsEmail()`).
+2. Consulta o usuário pelo e-mail. **Se o usuário não existe ou está inativo, a função encerra sem lançar erro.**
 3. Se existe e está ativo:
-   - Gera um token aleatório: `randomBytes(32).toString('hex')` — 32 bytes (256 bits) de entropia, formatados em hex (64 caracteres).
-   - Calcula `tokenHash = sha256(rawToken)` e persiste **apenas o hash** na tabela `redefinicoes_senha` (`RedefinicaoSenha.tokenHash`), nunca o token em texto puro no banco.
-   - Define expiração: `expiraEm = agora + 1h` (`RESET_TOKEN_TTL_MS = 60 * 60 * 1000`).
-   - Envia e-mail (via `MailService`) com um link `${FRONTEND_URL}/redefinir-senha?token=${rawToken}` — o token em texto puro só existe nesse e-mail e na memória do processo durante a requisição.
-   - Grava evento de auditoria `redefinicao_senha_solicitada`.
-4. **Em ambos os casos (e-mail existe ou não), o controller devolve a mesma resposta** `{ message: 'Se o e-mail existir, você receberá as instruções de redefinição.' }` com o mesmo código HTTP — isso é uma proteção deliberada contra enumeração de e-mails cadastrados (um atacante não consegue distinguir "e-mail existe" de "e-mail não existe" pela resposta da API).
+   - gera token aleatório com `randomBytes(32).toString('hex')` (256 bits de entropia, 64 caracteres
+     hexadecimais);
+   - calcula `tokenHash = sha256(token)` e persiste **apenas o hash** em `redefinicoes_senha`;
+   - define a expiração em 1 hora (`RESET_TOKEN_TTL_MS = 60 * 60 * 1000`);
+   - envia por `MailService` o link `${FRONTEND_URL}/redefinir-senha?token=${token}`; o token em texto claro existe
+     apenas nesse e-mail e na memória do processo durante a requisição;
+   - registra o evento `redefinicao_senha_solicitada`.
+4. **Em ambos os casos, a resposta é idêntica** (`{ message: 'Se o e-mail existir, você receberá as instruções de
+   redefinição.' }`, com o mesmo código HTTP), proteção deliberada contra a enumeração de e-mails cadastrados.
 
-**Ressalva sobre anti-enumeração por tempo de resposta:** a resposta é idêntica em conteúdo, mas o caminho "e-mail existe" faz bcrypt/crypto + escrita no banco + envio de e-mail, enquanto o caminho "e-mail não existe" retorna quase imediatamente. Isso pode, em tese, permitir enumeração por *timing* (diferença de tempo de resposta), não por conteúdo da resposta. Não há mitigação de timing implementada (não há delay artificial equalizando os dois caminhos).
+**Ressalva quanto à temporização**: embora o conteúdo da resposta seja idêntico, o caminho de e-mail existente
+executa geração de token, gravação no banco e envio de e-mail, enquanto o de e-mail inexistente encerra quase de
+imediato. A diferença de tempo de resposta pode, em tese, permitir a enumeração; não há equalização artificial dos
+dois caminhos. A limitação de requisições (8 por minuto por endereço IP) restringe a exploração.
 
-**Modo de desenvolvimento sem SMTP:** se `SMTP_HOST` não estiver configurado, `MailService` não falha — ele registra o e-mail (incluindo o link com o token em texto puro) em `logger.warn(...)` e num array `outbox` em memória (usado pelos testes e2e), ver `04-seguranca-aplicacao.md`/`05-analise-de-seguranca.md` para a implicação disso em termos de vazamento de segredo em log.
+**Modo de desenvolvimento sem SMTP**: sem `SMTP_HOST`, o `MailService` registra o e-mail em log de nível `warn`, com o
+token do link **mascarado** (`mascararSegredosNaUrl`), e armazena a mensagem completa na lista em memória `outbox`,
+utilizada pelos testes. Em produção sem SMTP, o conteúdo não é registrado, e o log informa apenas a falha de
+configuração, de modo que o token de redefinição não é exposto em log.
 
-### Passo 2 — Redefinição (`POST /auth/redefinir-senha`)
+### Etapa 2 — Redefinição (`POST /auth/redefinir-senha`)
 
-1. Recebe `{ token, novaSenha }` (`RedefinirSenhaDto`: `token` string não vazia; `novaSenha` string de 6 a 200 caracteres — sem exigência de complexidade, maiúsculas, números, etc.).
-2. O backend recalcula `tokenHash = sha256(token)` e busca `RedefinicaoSenha` por esse hash (nunca compara o token em texto puro contra nada persistido).
-3. Validações, todas resultando em `400 Bad Request — "Link de redefinição inválido ou expirado."` (mensagem genérica, não distingue "token não existe" de "já usado" de "expirado"):
-   - Registro não encontrado.
-   - `usadoEm` já preenchido (**uso único** — token já foi consumido antes).
-   - `expiraEm < agora` (expirado; janela de 1h desde a criação).
+1. Recebe `{ token, novaSenha }` (`RedefinirSenhaDto`: `token` não vazio; `novaSenha` com 8 a 200 caracteres, sem
+   exigência de composição).
+2. Recalcula `tokenHash = sha256(token)` e consulta `RedefinicaoSenha` por esse hash, sem comparar o token em texto
+   claro com valor persistido.
+3. As seguintes situações resultam em `400 Bad Request — "Link de redefinição inválido ou expirado."`, mensagem
+   genérica que não distingue a causa:
+   - registro inexistente;
+   - `usadoEm` preenchido (**uso único**);
+   - `expiraEm` anterior ao momento atual (janela de 1 hora).
 4. Se válido, em uma única transação (`prisma.$transaction`):
-   - Atualiza `usuario.senhaHash` com o hash bcrypt da nova senha.
-   - Marca o registro de redefinição como usado (`usadoEm = agora`), o que invalida o token para qualquer uso futuro (inclusive reuso do mesmo link).
-5. Grava evento de auditoria `senha_redefinida_por_token`.
+   - atualiza `usuario.senhaHash` com o hash bcrypt da nova senha;
+   - marca o registro como utilizado (`usadoEm`), o que invalida o link para qualquer uso posterior;
+   - revoga todas as sessões de refresh token em aberto do usuário.
+5. Registra o evento `senha_redefinida_por_token`.
 
-Não há invalidação de outros tokens JWT já emitidos para esse usuário quando a senha é redefinida — como não existe lista de revogação de JWT, uma sessão já autenticada (token ainda não expirado) continua válida mesmo depois de uma redefinição de senha. O único jeito de "derrubar" essa sessão de imediato seria desativar o usuário (o que o `JwtAuthGuard` checa a cada requisição).
+## Redefinição de senha pelo administrador
 
-## Redefinição de senha por administrador
+Fora do fluxo por e-mail, o administrador pode redefinir a senha de qualquer usuário por `PATCH /usuarios/:id`
+(`UsuariosController.update`), com `senhaHash` no corpo; o service aplica o bcrypt, revoga as sessões em aberto do
+usuário e registra o evento `senha_redefinida_por_admin` (em vez de `usuario_editado`), com o administrador como
+autor. A rota exige a permissão `Rooster Hub` / `/hub/usuarios` / `editar` (ver `02-autorizacao.md` e
+`03-rbac.md`).
 
-Fora do fluxo de token por e-mail, um administrador pode redefinir a senha de qualquer usuário diretamente via `PATCH /usuarios/:id` (`UsuariosController.update`), enviando `senhaHash` no corpo — o service aplica bcrypt e grava o evento de auditoria `senha_redefinida_por_admin` em vez de `usuario_editado`. Essa rota exige a permissão `Rooster Hub` / `/hub/usuarios` / `editar` (ver `02-autorizacao.md` e `03-rbac.md`).
+## Eventos de auditoria de autenticação
 
-## Resumo do fluxo de auditoria de autenticação
+Todos os eventos abaixo são registrados por `AuditoriaService.registrar()`
+(`src/roster-hub/shared/auditoria.service.ts`) na tabela `logs_auditoria`, com `usuarioId`, `modulo`, `acao`,
+`entidade`, `entidadeId`, `ip`, `navegador` e `criadoEm`:
 
-Todos os eventos abaixo são gravados por `AuditoriaService.registrar()` (`src/roster-hub/shared/auditoria.service.ts`) na tabela `logs_auditoria`, com `modulo`, `acao`, `entidade`, `entidadeId`, `ip`, `navegador` e `criadoEm`:
-
-| Evento (`acao`) | Quando |
+| Evento (`acao`) | Ocorrência |
 |---|---|
 | `login_falhou` | Tentativa de login com credenciais inválidas ou usuário inativo |
 | `login_sucesso` | Login bem-sucedido |
-| `redefinicao_senha_solicitada` | Pedido de "esqueci minha senha" para um e-mail existente e ativo |
-| `senha_redefinida_por_token` | Senha efetivamente trocada via link de redefinição |
-| `senha_redefinida_por_admin` | Senha trocada por um administrador via `PATCH /usuarios/:id` |
+| `sessao_renovada` | Renovação de sessão por refresh token |
+| `logout` | Encerramento de sessão |
+| `redefinicao_senha_solicitada` | Solicitação de recuperação para e-mail existente e ativo |
+| `senha_redefinida_por_token` | Troca de senha pelo link de redefinição |
+| `senha_redefinida_por_admin` | Troca de senha pelo administrador por `PATCH /usuarios/:id` |
 
-A gravação de auditoria é "best effort": se falhar (ex.: erro de banco), o erro é apenas logado (`logger.error`) e **não interrompe** a operação principal (login, criação de usuário, etc.) — ver `try/catch` em `AuditoriaService.registrar()`.
+A gravação de auditoria não interrompe a operação principal: em caso de falha (por exemplo, erro de banco), o erro é
+registrado no log da aplicação (`logger.error`) e não é propagado (ver o `try/catch` de
+`AuditoriaService.registrar()`).

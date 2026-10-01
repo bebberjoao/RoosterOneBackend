@@ -1,51 +1,115 @@
 # Segurança da Aplicação — Rooster One
 
+Controles de segurança transversais do backend (revisão de 01/10/2026). A análise consolidada, com a situação de
+cada controle, está em `05-analise-de-seguranca.md`, e os resultados do teste de intrusão interno, em
+`06-pentest-2026-09.md`.
+
 ## CORS
 
-Configurado por função em `src/main.ts`: aceita qualquer origem `http://localhost:<porta>` ou `http://127.0.0.1:<porta>`, com `credentials: true`. **Não é uma configuração de produção** — não restringe a um domínio fixo, foi pensada para o Vite trocar de porta em desenvolvimento local. Métodos liberados: `GET, POST, PATCH, DELETE, OPTIONS`. Cabeçalhos liberados incluem `x-user-id`, resquício de um esquema de autenticação anterior sem uso real hoje (ver `docs/engineering/08-divida-tecnica.md`).
+Critério único definido em `src/common/cors.ts` e aplicado à API REST (`src/main.ts`) e aos gateways WebSocket do
+Desk e do Boost:
 
-## Rate limiting
+- as origens configuradas em `CORS_ORIGINS` (lista separada por vírgula) e a origem de `FRONTEND_URL` são aceitas em
+  qualquer ambiente;
+- `http://localhost:<porta>` e `http://127.0.0.1:<porta>` são aceitas **somente fora de produção**;
+- requisições sem cabeçalho `Origin` são aceitas, pois o CORS é restrição aplicada pelos navegadores;
+- origem recusada recebe resposta sem `Access-Control-Allow-Origin` (e não erro interno), e o navegador bloqueia a
+  requisição.
 
-`@nestjs/throttler` (`ThrottlerGuard`), registrado como guard global em `src/auth/auth.module.ts`: 120 requisições/minuto por IP por padrão (`GLOBAL_THROTTLE_LIMIT`). Rotas de autenticação têm um limite bem mais rígido via `@Throttle()`, definido em `src/auth/throttle.util.ts`:
+Métodos permitidos: `GET`, `POST`, `PATCH`, `DELETE` e `OPTIONS`; cabeçalhos permitidos: `Content-Type` e
+`Authorization`; `credentials: true`. Em produção sem origem configurada, a aplicação emite aviso no log na
+inicialização. O cabeçalho `x-user-id`, remanescente de esquema de autenticação anterior, foi removido em 30/09/2026.
 
-| Rota | Limite |
+## Limitação de requisições
+
+`@nestjs/throttler` (`ThrottlerGuard`), registrado como guard global em `src/auth/auth.module.ts`, com limite de 120
+requisições por minuto por endereço IP (`GLOBAL_THROTTLE_LIMIT`). As rotas sensíveis possuem limite mais
+restritivo, por `@Throttle()`, com os valores definidos em `src/auth/throttle.util.ts`:
+
+| Rota | Limite por minuto |
 |---|---|
-| `POST /auth/login` | 8/min |
-| `POST /auth/esqueci-senha` | 8/min |
-| `POST /auth/redefinir-senha` | 8/min |
-| `POST /boost/login` | 8/min |
-| `POST /boost/cadastro` | 5/min |
+| `POST /auth/login` | 8 |
+| `POST /auth/esqueci-senha` | 8 |
+| `POST /auth/redefinir-senha` | 8 |
+| `POST /auth/refresh` | 8 |
+| `POST /boost/login` | 8 |
+| `POST /boost/cadastro` | 5 |
+| `GET /certificados-boost/verificar/:codigo` | 20 |
 
-Os três limites em `throttle.util.ts` sobem para um valor efetivamente ilimitado quando `process.env.NODE_ENV === 'test'` (Jest define isso automaticamente, sem precisar de configuração extra) — sem essa exceção, a suíte e2e (que faz dezenas de login dentro da mesma janela de um minuto, vindos do mesmo IP local) ficaria flaky por `429 Too Many Requests`, mascarando falha real de teste com falha de rate limit.
+Os limites são ampliados para valor efetivamente ilimitado quando `process.env.NODE_ENV === 'test'` (definido
+automaticamente pelo Jest), pois a suíte e2e realiza dezenas de logins no mesmo minuto, a partir do mesmo endereço
+local, e, de outro modo, apresentaria falhas por `429 Too Many Requests` sem relação com defeito.
 
-## Headers de segurança HTTP
+## Cabeçalhos de segurança HTTP
 
-`helmet()` aplicado em `src/main.ts`, antes de qualquer rota. `contentSecurityPolicy: false` deliberadamente — o Swagger UI (`/api/docs`) usa `<script>`/`<style>` inline e quebraria sob o CSP padrão do Helmet; um CSP customizado especificamente para essa rota não foi implementado. Os demais headers (`Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options`, `X-DNS-Prefetch-Control`, `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy`, `Origin-Agent-Cluster`, `Referrer-Policy`) ficam ativos em toda rota — confirmado via `curl -D -` numa instância local.
+`helmet()` é aplicado em `src/main.ts`, antes de qualquer rota, com os cabeçalhos `Strict-Transport-Security`,
+`X-Content-Type-Options`, `X-Frame-Options`, `X-DNS-Prefetch-Control`, `Cross-Origin-Opener-Policy`,
+`Cross-Origin-Resource-Policy`, `Origin-Agent-Cluster` e `Referrer-Policy`. A **Content-Security-Policy** padrão do
+Helmet é aplicada sempre que o Swagger não está exposto (em produção, por padrão); quando o Swagger está habilitado,
+a política é desativada, pois a interface do Swagger depende de scripts e estilos embutidos.
+
+## Documentação interativa (Swagger)
+
+Disponível em `/api/docs` fora de produção. Em produção (`NODE_ENV=production`), permanece desabilitada, salvo
+`SWAGGER_ENABLED=true`, por expor a estrutura completa de rotas e DTOs (achado do teste de intrusão interno).
 
 ## Validação de entrada
 
-`ValidationPipe` global (`src/main.ts`) com `whitelist: true, forbidNonWhitelisted: true, transform: true` — qualquer campo não declarado no DTO é rejeitado (não só ignorado), e o corpo é transformado para o tipo declarado antes de chegar no controller. Cada DTO usa `class-validator` por campo.
+`ValidationPipe` global, registrado por `configurarApp()` (`src/app-config.ts`), com `whitelist: true`,
+`forbidNonWhitelisted: true` e `transform: true`: todo campo não declarado no DTO é recusado, e não apenas ignorado,
+e o corpo é convertido ao tipo declarado antes da chegada ao controller. Cada DTO aplica `class-validator` por
+campo. A suíte `src/common/validacao-dtos.spec.ts` cobre os limites e formatos críticos.
 
-## Upload de arquivo
+## Upload de arquivos
 
-- `FileInterceptor` (multer) em `POST /chamados/:id/anexos`, limite de 10 MB (`MAX_ANEXO_BYTES`).
-- Nome salvo em disco é sempre um `randomUUID()` + extensão original — nunca o nome enviado pelo usuário, evitando path traversal e colisão de nome.
-- **Não identificado**: validação de tipo de arquivo (mimetype/extensão permitida) — o endpoint aceita qualquer tipo de arquivo dentro do limite de tamanho.
-- **Vulnerabilidade de dependência conhecida**: a versão de `multer` usada (`<=2.2.0`, trazida por `@nestjs/platform-express`) tem 4 avisos de segurança publicados (DoS via nome de campo malformado, vazamento de file descriptor em upload abortado, bypass de limite de tamanho por race condition no `fileFilter`, DoS via índice de array grande em nome de campo) — confirmado via `npm audit` nesta análise. Correção disponível só via atualização com breaking change (`@nestjs/platform-express@12`).
+- A permissão da rota é verificada pelo guard **antes** do recebimento do arquivo.
+- Limites de tamanho por tipo: 10 MB (anexo de chamado), 15 MB (documento acadêmico e anexo de entrega), 25 MB
+  (material de apoio) e 2 GB (vídeo do Boost); acima do limite, `413 Payload Too Large`.
+- Lista de mimetypes aceitos (`MIMETYPES_DOCUMENTO` e `MIMETYPES_VIDEO`, `src/common/storage.config.ts`).
+- **Verificação da assinatura binária** do conteúdo contra o mimetype declarado (`src/common/assinatura-arquivo.ts`):
+  documentos são verificados em memória, antes da gravação; o vídeo, nos primeiros bytes recebidos, com remoção do
+  arquivo parcial em caso de incompatibilidade. Conteúdo incompatível resulta em `400`.
+- Gravação **cifrada em repouso** (AES-256-GCM para documentos e AES-256-CTR para vídeo, `FILE_ENCRYPTION_KEY`).
+- Nome em disco sempre gerado no servidor (`randomUUID()` e extensão original), e nunca o nome enviado pelo
+  usuário, o que impede travessia de diretório e colisão de nomes. O nome original é decodificado em UTF-8
+  (`OPCOES_UPLOAD`) e devolvido no download em `Content-Disposition` conforme a RFC 6266.
+- `multer` atualizado para a versão 2.4.0 (30/09/2026), que corrige os avisos de negação de serviço e de contorno do
+  limite de tamanho publicados para as versões anteriores.
 
-## SQL Injection
+## Injeção de SQL
 
-Nenhum uso de `$queryRawUnsafe`, `$executeRawUnsafe` ou SQL bruto encontrado em todo o `src/` — todo acesso a dado passa pelo Prisma Client, que parametriza consultas por padrão.
+Não há uso de `$queryRawUnsafe`, `$executeRawUnsafe` nem de SQL bruto construído a partir de entrada em `src/`; a
+única consulta bruta é `SELECT 1`, estática, na verificação de saúde. Todo acesso a dados é realizado pelo Prisma
+Client, que parametriza as consultas.
 
 ## XSS
 
-Não identificado nenhum mecanismo de sanitização de HTML no backend — mas o backend só responde JSON puro (API REST consumida por SPA), não renderiza HTML para o navegador, o que reduz a superfície real desse tipo de ataque no lado servidor. Responsabilidade de escapar dado ao exibir fica do lado do frontend (React escapa por padrão em JSX, mas isso não foi auditado neste levantamento).
+O backend não realiza sanitização de HTML, mas responde exclusivamente JSON (API REST consumida por aplicação
+React) e não renderiza HTML ao navegador, o que restringe a superfície desse ataque no servidor. O escape do
+conteúdo na exibição é responsabilidade do frontend: o React escapa o conteúdo inserido em JSX por padrão, e o único
+uso de `dangerouslySetInnerHTML` (`src/components/ui/chart.tsx`) injeta estilos gerados a partir da configuração
+do gráfico, e não de dados fornecidos por usuários.
 
 ## Segredos e configuração
 
-`JWT_SECRET` e `DATABASE_URL` são lidos só de variável de ambiente, sem valor padrão hardcoded — a aplicação recusa iniciar sem `JWT_SECRET` (ver `docs/engineering/03-decisoes-arquiteturais.md`, ADR-003). Nenhum segredo encontrado commitado em código-fonte.
+`JWT_SECRET`, `FILE_ENCRYPTION_KEY` e `DATABASE_URL` são lidos exclusivamente de variáveis de ambiente, sem valor
+padrão no código; a aplicação não é iniciada sem `JWT_SECRET` e sem `FILE_ENCRYPTION_KEY` válida (ver
+`docs/engineering/03-decisoes-arquiteturais.md`, ADR-003). O arquivo `.env` é excluído do controle de versão, e não
+há segredo versionado no código-fonte. No modo de desenvolvimento sem SMTP, o `MailService` registra o e-mail em
+log com os parâmetros sensíveis de URL (`token`, `senha` etc.) mascarados (`mascararSegredosNaUrl`); em produção sem
+SMTP, o conteúdo não é registrado, e apenas a falha de configuração é informada.
 
-## Dependências (`npm audit --production`)
+## Dependências (`npm audit --omit=dev`)
 
-- **Backend**: 11 avisos (10 altos, 1 moderado) — `multer` (ver acima), `js-yaml` (via `@nestjs/swagger`), `deepmerge-ts` (via `prisma`/`@prisma/config`, ferramenta de desenvolvimento, não roda em produção), `qs` (transitiva).
-- **Frontend**: 0 avisos.
+Situação em 01/10/2026:
+
+- **Backend**: as vulnerabilidades exploráveis por requisição HTTP foram corrigidas por atualização dentro das faixas
+  declaradas (`@nestjs/*` 11.2.7, `multer` 2.4.0 e `qs` 6.16.0). Permanecem cinco avisos (três altos e dois
+  moderados), todos decorrentes de duas bibliotecas classificadas como risco aceito, por processarem apenas entrada
+  confiável: `deepmerge-ts` (por meio de `@prisma/config`, utilizado pela CLI do Prisma na leitura da configuração
+  local) e `js-yaml` (fixado pelo `@nestjs/swagger`, utilizado na serialização do próprio esquema da API, com o
+  Swagger desabilitado em produção). A correção automática rebaixaria a CLI do Prisma para versão incompatível com
+  o cliente e, por isso, não foi aplicada.
+- **Frontend**: nenhum aviso.
+
+A varredura é executada pelo pipeline de integração contínua (job `auditoria`, não bloqueante).

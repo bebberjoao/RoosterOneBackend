@@ -85,8 +85,9 @@ explicitamente, e a omissão não a expõe.
 
 ## ADR-005 — Envio de e-mail com modo de desenvolvimento sem SMTP
 
-**Decisão**: o `MailService` não exige SMTP configurado. Na ausência de `SMTP_HOST`, registra o conteúdo do e-mail
-(inclusive links) no log da aplicação, em vez de falhar.
+**Decisão**: o `MailService` não exige SMTP configurado. Na ausência de `SMTP_HOST`, fora de produção, registra o
+conteúdo do e-mail no log da aplicação, com os tokens dos links mascarados, em vez de falhar; em produção, registra
+apenas a falha de configuração, sem o conteúdo.
 
 **Contexto**: o fluxo de redefinição de senha por e-mail precisava ser testável integralmente em ambiente local,
 sem dependência de conta de e-mail ou servidor SMTP.

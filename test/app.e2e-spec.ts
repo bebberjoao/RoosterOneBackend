@@ -1201,10 +1201,21 @@ describe('Full API e2e tests', () => {
       .send({ token: 'token-invalido', novaSenha: 'NovaSenha789' })
       .expect(400);
 
+    // Sessão aberta antes da troca de senha: o refresh token correspondente deve ser revogado.
+    const sessaoAnterior = await request(app.getHttpServer())
+      .post('/v1/auth/login')
+      .send({ email: 'admin.teste@example.com', senha: 'Senha123!' })
+      .expect(201);
+
     await request(app.getHttpServer())
       .post('/v1/auth/redefinir-senha')
       .send({ token, novaSenha: 'NovaSenha789' })
       .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/v1/auth/refresh')
+      .send({ refreshToken: sessaoAnterior.body.refreshToken })
+      .expect(401);
 
     await request(app.getHttpServer())
       .post('/v1/auth/login')
