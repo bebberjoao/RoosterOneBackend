@@ -67,3 +67,6 @@ alto, com texto ilegível.
   descrito em texto em `docs/operations/05-cicd.md`.
 - Revisão de 01/10/2026: `erd-geral` atualizado para representar o professor como orientador de curso do Boost
   (relação N:N por `CursoOrientadorBoost`), e não como instrutor responsável.
+- Revisão de 01/10/2026 (complemento): `casos-uso-boost` refeito com os atores vigentes (gestor, orientador,
+  administrador, aluno externo e visitante), em substituição ao ator único "instrutor", e com os casos de verificação
+  de certificado, vínculo de orientadores e gestão de contas externas; `contexto` corrigido para 64 tabelas.

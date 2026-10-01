@@ -1,29 +1,40 @@
 flowchart LR
-  INS((Instrutor - login do Hub))
+  GES((Gestor - login do Hub))
+  ORI((Orientador - professor, login do Hub))
+  ADM((Administrador))
   EXT((Aluno externo - login proprio))
   VIS((Visitante nao autenticado))
 
   subgraph Boost[Rooster Boost]
-    B1([Criar e publicar curso])
-    B2([Organizar modulos e aulas])
+    B1([Criar, publicar e retirar curso])
+    B2([Organizar modulos, aulas e video])
     B3([Anexar material de apoio])
-    B4([Acompanhar progresso da turma])
-    B5([Conversar no chat do curso])
-    B6([Navegar no catalogo publico])
-    B7([Cadastrar-se])
-    B8([Matricular-se em curso])
-    B9([Concluir aulas])
-    B10([Baixar certificado])
+    B4([Configurar certificado])
+    B5([Vincular orientadores])
+    B6([Acompanhar progresso dos alunos])
+    B7([Responder conversas dos alunos])
+    B8([Gerir contas externas])
+    B9([Navegar no catalogo publico])
+    B10([Verificar certificado])
+    B11([Cadastrar-se])
+    B12([Matricular-se em curso])
+    B13([Concluir aulas])
+    B14([Baixar certificado])
+    B15([Conversar com os orientadores])
   end
 
-  INS --> B1
-  INS --> B2
-  INS --> B3
-  INS --> B4
-  INS --> B5
-  VIS --> B6
-  VIS --> B7
-  EXT --> B8
-  EXT --> B9
-  EXT --> B10
-  EXT --> B5
+  GES --> B1
+  GES --> B2
+  GES --> B3
+  GES --> B4
+  GES --> B5
+  GES --> B6
+  ORI --> B7
+  ADM --> B8
+  VIS --> B9
+  VIS --> B10
+  VIS --> B11
+  EXT --> B12
+  EXT --> B13
+  EXT --> B14
+  EXT --> B15
