@@ -1,6 +1,6 @@
 # Estratégia de Testes e Matriz de Cobertura
 
-Situação em 30/09/2026. Este documento descreve as camadas de teste existentes (comandos, abrangência e
+Situação em 01/10/2026. Este documento descreve as camadas de teste existentes (comandos, abrangência e
 quantitativos) e, ao final, a matriz que associa cada teste ao requisito ou regra de negócio que verifica.
 
 ## Camadas
@@ -8,11 +8,11 @@ quantitativos) e, ao final, a matriz que associa cada teste ao requisito ou regr
 | Camada | Localização | Comando | Quantidade |
 |---|---|---|---|
 | e2e de API (backend) | `test/*.e2e-spec.ts` | `npm run test:e2e` | 78 testes, 2 arquivos |
-| Unitário (backend) | `src/**/*.spec.ts` | `npm test` | 131 testes, 11 arquivos |
+| Unitário (backend) | `src/**/*.spec.ts` | `npm test` | 137 testes, 12 arquivos |
 | Unitário e de componente (frontend) | `src/**/*.test.{ts,tsx}` | `npm test` (repositório do frontend) | 70 testes, 6 arquivos |
 | Acessibilidade (frontend) | `src/components/shared/acessibilidade.test.tsx` | incluída em `npm test` | 12 dos 70 acima |
 
-Total: **279 testes**. No backend, `npm run test:all` executa os testes unitários e e2e em sequência. Todas as
+Total: **285 testes**. No backend, `npm run test:all` executa os testes unitários e e2e em sequência. Todas as
 camadas são executadas pelo CI a cada envio para `main` e a cada pull request (ver
 `docs/operations/05-cicd.md`).
 
@@ -33,7 +33,8 @@ escopo e `404` que não revela a existência do recurso.
 `jest-unit.json`, isolado da suíte e2e (`roots: ["<rootDir>/src"]`, `testRegex: \.spec\.ts$`). Cobre lógica pura e
 decisões que dispensam banco de dados: auxiliares de paginação, mascaramento de segredos em log, regra do último
 administrador (com o Prisma substituído por dublê), criptografia de arquivos (incluindo o motor de armazenamento
-de vídeo), verificação de assinatura binária de arquivos, critério de origem do CORS, filtro de exceções e a
+de vídeo), verificação de assinatura binária de arquivos, critério de origem do CORS, filtro de exceções, conversão dos erros do Prisma em exceções HTTP
+(`prisma-erro.spec.ts`) e a
 **suíte dedicada de validação de entrada**.
 
 #### Validação de entrada (`src/common/validacao-dtos.spec.ts`)
@@ -153,6 +154,8 @@ teste automatizado estão indicadas, com o motivo.
 | Validação de entrada por regra (DTOs) | Unitário: `validacao-dtos.spec.ts` |
 | Senha mínima uniforme (8 caracteres) em todo fluxo que define senha | Unitário: `validacao-dtos.spec.ts` ("Senha mínima é a mesma em todo fluxo que define senha") |
 | Acessibilidade dos componentes compartilhados | Frontend: `acessibilidade.test.tsx` (axe-core) |
+| Violação de unicidade responde `409` e não é registrada como erro | Unitário: `prisma-erro.spec.ts`. e2e: "Users endpoints should create, read, update and delete a user" (e-mail duplicado) |
+| Auditoria registra o autor da ação administrativa | e2e: "Users endpoints should create, read, update and delete a user" (evento `usuario_criado`) |
 | Rastreamento de erros: somente status 500 ou superior é persistido | Unitário: `all-exceptions.filter.spec.ts`. e2e: "Rastreamento de erros: relatório e exportação exigem permissão própria…" |
 | Criptografia de arquivos em repouso (GCM para documentos, CTR para vídeo) | Unitário: `file-encryption.util.spec.ts` (ida e volta, detecção de adulteração, trechos em fronteiras de bloco) e `video-stream.util.spec.ts` (Range sobre arquivo cifrado). e2e: leitura do arquivo diretamente do disco no fluxo de anexo de chamado, confirmando a ausência do texto original |
 | Conteúdo do arquivo compatível com o tipo declarado (assinatura binária) | Unitário: `assinatura-arquivo.spec.ts` (amostra válida de cada tipo aceito, executável declarado como PNG, binário declarado como texto, UTF-16 com BOM) e `file-encryption.util.spec.ts` (motor de armazenamento de vídeo: aceitação com cabeçalho fragmentado, recusa com remoção do arquivo parcial). e2e: executável declarado como `image/png` e texto declarado como vídeo recebem `400` |

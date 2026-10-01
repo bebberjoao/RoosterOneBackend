@@ -110,7 +110,7 @@ Defeitos identificados durante a revisão do roadmap, com a correção aplicada:
   eram omitidas sem aviso. Corrigido com a resolução de cada pasta pela mesma regra da aplicação, em
   PowerShell e em bash, com compatibilidade para backups no formato anterior.
 - **Pasta de backups sem exclusão no controle de versão.** O destino padrão dos backups (`./backups`)
-  fica dentro do repositório e não constava do `.gitignore`; um dump do banco poderia ser versionado por
+  situa-se dentro do repositório e não constava do `.gitignore`; um dump do banco poderia ser versionado por
   engano. Incluído no `.gitignore`.
 - **Seed de desenvolvimento com arquivos inexistentes e autoria incorreta.** Os registros de demonstração
   apontavam para um arquivo fictício (`seed-placeholder.pdf`), e todo download desses registros falhava;
@@ -162,7 +162,7 @@ Defeitos identificados durante a revisão do roadmap, com a correção aplicada:
   de módulos, models e controllers, rotas removidas descritas como existentes e módulos com backend
   descritos como simulados. Todas as divergências de gravidade alta e média foram corrigidas, e as
   especificações funcionais de Boost e Finance (RF-B01 a RF-B10 e RF-F01 a RF-F10) foram redigidas.
-  **Lição**: a divergência acumulada só é detectada por auditoria periódica; o padrão dominante foi o de
+  **Lição**: a divergência acumulada somente é detectada por auditoria periódica; o padrão dominante foi o de
   afirmações de ausência escritas quando verdadeiras e não revisadas depois de deixarem de sê-lo.
 - **Dados simulados sem uso, serviços simulados desconectados e documentação obsoleta.** Varredura de
   setembro/2026 removeu cerca de 30 arquivos de dados simulados sem importador, dois serviços simulados

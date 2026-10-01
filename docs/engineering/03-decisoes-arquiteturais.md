@@ -1,97 +1,158 @@
 # Decisões Arquiteturais — Rooster One
 
-Registro de decisões técnicas relevantes. Cada uma segue o formato Decisão / Contexto / Implementação / Consequências / Evidência. Quando o motivo histórico de uma escolha não pôde ser confirmado (nem em comentário de código, nem em histórico de conversa disponível), isso é dito explicitamente em vez de inventado.
+Registro das decisões técnicas relevantes, no formato Decisão / Contexto / Implementação / Consequências /
+Evidência. Quando a motivação histórica de uma escolha não pôde ser confirmada (em comentário de código ou em
+registro disponível), essa circunstância é declarada explicitamente.
 
 ## ADR-001 — RBAC direto por usuário, sem entidade Perfil/Role
 
-**Decisão**: permissão é um vínculo direto `usuário ↔ permissão` (`UsuarioPermissao`). Não existe tabela de Perfil/Role nem herança de permissão por grupo.
+**Decisão**: a permissão é um vínculo direto `usuário ↔ permissão` (`UsuarioPermissao`). Não há tabela de perfil
+ou papel nem herança de permissão por grupo.
 
-**Contexto**: o sistema tinha, em versão anterior, RBAC por Perfil (`Usuário → Perfil → Permissão`). Foi deliberadamente removido e substituído por concessão direta, alinhando o backend ao catálogo de permissões já usado pelo frontend (`permission-catalog.ts`), que já era organizado por `módulo/tela/ação` sem conceito de Perfil.
+**Contexto**: o sistema possuía, em versão anterior, RBAC por perfil (`Usuário → Perfil → Permissão`), que foi
+deliberadamente removido e substituído pela concessão direta, de modo a alinhar o backend ao catálogo de
+permissões do frontend (`permission-catalog.ts`), organizado por módulo, tela e ação, sem o conceito de perfil.
 
-**Implementação**: tabela `UsuarioPermissao`; verificação em `UsuariosService::hasPermission`; "administrador" não é um campo, é ter a permissão `Rooster Hub / /hub/acessos / gerenciar-permissoes`.
+**Implementação**: tabela `UsuarioPermissao`; verificação em `UsuariosService.hasPermission`; o administrador não
+é identificado por atributo, e sim pela permissão `Rooster Hub / /hub/acessos / gerenciar-permissoes`.
 
 **Consequências**:
-- Positivo: alinhamento exato entre o que o frontend pede permissão para mostrar e o que o backend exige para autorizar — uma única fonte de vocabulário (`módulo/recurso/ação`).
-- Negativo: sem Perfil, conceder a mesma combinação de permissões para vários usuários exige repetir a concessão usuário por usuário — não há "atualizar o Perfil e propagar para todos".
+- Positiva: correspondência exata entre a permissão consultada pelo frontend para exibir um recurso e a exigida
+  pelo backend para autorizá-lo, com vocabulário único (`módulo/recurso/ação`).
+- Negativa: sem perfil, a concessão da mesma combinação de permissões a vários usuários exige repetição usuário a
+  usuário; não há atualização centralizada propagada a um grupo.
 
-**Evidência**: `prisma/schema.prisma` (ausência de model `Perfil`), `src/roster-hub/usuarios/usuarios.service.ts::isAdmin/hasPermission`, `docs/system/04-regras-de-negocio.md` (RN001, RN002).
+**Evidência**: `prisma/schema.prisma` (ausência de modelo `Perfil`),
+`src/roster-hub/usuarios/usuarios.service.ts` (`isAdmin` e `hasPermission`), `docs/system/04-regras-de-negocio.md`
+(RN001 e RN002).
 
 ## ADR-002 — bcryptjs em vez de bcrypt nativo
 
-**Decisão**: hash de senha usa a biblioteca `bcryptjs` (implementação pura em JavaScript), não o pacote `bcrypt` (binário nativo compilado).
+**Decisão**: o hash de senha utiliza a biblioteca `bcryptjs` (implementação em JavaScript), e não o pacote
+`bcrypt` (binário nativo compilado).
 
-**Contexto**: `bcrypt` nativo depende de compilação C++ via `node-gyp` no momento da instalação; em ambiente de desenvolvimento Windows sem toolchain de compilação configurado, a instalação falhava.
+**Contexto**: o `bcrypt` nativo depende de compilação C++ por `node-gyp` na instalação; em ambiente Windows sem
+ferramentas de compilação configuradas, a instalação falhava.
 
-**Implementação**: `bcryptjs` em `package.json`, usado em `usuarios.service.ts` (hash e comparação de senha) com `SALT_ROUNDS = 10`.
-
-**Consequências**:
-- Positivo: instala em qualquer ambiente sem dependência de compilador nativo.
-- Negativo: `bcryptjs` é mais lento que o `bcrypt` nativo (implementação em JS puro) — irrelevante no volume atual de usuários, pode importar em escala maior.
-
-**Evidência**: `package.json` (dependência `bcryptjs`, ausência de `bcrypt`).
-
-## ADR-003 — `JWT_SECRET` obrigatório, sem valor padrão
-
-**Decisão**: a aplicação recusa iniciar se `JWT_SECRET` não estiver definida no ambiente — não existe segredo padrão embutido no código.
-
-**Contexto**: evitar que a aplicação suba "por acidente" assinando tokens com um segredo conhecido/público, o que tornaria qualquer token forjável.
-
-**Implementação**: `src/auth/jwt-config.ts::jwtModuleOptions` lança `Error` explícito se `process.env.JWT_SECRET` for vazio.
+**Implementação**: `bcryptjs` em `package.json`, utilizado em `usuarios.service.ts` (hash e comparação) e no portal
+do Boost, com `SALT_ROUNDS = 10`.
 
 **Consequências**:
-- Positivo: impossível esquecer de configurar o segredo em um ambiente novo sem perceber — o processo nem sobe.
-- Negativo: exige que todo ambiente (dev, teste, produção) tenha a variável setada explicitamente; não há `.env.example` no repositório apontando isso (ver `docs/engineering/08-divida-tecnica.md`).
+- Positiva: instalação em qualquer ambiente, sem dependência de compilador nativo.
+- Negativa: desempenho inferior ao do `bcrypt` nativo, irrelevante no volume atual de usuários e potencialmente
+  significativo em escala maior.
 
-**Evidência**: `src/auth/jwt-config.ts`.
+**Evidência**: `package.json` (dependência `bcryptjs` e ausência de `bcrypt`).
 
-## ADR-004 — Guard de autenticação global, com opt-out explícito por `@Public()`
+## ADR-003 — Segredos obrigatórios, sem valor padrão
 
-**Decisão**: `JwtAuthGuard` é registrado uma vez, globalmente (`APP_GUARD`), em vez de aplicado rota por rota. Rotas que não exigem token usam o decorator `@Public()`.
+**Decisão**: a aplicação recusa-se a iniciar quando `JWT_SECRET` ou `FILE_ENCRYPTION_KEY` não estão definidas (ou,
+no caso da chave de cifragem, não possuem 32 bytes em base64); não há segredo padrão no código.
 
-**Contexto**: modelo "seguro por padrão" — uma rota nova só fica sem autenticação se alguém marcar isso explicitamente; esquecer de proteger uma rota nova não é possível por omissão.
+**Contexto**: impedir que a aplicação seja iniciada inadvertidamente com segredo conhecido, o que permitiria forjar
+tokens ou decifrar arquivos.
 
-**Implementação**: `src/auth/auth.module.ts` (`{ provide: APP_GUARD, useClass: JwtAuthGuard }`), `src/auth/public.decorator.ts`.
+**Implementação**: `src/auth/jwt-config.ts` (`jwtModuleOptions` lança `Error` quando `JWT_SECRET` está vazia) e
+`src/common/file-encryption.util.ts` (`chaveMestraDeArquivos`, invocada antecipadamente em `main.ts`).
 
 **Consequências**:
-- Positivo: reduz risco de rota exposta por esquecimento.
-- Negativo: toda rota verdadeiramente pública precisa do decorator — hoje só 3 rotas o usam (`POST /auth/login`, `POST /auth/esqueci-senha`, `POST /auth/redefinir-senha`).
+- Positiva: a omissão da configuração em novo ambiente é detectada de imediato, pois o processo não é iniciado.
+- Negativa: todos os ambientes (desenvolvimento, teste e produção) devem definir as variáveis explicitamente; o
+  `.env.example` relaciona-as, com instruções de geração.
 
-**Evidência**: `src/auth/auth.module.ts`, `src/roster-hub/usuarios/usuarios.controller.ts`.
+**Evidência**: `src/auth/jwt-config.ts`, `src/common/file-encryption.util.ts`, `.env.example`.
+
+## ADR-004 — Guard de autenticação global, com exceção explícita por `@Public()`
+
+**Decisão**: o `JwtAuthGuard` é registrado uma única vez, globalmente (`APP_GUARD`), e não rota a rota. As rotas
+que dispensam token utilizam o decorator `@Public()`.
+
+**Contexto**: modelo seguro por padrão: uma nova rota somente fica sem autenticação se assim for declarado
+explicitamente, e a omissão não a expõe.
+
+**Implementação**: `src/auth/auth.module.ts` (`{ provide: APP_GUARD, useClass: JwtAuthGuard }`) e
+`src/auth/public.decorator.ts`.
+
+**Consequências**:
+- Positiva: reduz o risco de rota exposta por omissão.
+- Negativa: toda rota efetivamente pública exige o decorator. Atualmente, utilizam-no as rotas de verificação de
+  saúde (`GET /` e `GET /health`), as cinco rotas de autenticação (`/auth/login`, `/auth/esqueci-senha`,
+  `/auth/redefinir-senha`, `/auth/refresh` e `/auth/logout`), a transmissão de vídeo com token de curta duração e o
+  `BoostPortalController`, protegido por guard próprio.
+
+**Evidência**: `src/auth/auth.module.ts`, `src/roster-hub/usuarios/usuarios.controller.ts`,
+`src/app.controller.ts`, `src/rooster-boost-portal/boost-portal.controller.ts`.
 
 ## ADR-005 — Envio de e-mail com modo de desenvolvimento sem SMTP
 
-**Decisão**: `MailService` não exige SMTP configurado para funcionar. Sem `SMTP_HOST`, registra o conteúdo do e-mail (incluindo qualquer link) no log da aplicação em vez de falhar.
+**Decisão**: o `MailService` não exige SMTP configurado. Na ausência de `SMTP_HOST`, registra o conteúdo do e-mail
+(inclusive links) no log da aplicação, em vez de falhar.
 
-**Contexto**: o fluxo de redefinição de senha por e-mail precisava ser testável de ponta a ponta em ambiente de desenvolvimento local, sem depender de uma conta de e-mail/SMTP real disponível.
+**Contexto**: o fluxo de redefinição de senha por e-mail precisava ser testável integralmente em ambiente local,
+sem dependência de conta de e-mail ou servidor SMTP.
 
-**Implementação**: `src/mail/mail.service.ts` — `transporter` fica `null` se `SMTP_HOST` não estiver definido; nesse caso, loga e guarda o e-mail em `outbox` (também usado pelos testes e2e para capturar o link sem precisar de SMTP real).
-
-**Consequências**:
-- Positivo: fluxo completo (gerar token, montar link, "enviar") é testável sem infraestrutura externa.
-- Negativo: em qualquer ambiente onde `SMTP_HOST` não for configurado — inclusive por esquecimento — nenhum e-mail é entregue de verdade, silenciosamente (só aparece no log).
-
-**Evidência**: `src/mail/mail.service.ts`.
-
-## ADR-006 — Reserva recorrente como conjunto de linhas individuais ligadas por `serieId`
-
-**Decisão**: uma reserva recorrente não é um "template" separado com regra de repetição — é N linhas de `Reserva` normais, cada uma com sua própria data, todas compartilhando um `serieId` e um `serieTotal`.
-
-**Contexto**: cada ocorrência de uma série precisa poder ser aprovada, recusada ou cancelada individualmente, sem regra especial — reaproveitando exatamente o mesmo fluxo de aprovação/histórico/conversa que uma reserva única já tinha, em vez de duplicar essa lógica para "reservas de série".
-
-**Implementação**: `Reserva.serieId`/`Reserva.serieTotal` (nullable); `rooms.service.ts::createReservaSerie` valida todas as datas antes de criar qualquer uma (atômico) e gera uma linha por ocorrência; `cancelarSerie` itera as reservas da série e aplica o mesmo cancelamento individual a cada uma.
+**Implementação**: `src/mail/mail.service.ts`: o `transporter` permanece `null` sem `SMTP_HOST`; nesse caso, o
+e-mail é registrado em log e armazenado em `outbox`, utilizado pelos testes e2e para obter o link.
 
 **Consequências**:
-- Positivo: zero duplicação de lógica de aprovação/cancelamento/histórico entre reserva única e reserva de série.
-- Negativo: editar "a política de recorrência" depois de criada (ex.: mudar o horário de todas as ocorrências futuras de uma vez) não tem endpoint dedicado — teria que ser feito ocorrência por ocorrência.
+- Positiva: o fluxo completo (geração do token, montagem do link e envio) é testável sem infraestrutura externa.
+- Negativa: em ambiente sem `SMTP_HOST`, inclusive por omissão, nenhum e-mail é entregue, e a ocorrência consta
+  apenas do log. A tela de configurações (`GET /configuracoes/email`) exibe o estado do SMTP e permite o envio de
+  teste, o que torna a situação verificável.
 
-**Evidência**: `prisma/schema.prisma` (`Reserva.serieId`), `src/rooster-rooms/rooms.service.ts::createReservaSerie/cancelarSerie`.
+**Evidência**: `src/mail/mail.service.ts`, `src/roster-hub/configuracoes/configuracoes.controller.ts`.
 
-## Decisões sem motivo histórico confirmado
+## ADR-006 — Reserva recorrente como conjunto de registros individuais vinculados por `serieId`
 
-As escolhas abaixo estão confirmadas no código, mas o motivo original de tê-las escolhido **não foi encontrado** em comentário de código ou documentação — portanto não é inventado aqui:
+**Decisão**: a reserva recorrente não é um modelo separado com regra de repetição, e sim N registros comuns de
+`Reserva`, cada qual com data própria, que compartilham `serieId` e `serieTotal`.
 
-- **NestJS como framework de backend** — Motivo histórico não identificado no código analisado.
-- **Prisma como ORM** — Motivo histórico não identificado no código analisado.
-- **Organização modular por domínio de negócio** (Hub/Desk/Rooms/Assets como módulos Nest separados) — Motivo histórico não identificado; observado como padrão consistente em todo o backend.
-- **Ausência de camada de Repository** (acesso a dados direto via `PrismaService` dentro do service) — Motivo histórico não identificado; observado como padrão consistente.
-- **TanStack Start no frontend** (em vez de Next.js/Remix) — Motivo histórico não identificado no código analisado.
+**Contexto**: cada ocorrência deve poder ser aprovada, recusada ou cancelada individualmente, com o mesmo fluxo de
+aprovação, histórico e conversa da reserva única, sem duplicação dessa lógica.
+
+**Implementação**: `Reserva.serieId` e `Reserva.serieTotal` (opcionais); `rooms.service.ts::createReservaSerie`
+valida todas as datas antes de criar qualquer registro (operação atômica) e gera um registro por ocorrência;
+`cancelarSerie` aplica a cada ocorrência o mesmo cancelamento individual.
+
+**Consequências**:
+- Positiva: nenhuma duplicação da lógica de aprovação, cancelamento e histórico entre reserva única e série.
+- Negativa: a alteração da recorrência após a criação (por exemplo, mudança de horário de todas as ocorrências
+  futuras) não possui endpoint dedicado e deve ser realizada ocorrência a ocorrência.
+
+**Evidência**: `prisma/schema.prisma` (`Reserva.serieId`), `src/rooster-rooms/rooms.service.ts`
+(`createReservaSerie` e `cancelarSerie`).
+
+## ADR-007 — Cifragem de arquivos em repouso com chave mestra única
+
+**Decisão**: todo arquivo gravado pelo sistema é cifrado em repouso: documentos (anexos, documentos acadêmicos,
+materiais, certificados e notas fiscais) com AES-256-GCM e vídeos do Boost com AES-256-CTR, sob uma chave mestra
+(`FILE_ENCRYPTION_KEY`) e vetor de inicialização aleatório por arquivo.
+
+**Contexto**: os arquivos permaneciam legíveis por quem tivesse acesso ao disco, a cópias de segurança ou a servidor
+de arquivos estáticos mal configurado.
+
+**Implementação**: `src/common/file-encryption.util.ts`. Os documentos, de até 25 MB, são lidos integralmente, e o
+GCM garante confidencialidade e integridade. O vídeo, de até 2 GB e transmitido com `Range`, utiliza CTR, que
+permite decifrar apenas o trecho solicitado.
+
+**Consequências**:
+- Positiva: o conteúdo cru dos arquivos não é legível sem a chave.
+- Negativa: a perda da chave implica a perda permanente de todos os arquivos, razão pela qual a chave integra o
+  procedimento de cópia de segurança; o CTR não detecta adulteração do vídeo por quem possua acesso de escrita ao
+  disco, risco aceito e documentado em `docs/security/05-analise-de-seguranca.md`.
+
+**Evidência**: `src/common/file-encryption.util.ts`, `src/common/video-stream.util.ts`,
+`docs/operations/06-backup-e-recuperacao.md`.
+
+## Decisões sem motivação histórica confirmada
+
+As escolhas abaixo estão confirmadas no código, mas a motivação original **não foi localizada** em comentário de
+código ou documentação, razão pela qual não é apresentada:
+
+- **NestJS como framework do backend.**
+- **Prisma como ORM.**
+- **Organização modular por domínio de negócio** (Hub, Desk, Rooms, Assets, Academy, Learn, Boost e Finance como
+  módulos NestJS separados), observada como padrão consistente em todo o backend.
+- **Ausência de camada de repositório** (acesso a dados pelo `PrismaService` no service), observada como padrão
+  consistente.
+- **TanStack Start no frontend** (em vez de Next.js ou Remix).

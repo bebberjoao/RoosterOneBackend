@@ -662,6 +662,7 @@ O chat único por curso, visível a todos os participantes, foi **substituído p
 | POST | `/cursos-boost/:id/matricular` | Bearer (Boost) | Matricula o aluno autenticado (operação idempotente: uma nova chamada devolve a matrícula existente, sem duplicá-la) |
 | GET | `/boost/me/matriculas` | Bearer (Boost) | Matrículas do aluno autenticado |
 | GET | `/boost/me/matriculas/:id` | Bearer (Boost) | Matrícula completa (curso com módulos, aulas e materiais, progresso por aula e certificado); `404` quando a matrícula pertence a outro aluno |
+| GET | `/boost/materiais/:id/arquivo` | Bearer (Boost) | Download de material de apoio, restrito ao aluno matriculado no curso da aula; conteúdo decifrado, com `Content-Disposition` conforme a RFC 6266 |
 | PATCH | `/boost/aulas/:id/concluir` | Bearer (Boost) | **Marca a aula como concluída**, recalcula `progressoPct` e, ao atingir 100%, **gera automaticamente o certificado em PDF**, sem etapa manual (ver `CertificadoBoostService`) |
 
 ### 7.6 Conversa com o orientador — aluno
@@ -677,6 +678,7 @@ O chat único por curso, visível a todos os participantes, foi **substituído p
 | Método | Rota | Auth | Descrição |
 |---|---|---|---|
 | GET | `/boost/certificados/:id/arquivo` | Bearer (Boost) | Download do PDF do certificado, restrito ao titular da matrícula (`404` para os demais) |
+| GET | `/certificados-boost/verificar/:codigo` | **Público** | Verificação pública da autenticidade de um certificado pelo código nele impresso (sem distinção entre maiúsculas e minúsculas). Resposta `{ valido: true, codigo, aluno, curso, cargaHoraria, emitidoEm }`; `404` para código inexistente ou malformado, sem distinção entre os casos. Limite de 20 requisições por minuto por endereço IP, para impedir a varredura do espaço de códigos |
 
 ### 7.7.1 Contas externas — painel administrativo (setembro de 2026)
 

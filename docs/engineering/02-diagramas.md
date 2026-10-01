@@ -1,21 +1,28 @@
 # Diagramas Técnicos — Rooster One
 
-Central de diagramas de arquitetura e fluxos técnicos. Diagramas de fluxo **funcional/negócio** (ciclo de vida de chamado, reserva, empréstimo) ficam em [`docs/system/05-fluxos-do-sistema.md`](../system/05-fluxos-do-sistema.md) — aqui é o nível de arquitetura e mecanismo técnico. O diagrama ER completo, entidade por entidade, fica em [`docs/database/03-relacionamentos.md`](../database/03-relacionamentos.md).
+Concentra os diagramas de arquitetura e de fluxos técnicos. Os diagramas de fluxo **funcional** (ciclo de vida de
+chamado, reserva e empréstimo) estão em [`docs/system/05-fluxos-do-sistema.md`](../system/05-fluxos-do-sistema.md);
+este documento trata da arquitetura e dos mecanismos técnicos. O diagrama ER completo, por entidade, está em
+[`docs/database/03-relacionamentos.md`](../database/03-relacionamentos.md).
 
 ## Arquitetura do sistema
 
 ```mermaid
 flowchart LR
     subgraph Cliente
-        F[Frontend<br/>TanStack Start + React 19]
+        N[Navegador]
     end
     subgraph Servidor
+        F[Frontend<br/>TanStack Start + React 19]
         B[Backend<br/>NestJS 11]
         DB[(PostgreSQL)]
+        FS[(Arquivos cifrados)]
         M[SMTP externo<br/>opcional]
     end
-    F -- HTTP REST + JWT --> B
+    N -- páginas --> F
+    N -- HTTP REST + JWT / WebSocket --> B
     B -- Prisma --> DB
+    B --> FS
     B -.-> M
 ```
 
@@ -23,16 +30,15 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    Auth[AuthModule] --> Guards[JwtAuthGuard / PermissionGuard]
+    Auth[AuthModule] --> Guards[ThrottlerGuard / JwtAuthGuard / PermissionGuard]
     Hub[RoosterHubModule] --> Guards
-    Desk[RoosterDeskModule] --> Guards
-    Rooms[RoosterRoomsModule] --> Guards
-    Assets[RoosterAssetsModule] --> Guards
-    Desk --> HubUsers[Hub · UsuariosService]
-    Rooms --> HubUsers
-    Assets --> HubUsers
+    Negocio[Desk, Rooms, Assets, Academy,<br/>Learn, Boost, Finance] --> Guards
+    Negocio --> HubUsers[Hub · UsuariosService]
+    Negocio --> Notif[Hub · NotificacoesService]
+    Negocio --> Audit[Hub · AuditoriaService]
+    Portal[BoostPortalModule] --> BoostGuard[BoostJwtAuthGuard]
     Hub --> Mail[MailModule]
-    Hub --> Audit[AuditoriaService]
+    Filtro[AllExceptionsFilter] --> LogErro[Hub · LogsErroService]
 ```
 
 ## Fluxo de autenticação
@@ -44,15 +50,15 @@ sequenceDiagram
     participant DB as PostgreSQL
     F->>G: requisição com Authorization: Bearer <token>
     G->>G: jwt.verifyAsync(token)
-    alt assinatura inválida ou expirado
+    alt assinatura inválida ou token expirado
         G-->>F: 401 Unauthorized
     else assinatura válida
-        G->>DB: busca usuário pelo sub do payload
-        alt usuário não existe ou inativo
+        G->>DB: consulta o usuário pelo sub do payload
+        alt usuário inexistente ou inativo
             G-->>F: 401 Unauthorized
         else usuário ativo
             G->>G: request.user = usuário
-            G-->>F: segue para PermissionGuard/controller
+            G-->>F: prossegue para PermissionGuard e controller
         end
     end
 ```
@@ -64,46 +70,55 @@ sequenceDiagram
     participant G as PermissionGuard
     participant S as UsuariosService
     participant C as Controller
-    G->>S: hasPermission(usuarioId, modulo, recurso, acao) — via @RequirePermission do handler
-    S->>S: resolve permissões efetivas do usuário (usuarios_permissoes → permissoes → modulos)
-    alt não tem a permissão exigida
+    G->>S: hasPermission(usuarioId, modulo, recurso, acao), conforme @RequirePermission do handler
+    S->>S: resolve as permissões efetivas (usuarios_permissoes → permissoes → modulos)
+    alt permissão ausente
         G-->>G: 403 Forbidden
-    else tem a permissão
-        G->>C: segue para o controller
+    else permissão presente
+        G->>C: prossegue para o controller
     end
 ```
 
-Alguns controllers (Desk, Rooms) fazem uma checagem adicional dentro do próprio handler além do `PermissionGuard` — por exemplo, "o solicitante não pode encerrar o próprio chamado" ou "quem gerencia OU é o dono da reserva" — isso não está no guard genérico, está em métodos como `requireTicketAction`/`requireReservaAccess` de cada controller.
+Alguns controllers (Desk, Rooms, Academy, Learn e Finance) realizam verificação adicional no próprio handler, além
+do `PermissionGuard`; por exemplo, "o solicitante não pode encerrar o próprio chamado" ou "o gestor ou o responsável
+pela reserva". Essas regras residem em métodos como `requireTicketAction`, `requireReservaAccess` e
+`exigirDonoOuGestor`, e não no guard genérico.
 
-## Comunicação Frontend → Backend
+## Comunicação frontend → backend
 
 ```mermaid
 sequenceDiagram
     participant U as Usuário
     participant R as Rota (TanStack Router)
     participant SV as Service (src/services/mock-api/*)
-    participant CL as client.ts (request/uploadFile/requestBlob)
+    participant CL as client.ts (request, uploadFile, requestBlob)
     participant B as Backend
-    U->>R: navega/interage com a tela
-    R->>SV: chama método do service (ex.: ticketService.getAll())
+    U->>R: navega ou interage com a tela
+    R->>SV: invoca método do service (por exemplo, ticketService.getAll())
     SV->>CL: request("/chamados")
     CL->>CL: anexa Authorization: Bearer <token da sessão>
-    CL->>B: fetch HTTP
+    CL->>B: fetch HTTP (prefixo /v1)
     alt resposta 401
-        CL->>CL: limpa a sessão local
-        CL-->>SV: lança ApiError(401)
+        CL->>B: POST /v1/auth/refresh (renovação única, compartilhada entre chamadas simultâneas)
+        alt renovação aceita
+            CL->>B: repete a requisição original
+        else renovação recusada
+            CL->>CL: descarta a sessão local
+            CL-->>SV: lança ApiError(401)
+        end
     else erro de rede
         CL-->>SV: lança ApiUnavailableError
     else sucesso
-        CL-->>SV: retorna JSON já tipado
-        SV->>SV: traduz PT (backend) → EN (tela), quando aplicável
-        SV-->>R: dado pronto para a UI
+        CL-->>SV: devolve o JSON
+        SV->>SV: converte nomenclatura do backend para a da tela, quando aplicável
+        SV-->>R: dado pronto para a interface
     end
 ```
 
 ## Modelo de dados (visão simplificada)
 
-Visão de orientação só com as entidades centrais de cada módulo — modelo completo em `docs/database/03-relacionamentos.md`.
+Visão de orientação, apenas com as entidades centrais de cada módulo; o modelo completo está em
+`docs/database/03-relacionamentos.md`.
 
 ```mermaid
 erDiagram
@@ -125,4 +140,17 @@ erDiagram
 
     PatrimonioCategoria ||--o{ Patrimonio : classifica
     Patrimonio ||--o{ PatrimonioMovimento : movimenta
+
+    Usuario ||--o| Professor : vinculo
+    Usuario ||--o| Aluno : vinculo
+    Turma ||--o{ Matricula : recebe
+    Aluno ||--o{ Matricula : possui
+    Turma ||--o{ Atividade : possui
+    Atividade ||--o{ Entrega : recebe
+
+    CursoBoost ||--o{ MatriculaBoost : recebe
+    BoostUsuario ||--o{ MatriculaBoost : possui
+
+    Aluno ||--o{ Cobranca : gera
+    Cobranca ||--o| NotaFiscal : documenta
 ```

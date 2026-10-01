@@ -1,12 +1,21 @@
 # Auditoria da Documentação — Rooster One
 
-Auditoria final da reconstrução completa da documentação, executada em setembro/2026. Cobre os dois repositórios (`RoosterOneBackend-main` e `RoosterOneFrontEnd-main`).
+Registro das auditorias da documentação técnica dos dois repositórios (`RoosterOneBackend-main` e
+`RoosterOneFrontEnd-main`): cobertura, método, inconsistências identificadas e política de manutenção.
 
-> **Nota de atualização (mesmo mês, depois desta auditoria):** o resto deste documento descreve a cobertura no momento em que foi escrito — histórico, não reescrito abaixo. Desde então: (1) Rooster Boost e Rooster Finance ganharam backend real (a auditoria original só cobria os 4 módulos de então — Hub, Desk, Rooms, Assets); os documentos de `backend/`, `api/`, `database/`, `security/` já foram atualizados pra incluir os dois, mas **este arquivo de auditoria em si não foi reescrito** pra refletir isso, só esta nota; (2) das "Inconsistências encontradas" abaixo, duas já foram corrigidas: exposição de `senhaHash` (ver `security/05-analise-de-seguranca.md`) e ausência de rate limiting (idem); o acoplamento `RoleSwitcher`/permissão real também foi bastante reduzido (a permissão real passou a ser a fonte de verdade de `usePermissions()`, e as telas de Academy/Learn que ainda decidiam *o que buscar* pela Visão de demonstração — não só o que mostrar — foram corrigidas para usar `useCan()`), mas o padrão de telas com gating por Visão pra habilitar/desabilitar botão continua existindo por design (documentado, não é a mesma coisa). As demais inconsistências e pendências abaixo continuam válidas.
+## Revisão de 30/09 a 01/10/2026
 
-## Cobertura
+### Escopo
 
-**65 documentos** criados, organizados em 9 áreas:
+Revisão integral de todos os documentos dos dois repositórios, com dois objetivos:
+
+1. **Conformidade com o código**: cada afirmação foi confrontada com o código-fonte, o schema e os scripts
+   vigentes; as afirmações desatualizadas foram corrigidas, e as lacunas, preenchidas.
+2. **Registro técnico-formal**: todo o texto foi reescrito em linguagem técnica e impessoal, com a eliminação de
+   coloquialismos, de construções em primeira pessoa e de expressões informais. Como apoio, utilizou-se um detector
+   de marcadores de informalidade aplicado a todos os arquivos `.md`, seguido de leitura integral dos documentos.
+
+### Cobertura
 
 | Área | Local | Documentos |
 |---|---|---|
@@ -14,73 +23,88 @@ Auditoria final da reconstrução completa da documentação, executada em setem
 | Frontend | `RoosterOneFrontEnd-main/docs/frontend/` | 11 |
 | Backend | `RoosterOneBackend-main/docs/backend/` | 13 |
 | API | `RoosterOneBackend-main/docs/api/` | 5 |
-| Banco de Dados | `RoosterOneBackend-main/docs/database/` | 6 |
-| Segurança | `RoosterOneBackend-main/docs/security/` | 5 |
-| Engenharia | `RoosterOneBackend-main/docs/engineering/` | 10 (+ este documento) |
-| Operações | `RoosterOneBackend-main/docs/operations/` | 7 |
+| Banco de dados | `RoosterOneBackend-main/docs/database/` | 6 |
+| Segurança | `RoosterOneBackend-main/docs/security/` | 6 |
+| Engenharia | `RoosterOneBackend-main/docs/engineering/` | 14 |
+| Operações | `RoosterOneBackend-main/docs/operations/` | 8 |
 | Guias | `RoosterOneBackend-main/docs/user-guides/` | 2 |
+| Diagramas | `RoosterOneBackend-main/docs/diagramas/` | 1 (com fontes Mermaid e imagens) |
 
-Cada área cobre, com evidência direta no código (não presumida): visão de produto, arquitetura de cada camada, todo endpoint real dos 4 módulos com backend, todo model do Prisma com relacionamentos (diagrama ER incluído), modelo de autenticação/autorização, configuração/instalação/execução, e o que está ou não implementado em relação ao que o frontend sugere existir.
+Além desses, foram revisados os arquivos `README.md`, `CONTRIBUTING.md`, `CHANGELOG.md`, os modelos de issue e de
+pull request (`.github/`) e os índices `docs/README.md` dos dois repositórios, bem como o Manual do Usuário e a
+Documentação Geral em formato Word.
 
-## Como foi produzida
+### Inconsistências corrigidas na documentação
 
-Trabalho misto: parte escrita diretamente por mim, parte por agentes especializados despachados em paralelo (um por área: backend, frontend, api, database, security, operations), cada um investigando o código de forma independente antes de escrever. **5 dos 6 agentes foram interrompidos no meio da tarefa por limite de uso da sessão da conta** (não relacionado ao conteúdo); o trabalho já escrito por eles foi recuperado (inclusive de um worktree git isolado, no caso do agente de backend) e os documentos restantes de cada área foram completados diretamente por mim, seguindo o mesmo padrão de investigação e o mesmo formato. `operations/` foi o único bloco concluído integralmente por um agente sem interrupção.
+Entre as afirmações que não correspondiam mais ao código, destacam-se:
 
-Todo conteúdo produzido por agente foi conferido por amostragem depois (não linha a linha em 100% dos 65 arquivos) — ver "Pendências" abaixo.
+- arquitetura descrita com apenas quatro módulos (Hub, Desk, Rooms e Assets), quando o sistema possui nove;
+- ausência de renovação de sessão, quando o refresh token com rotação está implementado;
+- CORS restrito a `localhost` e com o cabeçalho `x-user-id`, quando o critério atual considera as origens
+  configuradas e o cabeçalho foi removido;
+- inexistência de filtro global de exceções e de log em JSON, ambos implementados;
+- ordem de execução incorreta entre `ValidationPipe` e guards (os guards são executados antes dos pipes);
+- diagrama ER sem o módulo Finance e com o modelo anterior do Boost (professor responsável pelo curso e mensagens
+  vinculadas ao curso);
+- matriz de rastreabilidade restrita a quatro módulos (45 requisitos ausentes);
+- catálogo de índices e restrições sem os módulos Boost e Finance e sem os índices recentes de `Reserva` e
+  `LogErro`;
+- seed descrito com 132 permissões e sem arquivos de demonstração, quando o script atual cria 141 permissões e PDFs
+  cifrados;
+- endpoints omitidos da referência da API (verificação pública de certificado e download de material pelo aluno);
+- tamanho mínimo de senha divergente entre documentos (6 e 8 caracteres; o valor vigente é 8).
 
-## Arquivos analisados
+### Defeitos de código identificados durante a revisão
 
-Principais fontes usadas em toda a reconstrução (lista não exaustiva):
+A confrontação da documentação com o código revelou dois defeitos, corrigidos em 01/10/2026 e registrados em
+`docs/engineering/08-divida-tecnica.md` e no `CHANGELOG.md`:
 
-- `prisma/schema.prisma`, `prisma/schema.test.prisma`, `prisma/migrations/*`, `prisma/seed-dev.ts`
-- Todos os `*.controller.ts`, `*.service.ts`, `*.dto.ts` dos 4 módulos com backend (Hub, Desk, Rooms, Assets) e de `src/auth/`, `src/mail/`
-- `src/main.ts`, `src/app.module.ts`, `*.module.ts` de cada módulo
-- `test/app.e2e-spec.ts`, `jest-e2e.json`
-- `package.json` de ambos os repositórios (dependências, scripts) e saída de `npm audit`
-- `src/routes/*.tsx` (frontend), `src/components/rooster/**`, `src/services/hub/**`, `src/services/mock-api/**`
-- `src/routes/__root.tsx`, `src/router.tsx`, `src/start.ts`, `src/server.ts`, `vite.config.ts`
-- Ausência confirmada por busca: `Dockerfile`, `docker-compose*`, `.github/workflows/`, `.env.example`, `.nvmrc`, testes de frontend, testes unitários de backend
+- violação de unicidade respondida como erro interno (`500`) em doze services, em contradição com a documentação,
+  que previa `409`;
+- auditoria do Hub com o usuário afetado registrado como autor da ação.
 
-## Documentos criados
+### Pendências
 
-Ver árvore completa em [`docs/README.md`](../README.md) (backend) e [`docs/README.md`](../../../RoosterOneFrontEnd-main/docs/README.md) (frontend).
+- Os diagramas Mermaid foram construídos a partir da leitura do código; as imagens em `docs/diagramas/png/` devem
+  ser regeneradas sempre que as fontes forem alteradas (ver `docs/diagramas/README.md`).
+- A referência de endpoints (`docs/api/02-endpoints.md`) deve ser confrontada com o Swagger (`/api/docs`) antes de
+  sua utilização como contrato para nova integração externa.
 
-## Pontos não identificados
+## Auditoria inicial (setembro de 2026)
 
-Registrados em cada documento específico com a frase "Não identificado no código analisado" — consolidado aqui:
+A primeira reconstrução integral da documentação, realizada em setembro de 2026, produziu 65 documentos e abrangia,
+à época, os quatro módulos então implementados (Hub, Desk, Rooms e Assets). As pendências registradas naquela
+auditoria e a situação de cada uma estão resumidas a seguir.
 
-- Pipeline de CI/CD e configuração de deploy/Docker.
-- Rotina de backup automatizada.
-- Testes automatizados de frontend; testes unitários isolados de backend (só e2e).
-- Rate limiting em qualquer rota.
-- Validação de tipo de arquivo no upload de anexo (só limite de tamanho).
-- `.env.example` em qualquer um dos repositórios.
-- Motivo histórico da escolha de NestJS, Prisma, organização modular por domínio, ausência de camada Repository, e TanStack Start no frontend — decisões confirmadas no código, mas sem registro do "porquê" original.
-
-## Inconsistências encontradas
-
-- **`GET /usuarios/:id` (e outras respostas de usuário) expõem `senhaHash`** (o hash bcrypt) porque o service não usa `select` para omitir o campo — achado de segurança real, documentado em `security/05-analise-de-seguranca.md` com recomendação de correção.
-- ~~**Senha mínima inconsistente**~~ — **corrigido (setembro/2026)**. Criação de usuário e cadastro do Boost exigiam 8 caracteres, mas a redefinição de senha aceitava 6. Não era só inconsistência de documentação: dava para contornar o mínimo de 8 usando o fluxo de "esqueci minha senha" para definir uma senha de 6. Unificado em 8, com teste que trava a regressão (`src/common/validacao-dtos.spec.ts`).
-- **`@tanstack/react-query` e `react-hook-form`/`zod` instalados mas não usados** para data fetching/validação real em nenhuma tela — infraestrutura montada no root, sem uso efetivo (`frontend/05-estado-e-hooks.md`, `frontend/09-validacoes.md`).
-- **Tabela `Sessao` (com `refreshToken`) sem uso pelo fluxo real de login** — CRUD existe, nada escreve nela no caminho principal (`engineering/08-divida-tecnica.md`).
-- **`x-user-id` ainda liberado no CORS do backend**, resquício de um esquema de autenticação anterior sem uso real hoje.
-- **Acoplamento entre `RoleSwitcher` (persona de demonstração) e a resolução de permissão real da UI** — a interface decide o que mostrar comparando o nome da persona de demonstração contra usuários reais do Hub, não o usuário logado de verdade (`frontend/08-autorizacao.md`).
-- **Dependências com vulnerabilidade conhecida** no backend: `multer` (usado no upload real de anexo), `js-yaml` (via Swagger), `deepmerge-ts` (via tooling do Prisma) — 11 avisos no total (`npm audit --production`), 0 no frontend.
-
-Nenhuma dessas inconsistências foi corrigida como parte deste trabalho de documentação — são características reais do código atual, documentadas como estão, com recomendação separada de correção onde aplicável.
-
-## Pendências
-
-- Conteúdo escrito por agente foi validado por amostragem (leitura completa de vários arquivos, verificação cruzada de contagem de entidades/rotas contra o código), não com revisão linha a linha de cada um dos 65 documentos.
-- `docs/api/02-endpoints.md` documenta 4 grupos de controllers com ~170 linhas de rota — recomenda-se validar pontualmente contra o Swagger (`/api/docs`, com o servidor rodando) antes de usar como referência definitiva de contrato para uma integração externa nova.
-- Diagramas Mermaid (arquitetura, ER, sequência) foram construídos a partir da leitura do código, não renderizados/validados visualmente nesta auditoria.
+| Pendência registrada em setembro de 2026 | Situação em 01/10/2026 |
+|---|---|
+| Ausência de integração contínua, Docker e configuração de implantação | Resolvida: CI no GitHub Actions nos dois repositórios, `Dockerfile` e `docker-compose.yml` (`docs/operations/04-deploy.md` e `05-cicd.md`) |
+| Ausência de rotina de backup | Resolvida: scripts de backup, restauração e simulado de recuperação (`docs/operations/06-backup-e-recuperacao.md`); o agendamento depende do ambiente de produção |
+| Ausência de testes de frontend e de testes unitários de backend | Resolvida: 70 testes de frontend, 137 testes unitários e 78 testes e2e no backend (`docs/engineering/14-estrategia-de-testes.md`) |
+| Ausência de limitação de requisições | Resolvida: `ThrottlerGuard` global e limites por rota |
+| Validação de upload restrita ao tamanho | Resolvida: lista de mimetypes e verificação de assinatura binária, com gravação cifrada |
+| Ausência de `.env.example` | Resolvida nos dois repositórios |
+| Exposição de `senhaHash` nas respostas de usuário | Resolvida: seleção explícita dos campos (`USUARIO_SAFE_SELECT`) |
+| Senha mínima inconsistente (6 e 8 caracteres) | Resolvida: mínimo unificado em 8, com teste de regressão |
+| Bibliotecas instaladas sem uso (`react-hook-form`, `zod`) | Resolvida: removidas |
+| Tabela `Sessao` sem uso | Resolvida: utilizada pelo refresh token |
+| Cabeçalho `x-user-id` no CORS | Resolvido: removido |
+| Acoplamento entre o seletor de perfil de demonstração e a permissão real | Resolvido: seletor removido; a interface utiliza as permissões efetivas |
+| Dependências com vulnerabilidade conhecida (11 avisos) | Parcialmente resolvida: as vulnerabilidades exploráveis por requisição HTTP foram corrigidas; permanecem avisos em `deepmerge-ts` (CLI do Prisma) e `js-yaml` (Swagger), classificados como risco aceito por processarem apenas entrada confiável (`docs/security/05-analise-de-seguranca.md`) |
+| Motivação histórica de NestJS, Prisma, organização modular, ausência de repositório e TanStack Start | Permanece não documentada, por ausência de registro (`docs/engineering/03-decisoes-arquiteturais.md`) |
 
 ## Política de manutenção
 
-A partir desta reconstrução, documentação é tratada como parte da tarefa, não uma etapa separada opcional:
+A documentação integra a tarefa de desenvolvimento, e não constitui etapa opcional:
 
 ```
 Código alterado → Testes → Análise de impacto na documentação → Documentação atualizada → Validação → Tarefa concluída
 ```
 
-Ao alterar o sistema, verificar quais destas áreas são afetadas e atualizar só os documentos realmente impactados: `system/`, `frontend/`, `backend/`, `api/`, `database/`, `security/`, `engineering/`, `operations/`, `user-guides/`. Mudança de schema/migration → sempre revisar `database/` e `engineering/07-rastreabilidade.md`. Mudança de permissão/RBAC → sempre revisar `security/` e o lado afetado (`backend/10-autorizacao-rbac.md` e/ou `frontend/08-autorizacao.md`). Mudança de endpoint → sempre revisar `api/02-endpoints.md`.
+Ao alterar o sistema, devem ser identificadas as áreas afetadas e atualizados os documentos correspondentes:
+`system/`, `frontend/`, `backend/`, `api/`, `database/`, `security/`, `engineering/`, `operations/` e
+`user-guides/`. Alteração de schema ou migration exige revisão de `database/` e de
+`engineering/07-rastreabilidade.md`; alteração de permissão ou RBAC, revisão de `security/` e do lado afetado
+(`backend/10-autorizacao-rbac.md` e/ou `frontend/08-autorizacao.md`); alteração de endpoint, revisão de
+`api/02-endpoints.md`. Toda documentação deve ser redigida em registro técnico-formal, em terceira pessoa e sem
+coloquialismos.
