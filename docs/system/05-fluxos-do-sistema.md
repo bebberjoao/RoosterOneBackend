@@ -1,6 +1,8 @@
 # Fluxos do Sistema — Rooster One
 
-Fluxos verificados diretamente no código (controllers/services citados em cada diagrama). Fluxos técnicos internos (guards, interceptors) ficam em `docs/engineering/05-fluxos-tecnicos.md`.
+Fluxos verificados no código (os controllers e services correspondentes são citados em cada seção). Os fluxos
+técnicos internos (guards, interceptores e transmissão em tempo real) estão em
+`docs/engineering/05-fluxos-tecnicos.md`. Revisão de 01/10/2026.
 
 ## Login
 
@@ -10,16 +12,35 @@ sequenceDiagram
     participant F as Frontend
     participant B as Backend (AuthController)
     U->>F: informa e-mail e senha
-    F->>B: POST /auth/login
-    B->>B: busca usuário por e-mail, compara hash bcrypt
+    F->>B: POST /v1/auth/login
+    B->>B: consulta o usuário por e-mail e compara o hash bcrypt
     alt credenciais inválidas ou usuário inativo
+        B->>B: registra o evento de auditoria "login_falhou"
         B-->>F: 401 Unauthorized
-        B->>B: registra log de auditoria "login_falhou"
     else credenciais válidas
-        B->>B: atualiza ultimoLogin
-        B->>B: registra log de auditoria "login_sucesso"
-        B-->>F: 201 { usuario, acesso, accessToken }
-        F->>F: guarda token/usuário na sessão local
+        B->>B: atualiza ultimoLogin e cria a sessão de refresh token
+        B->>B: registra o evento de auditoria "login_sucesso"
+        B-->>F: 201 { usuario, acesso, accessToken, refreshToken }
+        F->>F: armazena tokens e usuário na sessão local
+    end
+```
+
+## Renovação de sessão
+
+```mermaid
+sequenceDiagram
+    participant F as Frontend (cliente HTTP)
+    participant B as Backend
+    F->>B: requisição com access token expirado
+    B-->>F: 401 Unauthorized
+    F->>B: POST /v1/auth/refresh { refreshToken } (renovação única, compartilhada entre chamadas simultâneas)
+    alt sessão válida e usuário ativo
+        B->>B: revoga a sessão utilizada e cria nova (rotação)
+        B-->>F: novo par de tokens
+        F->>B: repete a requisição original
+    else sessão inválida, revogada ou expirada
+        B-->>F: 401 "Sessão inválida ou expirada."
+        F->>F: descarta a sessão e retorna à tela de login
     end
 ```
 
@@ -31,16 +52,16 @@ sequenceDiagram
     participant F as Frontend
     participant B as Backend
     participant M as MailService
-    U->>F: informa e-mail na tela de login
-    F->>B: POST /auth/esqueci-senha
-    B->>B: se o e-mail existir, gera token (hash SHA-256, expira em 1h)
-    B->>M: envia link de redefinição
-    M-->>M: SMTP configurado? envia e-mail real : registra link em log
+    U->>F: informa o e-mail na tela de login
+    F->>B: POST /v1/auth/esqueci-senha
+    B->>B: se o e-mail existir, gera token (hash SHA-256, validade de 1 hora)
+    B->>M: envia o link de redefinição
+    M-->>M: com SMTP, envia o e-mail; sem SMTP (fora de produção), registra em log com o token mascarado
     B-->>F: mensagem genérica (sempre a mesma)
-    U->>F: abre /redefinir-senha?token=... e define nova senha
-    F->>B: POST /auth/redefinir-senha
-    B->>B: valida token (existe, não expirou, não usado)
-    B->>B: atualiza senhaHash, marca token como usado
+    U->>F: abre /redefinir-senha?token=... e define a nova senha
+    F->>B: POST /v1/auth/redefinir-senha
+    B->>B: valida o token (existente, não expirado e não utilizado)
+    B->>B: atualiza senhaHash, marca o token como utilizado e revoga as sessões
     B-->>F: sucesso
 ```
 
@@ -48,40 +69,98 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    A[Solicitante abre chamado] -->|status inicial: Aberto| B[Chamado em Aberto]
-    B -->|atendente assume / editar| C[Em atendimento]
-    C -->|status marcado como encerrado| D[Encerrado]
+    A[Solicitante abre o chamado] -->|status inicial: Aberto| B[Aberto]
+    B -->|atendente assume ou edita| C[Em atendimento]
+    C -->|status de encerramento| D[Encerrado]
     D -->|ação: reabrir| C
     B -.->|mensagens e notas internas a qualquer momento| B
-    C -.->|troca de prioridade/categoria/técnico gera histórico| C
+    C -.->|alteração de prioridade, categoria ou técnico gera histórico| C
+    B -.->|atribuição de técnico notifica o técnico| B
 ```
 
-Cada seta de mudança de status passa por uma checagem de permissão diferente (`editar`/`encerrar`/`reabrir`) e, se o valor realmente mudou, grava uma linha de histórico — ver RN005, RN006, RN009 em [04-regras-de-negocio.md](04-regras-de-negocio.md).
+Cada mudança de status é submetida a verificação de permissão específica (`editar`, `encerrar` ou `reabrir`) e, se o
+valor efetivamente mudou, gera registro de histórico; ver RN005, RN006 e RN009 em
+[04-regras-de-negocio.md](04-regras-de-negocio.md).
 
 ## Ciclo de vida de uma reserva (Rooms)
 
 ```mermaid
 flowchart TD
-    A[Usuário solicita reserva] -->|valida capacidade/janela/conflito| B[Em análise]
+    A[Usuário solicita a reserva] -->|valida antecedência, capacidade, janela e conflito| B[Em análise]
     B -->|equipe aprova| C[Confirmada]
     B -->|equipe recusa| D[Recusada]
     C -->|equipe ou responsável cancela, com motivo| E[Cancelada]
     B -->|responsável cancela| E
+    C -->|início do evento| F[Em andamento]
+    F -->|término| G[Finalizada]
 ```
 
-Para reserva recorrente, o mesmo fluxo de validação roda uma vez por ocorrência antes de qualquer linha ser criada (RN011); cancelar a série aplica o cancelamento a todas as ocorrências não canceladas de uma vez (RN012).
+Na reserva recorrente, a mesma validação é executada para cada ocorrência antes da gravação de qualquer registro
+(RN011); o cancelamento da série aplica-se de uma vez a todas as ocorrências não canceladas (RN012). As alterações
+de status realizadas pela equipe notificam o solicitante.
 
 ## Empréstimo de patrimônio (Assets)
 
 ```mermaid
 flowchart TD
-    A[Item disponível] -->|movimentação tipo emprestimo, com prazo opcional| B[Emprestado]
-    B -->|prazo vencido e não devolvido| C[Aparece em Empréstimos atrasados]
-    B -->|marcar como devolvido| D[Disponível novamente]
-    C -->|marcar como devolvido| D
+    A[Item disponível] -->|movimentação do tipo empréstimo, com prazo opcional| B[Emprestado]
+    B -->|prazo vencido sem devolução| C[Consta em Empréstimos atrasados]
+    B -->|devolução registrada| D[Disponível]
+    C -->|devolução registrada| D
 ```
 
-## Checagem de autorização em toda rota protegida
+## Atividade, entrega e nota (Learn → Academy)
+
+```mermaid
+sequenceDiagram
+    participant P as Professor
+    participant L as Learn
+    participant AC as Academy
+    participant A as Aluno
+    P->>L: cria a atividade (rascunho) na turma
+    P->>L: publica a atividade
+    L->>AC: cria ItemAvaliativo (origem learn), se peso > 0 — idempotente
+    L-->>A: notificação "Nova atividade"
+    A->>L: envia a entrega (texto e anexos) — prazo verificado pelo servidor
+    P->>L: corrige (nota e parecer)
+    L->>AC: grava a Nota do item avaliativo na mesma transação
+    L-->>A: notificação "Atividade corrigida"
+    A->>AC: consulta GET /me/notas (média inclui a nota do Learn)
+```
+
+## Matrícula e certificado (Boost)
+
+```mermaid
+flowchart TD
+    A[Visitante consulta o catálogo público] --> B[Cadastro ou login no portal do Boost]
+    B --> C[Matrícula em curso publicado]
+    C --> D[Conclusão de aulas: manual ou 90% do vídeo hospedado]
+    D -->|recalcula progressoPct| E{100%?}
+    E -->|não| D
+    E -->|sim| F[Matrícula concluída]
+    F -->|curso emite certificado| G[Certificado em PDF com código de verificação]
+    F -->|curso sem certificado| H[Conclusão como material de apoio]
+    G --> I[Verificação pública pelo código]
+```
+
+## Ciclo de vida de uma cobrança (Finance)
+
+```mermaid
+flowchart TD
+    A[Cobrança criada: avulsa ou mensalidade em lote] --> B[Aberto]
+    B -->|vencimento anterior à data corrente — derivado na leitura| C[Vencido]
+    B -->|emissão de boleto| B
+    B -->|pagamento registrado| D[Pago]
+    C -->|pagamento registrado, com multa e juros manuais ou por política| D
+    B -->|renegociação: novo valor e vencimento, com motivo| E[Negociado]
+    C -->|renegociação| E
+    B -->|cancelamento, com motivo| F[Cancelado]
+    D -->|cobrança de produto ou serviço| G[Nota fiscal interna emitida]
+```
+
+As transições de pagamento, renegociação e cancelamento são registradas em auditoria e notificadas ao aluno.
+
+## Verificação de autorização nas rotas protegidas
 
 ```mermaid
 sequenceDiagram
@@ -90,20 +169,20 @@ sequenceDiagram
     participant G2 as PermissionGuard
     participant C as Controller
     F->>G1: requisição com Authorization: Bearer <token>
-    alt rota marcada @Public()
-        G1->>C: segue sem exigir token
+    alt rota marcada com @Public()
+        G1->>C: prossegue sem exigir token
     else rota protegida
-        G1->>G1: valida assinatura e expiração do JWT
-        G1->>G1: busca o usuário do token no banco (não confia só no payload)
-        alt token inválido/expirado OU usuário não existe mais OU está inativo
+        G1->>G1: valida assinatura e validade do JWT
+        G1->>G1: consulta o usuário do token no banco
+        alt token inválido ou expirado, ou usuário inexistente ou inativo
             G1-->>F: 401 Unauthorized
         else token válido e usuário ativo
-            G1->>G2: injeta usuário autenticado na requisição
-            G2->>G2: resolve permissões do usuário e compara com @RequirePermission(módulo, recurso, ação) do handler
-            alt sem a permissão exigida
+            G1->>G2: disponibiliza o usuário autenticado na requisição
+            G2->>G2: resolve as permissões e compara com @RequirePermission(módulo, recurso, ação)
+            alt permissão ausente
                 G2-->>F: 403 Forbidden
-            else com a permissão
-                G2->>C: segue para o controller
+            else permissão presente
+                G2->>C: prossegue para o controller (verificações contextuais, quando houver)
             end
         end
     end

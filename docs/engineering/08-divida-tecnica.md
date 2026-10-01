@@ -30,6 +30,20 @@ disco do servidor e está coberta pelos scripts de backup.
 
 **Evidência**: `src/common/storage.config.ts`; `docs/operations/06-backup-e-recuperacao.md`.
 
+### Arquivos mantidos em disco após a exclusão do registro
+
+A exclusão de material de apoio, anexo de chamado, documento acadêmico ou anexo de entrega, bem como a exclusão em
+cascata (por exemplo, de aula, curso ou atividade), remove o registro do banco, mas mantém o arquivo cifrado em
+disco. Apenas o vídeo do Boost é removido do disco na substituição, na remoção e na exclusão da aula (RN036).
+
+**Impacto**: acúmulo de arquivos sem referência, que ocupam espaço e são incluídos nas cópias de segurança; não há
+exposição de conteúdo, pois os arquivos permanecem cifrados e não são acessíveis pela API.
+
+**Evidência**: ausência de remoção de arquivo em `boost.service.ts` (exceto vídeo), `academy.service.ts`,
+`rooster-desk.service.ts` e `learn.service.ts`. **Solução proposta**: remoção do arquivo após a exclusão bem-sucedida
+do registro, inclusive nas exclusões em cascata, ou rotina periódica de limpeza que compare as pastas de upload com os
+registros do banco.
+
 ### ~~Tratamento heterogêneo de violação de unicidade entre services~~ — resolvido (01/10/2026)
 
 Cada service possuía implementação própria do método privado `handleError`. Doze deles (`RoomsService`,

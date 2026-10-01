@@ -6,78 +6,121 @@ Rooster One.
 
 ## Objetivo
 
-Sistema de gestão institucional para instituições de ensino, cobrindo operações administrativas internas (atendimento, reserva de ambientes, controle de patrimônio, controle de acesso), atividades acadêmicas (cursos, turmas, matrícula, frequência, notas, atividades/entregas do Learn), financeiro do aluno (cobranças, boleto/PIX e nota fiscal internos) e uma plataforma pública de cursos extracurriculares (Boost, com login próprio para alunos externos). Todos os 9 módulos do frontend têm backend real hoje — ver `docs/system/02-escopo.md` para o detalhamento por módulo.
+Sistema de gestão institucional para instituições de ensino, que abrange as operações administrativas internas
+(atendimento, reserva de ambientes, controle de patrimônio e controle de acesso), as atividades acadêmicas (cursos,
+turmas, matrícula, frequência, notas e atividades e entregas do Learn), o financeiro do aluno (cobranças, boleto,
+PIX e nota fiscal internos) e uma plataforma pública de cursos extracurriculares (Boost, com autenticação própria
+para alunos externos). Os nove módulos do frontend possuem implementação no backend; ver
+`docs/system/02-escopo.md` para o detalhamento por módulo.
 
-## Problema que resolve
+## Problema tratado
 
-Centraliza, em um único sistema com controle de acesso granular, processos que hoje costumam ficar espalhados em planilhas, e-mail ou sistemas isolados:
+O sistema centraliza, com controle de acesso granular, processos que costumam estar dispersos em planilhas, e-mail
+ou sistemas isolados:
 
 - abertura e acompanhamento de chamados de suporte interno;
-- solicitação e aprovação de reserva de salas/ambientes;
-- controle de inventário de patrimônio (equipamentos, mobiliário) e seus empréstimos;
+- solicitação e aprovação de reserva de salas e ambientes;
+- controle do inventário de patrimônio (equipamentos e mobiliário) e de seus empréstimos;
+- gestão acadêmica, atividades avaliativas e portal do aluno;
+- cobranças e documentos financeiros do aluno;
+- oferta de cursos extracurriculares ao público externo;
 - gestão de usuários, setores e permissões de acesso ao próprio sistema.
 
 ## Contexto
 
-Aplicação web composta por dois projetos independentes que se comunicam por API REST:
+Aplicação web composta por dois projetos independentes, que se comunicam por API REST e WebSocket:
 
-- **Backend** (`RoosterOneBackend-main`) — API NestJS + Prisma + PostgreSQL, fonte de verdade dos dados e das regras de negócio.
-- **Frontend** (`RoosterOneFrontEnd-main`) — aplicação TanStack Start + React, consome a API do backend.
+- **Backend** (`RoosterOneBackend-main`): API NestJS, Prisma e PostgreSQL, fonte de verdade dos dados e das regras
+  de negócio.
+- **Frontend** (`RoosterOneFrontEnd-main`): aplicação TanStack Start e React, com renderização no servidor, que
+  consome a API do backend.
 
-Não há monorepo: são dois repositórios git separados, sem dependência de build entre eles — o frontend só precisa que a API esteja acessível em `VITE_API_URL`.
+Não há monorepo: são dois repositórios git separados, sem dependência de build entre si; o frontend requer apenas que
+a API esteja acessível em `VITE_API_URL`.
 
-## Público-alvo / usuários
+## Público-alvo
 
-Principalmente funcionários e equipe interna de uma instituição de ensino (Hub, Desk, Rooms, Assets, gestão do Academy/Learn); professores e alunos também são usuários diretos desde a introdução do Academy/Learn, através das rotas `/me/*` e das ações de professor escopadas à própria turma. Os dados de exemplo do sistema (`prisma/seed-dev.ts`) modelam três setores típicos:
+Funcionários e equipes internas de instituição de ensino (Hub, Desk, Rooms, Assets, Finance e gestão do Academy e
+do Learn); professores e alunos, como usuários diretos, por meio das rotas `/me/*`, do portal do aluno e das ações
+de professor restritas às próprias turmas; e o público externo, no portal do Boost. Os dados de demonstração
+(`prisma/seed-dev.ts`) modelam três setores típicos:
 
 - Secretaria Acadêmica;
 - Suporte de TI;
 - Coordenação.
 
-Cada usuário recebe permissões diretamente (não existe conceito de "Perfil" ou "Role" intermediário — ver [docs/security/03-rbac.md](../security/03-rbac.md), a ser criado). Um usuário é considerado "administrador" apenas por ter a permissão específica de gerenciar o próprio sistema de permissões (`Rooster Hub` / `/hub/acessos` / `gerenciar-permissoes`), não por um campo de papel fixo.
+As permissões são concedidas diretamente a cada usuário, sem perfil ou papel intermediário (ver
+[docs/security/03-rbac.md](../security/03-rbac.md)). O usuário é considerado administrador exclusivamente por
+possuir a permissão de gerenciar o próprio sistema de permissões (`Rooster Hub` / `/hub/acessos` /
+`gerenciar-permissoes`), e não por atributo fixo de papel.
 
 ## Módulos
 
-O frontend declara 9 módulos de navegação. **Todos os 9 têm backend implementado.**
+O frontend declara nove módulos de navegação, todos com implementação no backend.
 
-| Módulo | Backend implementado | Função |
+| Módulo | Backend | Função |
 |---|---|---|
-| Rooster Hub | ✅ Sim | Usuários, setores, módulos, permissões, notificações, sessões, log de auditoria |
-| Rooster Desk | ✅ Sim | Chamados de suporte (tickets), categorias, atendentes |
-| Rooster Rooms | ✅ Sim | Campus, blocos, ambientes, reservas (com limite/horizonte de antecedência e reserva recorrente reguláveis por permissão) |
-| Rooster Assets | ✅ Sim | Patrimônio, categorias, setores de patrimônio, movimentações e empréstimos |
-| Rooster Academy | ✅ Sim | Gestão acadêmica: cursos, disciplinas, turmas, matrícula, frequência, notas, calendário, documentos |
-| Rooster Learn | ✅ Sim | Atividades, entregas, correção, com propagação de nota para o Academy |
-| Rooster Student | ⚠️ Sem controller próprio | Portal do aluno (disciplinas, notas, frequência, histórico, documentos, financeiro) servido via `/me/*` pelo `AcademyController`/`LearnController`/`FinanceController`, sob o módulo de permissão `Rooster Student` |
-| Rooster Finance | ✅ Sim | Cobranças, mensalidades, boletos e PIX (simulados internamente), produtos, serviços, descontos, notas fiscais (PDF + XML internos), relatórios |
-| Rooster Boost | ✅ Sim | Plataforma pública de cursos extracurriculares — login próprio para aluno externo (`BoostUsuario`), instrutor é sempre um Professor já cadastrado no Academy, certificado em PDF automático |
+| Rooster Hub | Implementado | Usuários, setores, módulos, permissões, notificações, sessões, auditoria, rastreamento de erros e configurações |
+| Rooster Desk | Implementado | Chamados de suporte, categorias e atendentes |
+| Rooster Rooms | Implementado | Campus, blocos, ambientes e reservas (com horizonte de antecedência e reserva recorrente reguláveis por permissão) |
+| Rooster Assets | Implementado | Patrimônio, categorias, setores de patrimônio, movimentações e empréstimos |
+| Rooster Academy | Implementado | Gestão acadêmica: cursos, disciplinas, turmas, matrícula, frequência, notas, calendário e documentos |
+| Rooster Learn | Implementado | Atividades, entregas e correção, com propagação de notas para o Academy |
+| Rooster Student | Sem controller próprio | Portal do aluno (disciplinas, notas, frequência, histórico, documentos e financeiro), atendido pelas rotas `/me/*` e `/financeiro/me/*` do `AcademyController`, do `LearnController` e do `FinanceController`, sob o módulo de permissão `Rooster Student` |
+| Rooster Finance | Implementado | Cobranças, mensalidades, boletos e PIX (simulados internamente), produtos, serviços, descontos, políticas de multa e juros, notas fiscais (PDF e XML internos) e relatórios |
+| Rooster Boost | Implementado | Plataforma pública de cursos extracurriculares, com autenticação própria do aluno externo (`BoostUsuario`), gestão por permissão, professores do Academy como orientadores, vídeo hospedado e certificado em PDF automático |
 
 ## Funcionalidades implementadas
 
-Levantadas diretamente dos controllers e services do backend (`src/roster-hub`, `src/rooster-desk`, `src/rooster-rooms`, `src/rooster-assets`, `src/rooster-academy`, `src/rooster-learn`, `src/auth`, `src/mail`):
+Levantadas a partir dos controllers e services do backend:
 
-- **Autenticação**: login com e-mail/senha, hash bcrypt, JWT com expiração de 8 horas, guard global (`JwtAuthGuard`) exigindo token em toda rota não marcada como pública.
-- **Redefinição de senha por e-mail**: solicitação gera token com validade de 1 hora; envio real por SMTP quando configurado, ou registro do link em log da aplicação quando não há SMTP definido (modo desenvolvimento).
-- **RBAC direto por usuário**: permissões concedidas usuário a usuário, sem Perfil intermediário; guard de autorização (`PermissionGuard`) checa `módulo + recurso + ação` em cada rota protegida.
-- **Log de auditoria automático**: login (sucesso/falha), criação/edição/exclusão de usuário, concessão/revogação de permissão e redefinição de senha gravam evento automaticamente.
-- **Chamados (Desk)**: abertura, categorização, priorização, atribuição a atendente, mensagens/notas internas, histórico de alteração de campo (status/prioridade/categoria/técnico), anexo de arquivo real (upload e download).
-- **Reservas (Rooms)**: solicitação, aprovação/recusa com motivo, conversa por reserva, histórico de alteração de horário/status, reservas recorrentes (diária/semanal/mensal) geradas como série com validação atômica de conflito.
-- **Patrimônio (Assets)**: cadastro, categorização, movimentação entre setor/sala/manutenção, empréstimo com prazo de devolução e listagem de empréstimos em atraso, baixa de item.
-- **Gestão acadêmica (Academy)**: cursos, disciplinas (catálogo), turmas (oferta real por período/professor), matrícula, frequência em lote, itens avaliativos e notas com média ponderada, calendário acadêmico, documentos acadêmicos (upload real), e o portal do aluno (`/me/*`). Professor/aluno são vínculos a um `Usuario` do Hub já existente, nunca usuários novos. Escopo de turma checado por posse (professor só acessa a própria turma), não só por permissão — ver `docs/security/03-rbac.md`.
-- **Atividades e entregas (Learn)**: criação/publicação de atividade numa turma do Academy, envio/reenvio de entrega pelo aluno, correção com nota/feedback pelo professor, com propagação automática da nota para o item avaliativo do Academy. Sem banco de questões/correção automática (decisão de escopo).
-- **Cursos extracurriculares (Boost)**: cadastro/login público independente do Hub para alunos externos; instrutor cria curso → módulo → aula → material de apoio; matrícula, progresso por aula e certificado em PDF gerado automaticamente ao concluir; chat em tempo real aluno↔instrutor.
-- **Financeiro do aluno (Finance)**: produtos, serviços e descontos; cobrança única (`Cobranca`) para mensalidade/produto/serviço/taxa; geração de mensalidade em lote com desconto aplicado automaticamente; boleto e nota fiscal simulados internamente (sem gateway/SEFAZ real); relatórios e dashboard calculados a partir da `Cobranca`.
+- **Autenticação**: login por e-mail e senha, hash bcrypt, access token JWT com validade de 8 horas, refresh token de
+  30 dias com rotação, guard global (`JwtAuthGuard`) que exige token em toda rota não pública e limitação de
+  requisições.
+- **Recuperação de senha por e-mail**: token com validade de 1 hora; envio por SMTP quando configurado ou registro
+  em log, com o token mascarado, em desenvolvimento; a troca de senha revoga as sessões existentes.
+- **RBAC direto por usuário**: permissões concedidas individualmente, sem perfil intermediário; o `PermissionGuard`
+  verifica `módulo + recurso + ação` em cada rota protegida; o sistema impede a ausência de administrador ativo.
+- **Auditoria automática**: login, sessão, operações sobre usuários e permissões, senhas, notas, cobranças e contas
+  externas, com registro do autor; relatório e exportação em CSV.
+- **Rastreamento de erros**: registro de toda resposta com status igual ou superior a 500, com relatório.
+- **Notificações**: caixa de entrada pessoal, alimentada por Desk, Rooms, Academy, Learn e Finance, com rota de
+  destino.
+- **Chamados (Desk)**: abertura, categorização, priorização, atribuição a atendente (com notificação), mensagens e
+  notas internas em tempo real, histórico de alterações, anexos e avaliação.
+- **Reservas (Rooms)**: solicitação, aprovação ou recusa com motivo, conversa por reserva, histórico, reservas
+  recorrentes (diárias, semanais ou mensais) com validação atômica de conflito e vínculo opcional com turma.
+- **Patrimônio (Assets)**: cadastro, categorização, movimentação entre setor, sala e manutenção, empréstimo com
+  prazo e relação de atrasos, e baixa.
+- **Gestão acadêmica (Academy)**: cursos, disciplinas, turmas, matrícula, frequência em lote, itens avaliativos e
+  notas com média ponderada, calendário, documentos acadêmicos e portal do aluno (`/me/*`). Professor e aluno são
+  vínculos a `Usuario` existente no Hub, e o escopo de turma é verificado pelo vínculo, além da permissão.
+- **Atividades e entregas (Learn)**: criação e publicação de atividade em turma do Academy, envio e reenvio de
+  entrega, correção com nota e parecer e propagação automática da nota ao Academy. Não há banco de questões nem
+  correção automática, por decisão de escopo.
+- **Cursos extracurriculares (Boost)**: cadastro e login públicos independentes do Hub; cursos, módulos, aulas,
+  materiais e vídeo hospedado; matrícula, progresso por aula e certificado em PDF automático na conclusão, com
+  verificação pública; conversa em tempo real entre aluno e orientador; administração das contas externas.
+- **Financeiro do aluno (Finance)**: produtos, serviços, descontos e políticas de multa e juros; cobrança única
+  (`Cobranca`) para mensalidade, produto, serviço ou taxa; geração de mensalidades em lote com desconto automático;
+  boleto e nota fiscal simulados internamente (sem intermediador de pagamento e sem SEFAZ); relatórios e painel.
+- **Arquivos**: verificação de conteúdo no envio e cifragem em repouso de todos os arquivos gravados.
 
 ## Integrações externas
 
-- **E-mail**: suporte a SMTP via `nodemailer`, configurável por variável de ambiente; sem SMTP configurado, cai em modo de registro em log (não é uma integração externa ativa por padrão).
-- Nenhuma outra integração externa (pagamento, SSO, armazenamento em nuvem, mensageria) foi identificada no código.
+- **E-mail**: SMTP por `nodemailer`, configurável por variável de ambiente; sem SMTP, opera em modo de registro em log
+  (fora de produção).
+- Não há outras integrações externas (pagamento, SSO, armazenamento em nuvem ou mensageria).
 
 ## Limitações atuais
 
-- Rooster Student não tem controller/módulo NestJS próprio — suas rotas (`/me/*`) são servidas por `AcademyController`/`LearnController`/`FinanceController`.
-- Sem testes automatizados no frontend (nenhum framework de teste no `package.json`).
-- Backend tem apenas testes end-to-end (não há testes unitários isolados por serviço).
-- Sem Docker, `docker-compose` ou pipeline de CI/CD em nenhum dos dois repositórios.
-- JWT sem mecanismo de renovação (refresh token): expira em 8h e força novo login.
-- Envio de e-mail depende de configuração manual de SMTP; sem isso, nenhum e-mail é entregue de fato.
+- O Rooster Student não possui controller nem módulo NestJS próprio; suas rotas são atendidas por
+  `AcademyController`, `LearnController` e `FinanceController`.
+- Não há ambiente de produção: a integração contínua e a conteinerização existem, mas a entrega contínua depende de
+  ambiente de destino (ver `docs/operations/04-deploy.md`).
+- Os testes automatizados cobrem a API (unitários e e2e) e a lógica e os componentes do frontend, mas não o fluxo
+  completo de telas no navegador.
+- O envio de e-mail depende de configuração do SMTP; sem ela, nenhum e-mail é entregue.
+- Os arquivos permanecem no disco local do servidor (cifrados), sem armazenamento de objetos externo.
+
+Pendências e evoluções previstas estão em `docs/engineering/10-melhorias-futuras.md`.

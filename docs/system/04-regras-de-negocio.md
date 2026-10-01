@@ -1,281 +1,450 @@
 # Regras de Negócio — Rooster One
 
-Cada regra aponta o arquivo/método onde está implementada. Numeração própria desta reconstrução (RN001+), não reaproveita a numeração da documentação legada removida. RN001–RN018 cobrem Hub, Desk, Rooms e Assets; RN019–RN035 foram acrescentadas em setembro/2026, formalizando as regras de Academy, Learn, Finance e Boost que antes existiam só em prosa, mais a proteção do último administrador. RN036–RN038 cobrem o vídeo hospedado, o progresso real e a gestão de contas externas do Boost; RN039, a caixa de notificações; RN040–RN042, a gestão do Boost por permissão, a conversa com o orientador e o certificado por curso; RN043–RN044, acrescentadas no fim de setembro/2026, a política de multa/juros criável pelo financeiro e o vínculo de Reserva com Turma.
+Cada regra indica o arquivo e o método que a implementam. A numeração (RN001 em diante) é própria desta
+documentação e não reaproveita a da documentação anterior, removida. RN001 a RN018 abrangem Hub, Desk, Rooms e
+Assets; RN019 a RN035, acrescentadas em setembro de 2026, formalizam as regras de Academy, Learn, Finance e Boost e a
+proteção do último administrador; RN036 a RN038 tratam do vídeo hospedado, do progresso de vídeo e da gestão das
+contas externas do Boost; RN039, da caixa de notificações; RN040 a RN042, da gestão do Boost por permissão, da
+conversa com o orientador e do certificado por curso; RN043 e RN044, da política de multa e juros e do vínculo entre
+reserva e turma. Revisão de 01/10/2026.
 
-## RN001 — Administrador é definido por permissão, não por papel
+## RN001 — O administrador é definido por permissão, e não por papel
 
-Não existe campo "é admin" nem conceito de Perfil. Um usuário é tratado como administrador do sistema somente enquanto tiver a permissão `Rooster Hub` / `/hub/acessos` / `gerenciar-permissoes`. Perder essa permissão remove o status imediatamente, sem ação adicional.
+Não há atributo de administrador nem conceito de perfil. O usuário é tratado como administrador somente enquanto
+possuir a permissão `Rooster Hub` / `/hub/acessos` / `gerenciar-permissoes`; a perda dessa permissão remove a
+condição de imediato, sem ação adicional.
 
 **Implementação**: `usuarios.service.ts::isAdmin()`.
 
-## RN002 — Permissão é concedida direto ao usuário
+## RN002 — A permissão é concedida diretamente ao usuário
 
-Não há tabela de Perfil/Role. Toda permissão é um vínculo `usuário ↔ permissão` (`usuarios_permissoes`), com a permissão identificada por `módulo + recurso (rota da tela) + ação`. Concessão e revogação são operações independentes, sem herança.
+Não há tabela de perfil ou papel. Toda permissão é um vínculo `usuário ↔ permissão` (`usuarios_permissoes`),
+identificada por `módulo + recurso (rota da tela) + ação`. Concessão e revogação são operações independentes, sem
+herança.
 
 **Implementação**: `usuarios-permissoes.service.ts`; verificação em `usuarios.service.ts::hasPermission()`.
 
-## RN003 — E-mail de usuário é único
+## RN003 — O e-mail do usuário é único
 
-Cadastro e atualização de usuário exigem e-mail único (constraint de banco); tentativa de duplicar retorna erro de conflito.
+O cadastro e a atualização de usuário exigem e-mail único (restrição do banco); a tentativa de duplicação resulta em
+`409 Conflict`, sem registro como erro interno.
 
-**Implementação**: `schema.prisma` (`Usuario.email @unique`), tratado em `usuarios.service.ts::handleError` (código Prisma `P2002`).
+**Implementação**: `schema.prisma` (`Usuario.email @unique`), com tratamento em `usuarios.service.ts::handleError`
+(delegação a `traduzirErroPrisma`, código Prisma `P2002`).
 
-## RN004 — Redefinição de senha não revela se o e-mail existe
+## RN004 — A recuperação de senha não revela a existência do e-mail
 
-`POST /auth/esqueci-senha` sempre responde com a mesma mensagem genérica, exista ou não o e-mail informado — evita enumeração de contas. Token gerado é aleatório (32 bytes), armazenado como hash SHA-256 (nunca em texto puro), expira em 1 hora e só pode ser usado uma vez.
+`POST /auth/esqueci-senha` responde sempre com a mesma mensagem genérica, exista ou não o e-mail informado, o que
+impede a enumeração de contas. O token gerado é aleatório (32 bytes), armazenado como hash SHA-256 (nunca em texto
+claro), expira em 1 hora e é de uso único. A troca de senha revoga todas as sessões do usuário.
 
 **Implementação**: `usuarios.service.ts::requestPasswordReset/resetPasswordWithToken`.
 
-## RN005 — Transição de status de chamado exige permissão específica por tipo de transição
+## RN005 — A transição de status do chamado exige permissão específica por tipo de transição
 
-Mudar para um status marcado como encerrado exige a ação `encerrar`; sair de um status encerrado exige `reabrir`; qualquer outra mudança de status exige `editar`. O solicitante (dono do chamado) nunca pode mudar o próprio status, mesmo tendo a permissão — só quem não é o dono, ou um administrador.
+A mudança para status de encerramento exige a ação `encerrar`; a saída de status de encerramento, `reabrir`; as
+demais mudanças de status, `editar`. O solicitante não pode alterar o status do próprio chamado, ainda que possua a
+permissão; a alteração cabe a quem não é o solicitante ou ao administrador.
 
 **Implementação**: `rooster-desk.controller.ts::statusTransitionAction/updateTicketStatus`.
 
-## RN006 — `encerradoEm` do chamado é derivado, nunca informado pelo cliente
+## RN006 — A data de encerramento do chamado é derivada, e nunca informada pelo cliente
 
-A data de encerramento do chamado é calculada automaticamente a partir da transição de status (`encerrado: true` → grava `now()`; volta a `encerrado: false` → limpa para `null`). O corpo da requisição não pode fixar esse valor diretamente.
+A data de encerramento é calculada a partir da transição de status (`encerrado: true` grava o momento atual; o
+retorno a `encerrado: false` a limpa). O corpo da requisição não pode fixar esse valor.
 
 **Implementação**: `rooster-desk.controller.ts::derivarEncerradoEm`.
 
-## RN007 — Visibilidade de chamado é por setor da categoria
+## RN007 — A visibilidade do chamado é determinada pelo setor da categoria
 
-Um usuário só enxerga um chamado se: for o solicitante, for administrador, ou pertencer a um setor vinculado à categoria do chamado. Fora isso, a API responde 404 (não 403) para não revelar a existência do registro.
+O usuário visualiza um chamado somente se for o solicitante, administrador ou integrante de setor vinculado à
+categoria do chamado. Nos demais casos, a API responde `404`, e não `403`, para não revelar a existência do registro.
 
 **Implementação**: `rooster-desk.service.ts::canViewTicket`.
 
-## RN008 — Nota interna de chamado não é visível ao solicitante
+## RN008 — A nota interna do chamado não é visível ao solicitante
 
-O solicitante nunca pode criar nem ler uma nota marcada como interna; só administrador ou quem tem a permissão `nota-interna` pode criá-la, e ela é filtrada da conversa quando quem lê é o próprio solicitante.
+O solicitante não pode criar nem ler nota interna; apenas o administrador ou o usuário com a permissão
+`nota-interna` pode criá-la, e ela é excluída da conversa quando o leitor é o solicitante.
 
 **Implementação**: `rooster-desk.service.ts::createMensagemChamado/getMensagensChamado`.
 
-## RN009 — Toda troca real de campo do chamado vira histórico
+## RN009 — Toda alteração efetiva de campo do chamado gera histórico
 
-Mudança de status, prioridade, categoria ou técnico só gera linha de histórico se o valor novo for de fato diferente do atual (comparação explícita antes de gravar) — evita histórico "fantasma" de uma chamada de update que não mudou nada.
+A alteração de status, prioridade, categoria ou técnico gera registro de histórico somente quando o novo valor
+difere do atual (comparação explícita antes da gravação), o que evita registros de atualizações sem alteração. A
+atribuição de novo técnico gera, além do histórico, notificação ao técnico, exceto quando o autor assume o próprio
+chamado.
 
 **Implementação**: `rooster-desk.controller.ts::registrarHistoricoTicket`.
 
-## RN010 — Reserva de ambiente valida capacidade, dia de funcionamento, janela de horário e conflito
+## RN010 — A reserva de ambiente valida capacidade, dia de funcionamento, janela de horário e conflito
 
-Antes de criar ou reagendar uma reserva, o sistema verifica: horário de término maior que o de início; participantes dentro da capacidade do ambiente; dia da semana dentro de `diasFuncionamento`; horário dentro da janela de `horarioAbertura`; e ausência de sobreposição com outra reserva não cancelada/recusada no mesmo ambiente e data.
+Antes de criar ou reagendar uma reserva, o sistema verifica: término posterior ao início; participantes dentro da
+capacidade do ambiente; dia da semana contido em `diasFuncionamento`; horário contido na janela de
+`horarioAbertura`; e ausência de sobreposição com outra reserva não cancelada nem recusada no mesmo ambiente e data.
 
 **Implementação**: `rooms.service.ts::assertReservaDisponivel`.
 
-## RN011 — Série de reserva recorrente é atômica
+## RN011 — A série de reservas recorrentes é atômica
 
-Ao criar uma série (diária/semanal/mensal, até 26 ocorrências), todas as datas são validadas antes de qualquer criação. Se uma única ocorrência conflitar, a série inteira é rejeitada — nunca fica uma série "furada" com algumas reservas criadas e outras não.
+Na criação de série (diária, semanal ou mensal, com até 26 ocorrências), todas as datas são validadas antes de
+qualquer gravação. Se uma única ocorrência conflitar, a série inteira é recusada, e não permanece série incompleta
+com parte das reservas criadas.
 
 **Implementação**: `rooms.service.ts::createReservaSerie`.
 
-## RN012 — Cancelamento de reserva/série grava o motivo
+## RN012 — O cancelamento de reserva ou de série registra o motivo
 
-Ao mudar o status de uma reserva para `cancelada`, o campo `motivo` (quando informado) é gravado em `motivoCancelamento`. Cancelamento de série aplica o mesmo motivo a todas as ocorrências ainda não canceladas.
+Na alteração do status de uma reserva para `cancelada`, o `motivo`, quando informado, é gravado em
+`motivoCancelamento`. O cancelamento de série aplica o mesmo motivo a todas as ocorrências ainda não canceladas.
 
 **Implementação**: `rooms.service.ts::updateReservaStatus/cancelarSerie`.
 
 ## RN013 — Patrimônio baixado não pode ser movimentado
 
-Um item de patrimônio com status `baixado` rejeita qualquer nova movimentação (setor, sala, empréstimo, devolução, manutenção).
+O patrimônio com status `baixado` recusa qualquer nova movimentação (setor, sala, empréstimo, devolução ou
+manutenção).
 
 **Implementação**: `assets.service.ts::createMovement`.
 
-## RN014 — Movimentação de patrimônio exige destino quando aplicável
+## RN014 — A movimentação de patrimônio exige destino quando aplicável
 
-Movimentações do tipo `setor`, `sala` ou `emprestimo` exigem campo `destino` preenchido; sem isso a requisição é rejeitada antes de tocar no banco.
+As movimentações dos tipos `setor`, `sala` e `emprestimo` exigem o campo `destino`; na ausência dele, a requisição é
+recusada antes de qualquer gravação.
 
 **Implementação**: `assets.service.ts::createMovement`.
 
 ## RN015 — Empréstimo de patrimônio: prazo, atraso e devolução
 
-Uma movimentação tipo `emprestimo` pode receber `dataDevolucaoPrevista`. Enquanto não houver `devolvidoEm`, o empréstimo aparece na listagem de atrasados assim que a data prevista passar. Devolver um empréstimo já devolvido é rejeitado; devolver com sucesso cria uma movimentação de devolução e volta o item para `disponivel`.
+A movimentação do tipo `emprestimo` pode receber `dataDevolucaoPrevista`. Enquanto não houver `devolvidoEm`, o
+empréstimo passa a constar da relação de atrasos após a data prevista. A devolução de empréstimo já devolvido é
+recusada; a devolução bem-sucedida cria movimentação de devolução e restabelece o item como `disponivel`.
 
 **Implementação**: `assets.service.ts::createMovement/devolverEmprestimo/findEmprestimosAtrasados`.
 
-## RN016 — Eventos de segurança geram auditoria automaticamente
+## RN016 — Os eventos de segurança e as operações sensíveis geram auditoria automaticamente
 
-Login (sucesso e falha), criação/edição/exclusão de usuário, concessão/revogação de permissão e redefinição de senha (por admin ou por token) gravam um evento em log de auditoria sem que o chamador precise fazer isso explicitamente. Falha ao gravar auditoria não derruba a operação principal.
+Login (sucesso e falha), renovação de sessão, logout, criação, edição e exclusão de usuário, concessão e revogação de
+permissão, redefinição de senha (pelo administrador ou por token), lançamento de nota, transições de cobrança
+(pagamento, renegociação e cancelamento) e gestão de contas externas do Boost geram evento de auditoria sem chamada
+explícita pelo autor da operação. O evento registra como `usuarioId` o **autor** da ação e, em `entidadeId`, o
+registro afetado. A falha na gravação da auditoria não interrompe a operação principal.
 
-**Implementação**: `auditoria.service.ts::registrar`, chamado a partir de `usuarios.service.ts` e `usuarios-permissoes.service.ts`.
+**Implementação**: `auditoria.service.ts::registrar`, invocado por `usuarios.service.ts`,
+`usuarios-permissoes.service.ts`, `academy.service.ts`, `finance.service.ts` e `boost.service.ts`.
 
-## RN017 — Reserva tem horizonte máximo de antecedência, regulável por permissão
+## RN017 — A reserva possui horizonte máximo de antecedência, regulável por permissão
 
-Toda reserva (única ou série recorrente) só pode ser feita com até **15 dias** de antecedência a partir de hoje, por padrão — evita alguém reservar uma sala "pro ano inteiro" sem controle. Quem tem a permissão `Rooster Rooms` / `/rooms/book` / `prazo-estendido` (por padrão, só coordenação/admin) tem o horizonte ampliado pra **365 dias**. Pra uma série, a data checada é a última ocorrência (`repetirAte`), não a primeira — senão daria pra contornar o limite encadeando ocorrências. Estourar o limite é rejeitado com `403`, nunca `400` (é uma questão de permissão, não de formato de dado).
+Toda reserva, única ou em série, pode ser realizada com até **15 dias** de antecedência por padrão, o que impede a
+ocupação de ambientes por longos períodos sem controle. O usuário com a permissão `Rooster Rooms` / `/rooms/book` /
+`prazo-estendido` (por padrão, coordenação e administração) dispõe de horizonte de **365 dias**. Para série, a data
+verificada é a da última ocorrência (`repetirAte`), e não a da primeira, para que o limite não seja contornado por
+encadeamento de ocorrências. A violação resulta em `403`, e não `400`, por se tratar de questão de permissão, e não de
+formato de dado.
 
-**Implementação**: `rooms.controller.ts::assertDentroDoPrazo`, chamado em `createReserva`/`createReservaSerie` antes de delegar ao service.
+**Implementação**: `rooms.controller.ts::assertDentroDoPrazo`, invocado em `createReserva` e `createReservaSerie`
+antes da delegação ao service.
 
-## RN018 — Reserva recorrente exige permissão própria, além da permissão básica de reservar
+## RN018 — A reserva recorrente exige permissão própria, além da permissão básica de reserva
 
-Ter `Rooster Rooms` / `/rooms/book` / `solicitar` só permite reserva única. Criar uma série (`POST /reservas/serie`) exige adicionalmente `Rooster Rooms` / `/rooms/book` / `solicitar-recorrente` — as duas permissões são independentes uma da outra no catálogo (não uma implica a outra), então dá pra conceder recorrência sem prazo estendido, ou vice-versa, conforme a necessidade de cada usuário.
+A permissão `Rooster Rooms` / `/rooms/book` / `solicitar` autoriza apenas reserva única. A criação de série
+(`POST /reservas/serie`) exige adicionalmente `Rooster Rooms` / `/rooms/book` / `solicitar-recorrente`. As duas
+permissões são independentes no catálogo, o que permite conceder recorrência sem prazo estendido, ou o inverso,
+conforme a necessidade de cada usuário.
 
 **Implementação**: `rooms.controller.ts::createReservaSerie`.
 
-## RN019 — Professor e Aluno são vínculos de um Usuário existente, nunca cadastros novos
+## RN019 — Professor e aluno são vínculos de usuário existente, e nunca novos cadastros
 
-Criar um `Professor` ou um `Aluno` exige informar o `usuarioId` de um `Usuario` já cadastrado no Hub — o endpoint nunca cria o usuário junto. `usuarioId` inexistente falha. As duas relações são 1:1 e independentes entre si, então nada impede que o mesmo `Usuario` seja professor e aluno ao mesmo tempo (um professor que cursa uma pós na própria instituição, por exemplo).
+A criação de `Professor` ou de `Aluno` exige o `usuarioId` de `Usuario` cadastrado no Hub; o endpoint não cria o
+usuário. `usuarioId` inexistente resulta em falha. As duas relações são 1:1 e independentes, de modo que o mesmo
+`Usuario` pode ser professor e aluno simultaneamente (por exemplo, professor que cursa pós-graduação na própria
+instituição).
 
 **Implementação**: `academy.service.ts::createProfessor/createAluno`.
 
-## RN020 — Matrícula respeita a capacidade da turma
+## RN020 — A matrícula respeita a capacidade da turma
 
-Matricular um aluno numa turma que já atingiu `capacidade` é rejeitado com `409`. A contagem considera **apenas matrículas ativas** — uma matrícula cancelada libera a vaga. `capacidade` igual a zero significa "sem limite", e nesse caso a checagem não roda. Não existe lista de espera: a matrícula é simplesmente recusada (registrado como melhoria futura).
+A matrícula em turma que atingiu a `capacidade` é recusada com `409`. A contagem considera **apenas matrículas
+ativas**: a matrícula cancelada libera a vaga. `capacidade` igual a zero significa ausência de limite, caso em que a
+verificação não é realizada. Não há lista de espera: a matrícula é recusada (pendência registrada em
+`docs/engineering/10-melhorias-futuras.md`).
 
 **Implementação**: `academy.service.ts::createMatricula`.
 
-## RN021 — Posse de turma é condição obrigatória, além da permissão (Academy e Learn)
+## RN021 — O vínculo com a turma é condição obrigatória, além da permissão (Academy e Learn)
 
-Para tudo que gira em torno de uma turma — registrar frequência, lançar nota, criar ou corrigir atividade — ter a permissão da ação **não basta**: o usuário precisa ser o `professorId` daquela turma específica. A permissão ampla de gestão (coordenação) ou ser administrador dá acesso a qualquer turma; o aluno acessa somente pelas rotas `/me/*`, com o `Aluno` resolvido a partir do JWT e nunca de um parâmetro de rota, e só se estiver matriculado. A negativa é sempre `403` (diferente do Desk, que usa `404` para não revelar existência).
+Para os recursos vinculados a uma turma (frequência, notas e criação ou correção de atividades), a permissão da ação
+**não é suficiente**: o usuário deve ser o `professorId` da turma. A permissão ampla de gestão (coordenação) e a
+condição de administrador autorizam o acesso a qualquer turma; o aluno acessa exclusivamente pelas rotas `/me/*`, com
+o `Aluno` identificado pelo JWT, e nunca por parâmetro de rota, e somente se estiver matriculado. A recusa é sempre
+`403` (diferentemente do Desk, que utiliza `404` para não revelar a existência do recurso).
 
-Este é o mais restritivo dos três padrões de escopo do sistema — deliberadamente mais rígido que o do Rooms (onde posse **ou** permissão de gestão já bastam), porque nota e frequência de uma turma não devem vazar entre professores.
+É o mais restritivo dos três padrões de escopo do sistema, deliberadamente mais rígido que o do Rooms (em que
+titularidade **ou** permissão de gestão é suficiente), pois as notas e a frequência de uma turma não devem ser
+acessíveis a outros professores.
 
-**Implementação**: `academy.controller.ts` e `learn.controller.ts`, helpers `exigirEscopoTurma`/`exigirDonoOuGestor` (replicados de propósito em cada controller, não compartilhados).
+**Implementação**: `academy.controller.ts` e `learn.controller.ts`, métodos `exigirEscopoTurma` e
+`exigirDonoOuGestor` (replicados em cada controller, por decisão de projeto, para manter os módulos independentes).
 
-## RN022 — Nota é validada contra o máximo do item, e a média ignora item sem nota
+## RN022 — A nota é validada contra o máximo do item, e a média desconsidera itens sem nota
 
-Lançar nota exige `academy.grades.lancar-notas` mais posse da turma; configurar pesos exige `configurar-pesos`. A nota é validada contra a nota máxima do item avaliativo. A média é ponderada pelos pesos e **ignora itens ainda sem nota**, em vez de tratá-los como zero — senão a média exibida no meio do período puniria o aluno por avaliações que ainda nem aconteceram.
+O lançamento de nota exige `academy.grades.lancar-notas` e vínculo com a turma; a configuração de pesos exige
+`configurar-pesos`. A nota é validada contra a nota máxima do item avaliativo. A média é ponderada pelos pesos e
+**desconsidera os itens ainda sem nota**, em vez de tratá-los como zero; do contrário, a média exibida durante o
+período penalizaria o aluno por avaliações ainda não realizadas. O lançamento é registrado em auditoria e notificado
+ao aluno.
 
-Não há arredondamento nem regra de aprovação automática: o sistema calcula e exibe, a decisão acadêmica é humana.
+Não há arredondamento nem regra de aprovação automática: o sistema calcula e exibe, e a decisão acadêmica cabe aos
+responsáveis.
 
-**Implementação**: `academy.service.ts::lancarNota` e o cálculo de média do boletim.
+**Implementação**: `academy.service.ts::lancarNota` e cálculo de média (`calcularMediaTurma`).
 
-## RN023 — Frequência não reprova automaticamente
+## RN023 — A frequência não reprova automaticamente
 
-O registro de frequência é em lote por data e exige `registrar-chamada` (ou `editar-chamada`, para corrigir um registro anterior) mais posse da turma. O percentual de presença é calculado e exibido, mas **nenhuma reprovação por falta é aplicada pelo sistema** — não existe limite de faltas codificado.
+O registro de frequência é realizado em lote por data e exige `registrar-chamada` (ou `editar-chamada`, para a
+correção de registro anterior) e vínculo com a turma. O percentual de presença é calculado e exibido, mas **nenhuma
+reprovação por falta é aplicada pelo sistema**: não há limite de faltas codificado.
 
 **Implementação**: `academy.service.ts::registrarFrequenciaLote`.
 
-## RN024 — Não existe fechamento de período letivo
+## RN024 — Não há fechamento de período letivo
 
-`PeriodoLetivo` tem data de início, data de fim e um marcador de período ativo, mas não há rotina que consolide médias, calcule aprovação/reprovação em lote ou trave lançamento retroativo. O encerramento é operacional (parar de lançar), não um estado do sistema — lançar nota num período já encerrado continua tecnicamente possível. É a lacuna mais relevante do Academy, registrada como melhoria futura.
+`PeriodoLetivo` possui data de início, data de fim e indicador de período ativo, mas não há rotina que consolide
+médias, calcule aprovação ou reprovação em lote ou impeça lançamento retroativo. O encerramento é operacional
+(interrupção dos lançamentos), e não estado do sistema; o lançamento de nota em período encerrado permanece
+tecnicamente possível. Trata-se da lacuna mais relevante do Academy, registrada como evolução prevista e dependente
+de definição de regra de negócio.
 
-**Implementação**: ausência deliberada, registrada aqui para não ser lida como esquecimento.
+**Implementação**: ausência deliberada, registrada para que não seja interpretada como omissão.
 
-## RN025 — Publicar atividade cria o item avaliativo no Academy, de forma idempotente
+## RN025 — A publicação de atividade cria o item avaliativo no Academy, de forma idempotente
 
-Publicar uma atividade do Learn é uma transição de status que, quando a atividade tem peso, cria o `ItemAvaliativo` correspondente no Academy. A operação é idempotente: republicar não duplica o item.
+A publicação de atividade do Learn é transição de status que, quando a atividade possui peso, cria o
+`ItemAvaliativo` correspondente no Academy. A operação é idempotente: a nova publicação não duplica o item. Os alunos
+com matrícula ativa são notificados.
 
 **Implementação**: `learn.service.ts::publicarAtividade`.
 
-## RN026 — Correção do Learn e nota do Academy são atômicas
+## RN026 — A correção do Learn e a nota do Academy são atômicas
 
-Corrigir uma entrega exige `learn.classes.corrigir` mais posse da turma. A nota é validada contra o máximo da atividade e propagada ao `ItemAvaliativo` do Academy **na mesma transação**. Se qualquer parte falhar, nem a correção nem a propagação são aplicadas — o estado intermediário "corrigido no Learn mas sem nota no Academy" não existe.
+A correção de entrega exige `learn.classes.corrigir` e vínculo com a turma. A nota é validada contra o máximo da
+atividade e propagada ao `ItemAvaliativo` do Academy **na mesma transação**; em caso de falha em qualquer etapa,
+nenhuma das alterações é aplicada, de modo que não existe o estado "corrigido no Learn sem nota no Academy". O aluno é
+notificado da correção.
 
-**Implementação**: `learn.service.ts`, dentro de `prisma.$transaction`.
+**Implementação**: `learn.service.ts`, em `prisma.$transaction`.
 
-## RN027 — Prazo de entrega é decidido pelo servidor, e reenvio invalida a correção
+## RN027 — O prazo de entrega é determinado pelo servidor, e o reenvio invalida a correção
 
-Entregar exige `learn.student.responder`, matrícula na turma da atividade e atividade publicada. Entrega após o prazo é marcada como atrasada se a atividade permitir atraso, ou rejeitada se não permitir — sempre comparando com o relógio do servidor, nunca com o do cliente. O reenvio é permitido enquanto a atividade aceitar e **sempre invalida a correção anterior** (nota, feedback e corretor são limpos), porque a correção passada se refere a um conteúdo que não é mais o entregue.
+A entrega exige `learn.student.responder`, matrícula na turma da atividade e atividade publicada. A entrega após o
+prazo é marcada como atrasada, se a atividade admitir atraso, ou recusada, em caso contrário, sempre com base no
+relógio do servidor, e nunca no do cliente. O reenvio é permitido enquanto a atividade o admitir e **sempre invalida
+a correção anterior** (nota, parecer e corretor são limpos), pois a correção anterior refere-se a conteúdo que não é
+mais o entregue.
 
-**Implementação**: `learn.service.ts` (criação/atualização de entrega).
+**Implementação**: `learn.service.ts::enviarEntrega`.
 
-## RN028 — Toda cobrança aponta para um Aluno real do Academy
+## RN028 — Toda cobrança referencia um aluno do Academy
 
-Não existe cadastro de "aluno financeiro" paralelo: `Cobranca.alunoId` é FK para o `Aluno` do Academy. É isso que garante que a visão do aluno em `/financeiro/me/*` e a visão da secretaria em `/cobrancas` sejam a mesma informação, e não duas fontes que podem divergir.
+Não há cadastro paralelo de aluno financeiro: `Cobranca.alunoId` é chave estrangeira para o `Aluno` do Academy. Essa
+condição garante que a visão do aluno em `/financeiro/me/*` e a visão da secretaria em `/cobrancas` correspondam à
+mesma informação, e não a fontes passíveis de divergência.
 
-**Implementação**: `schema.prisma` (`Cobranca.alunoId → Aluno.id`); resolução do aluno pelo JWT em `finance.controller.ts` (rotas `/financeiro/me/*`).
+**Implementação**: `schema.prisma` (`Cobranca.alunoId → Aluno.id`); identificação do aluno pelo JWT em
+`finance.controller.ts` (rotas `/financeiro/me/*`).
 
-## RN029 — Geração de mensalidade em lote é idempotente
+## RN029 — A geração de mensalidades em lote é idempotente
 
-Antes de criar cada cobrança, a geração em lote verifica se já existe cobrança daquela competência para aquele aluno, e pula se existir. Isso torna seguro reexecutar a geração depois de uma falha parcial, sem cobrar o aluno duas vezes. O desconto aplicado é sempre o vigente do aluno na data da geração, consultado em `DescontoAluno` com verificação de vigência.
+Antes de criar cada cobrança, a geração em lote verifica a existência de cobrança da mesma competência e serviço para
+o aluno e, se existir, não a recria. A reexecução após falha parcial é, portanto, segura, sem cobrança em duplicidade.
+O desconto aplicado é o vigente para o aluno na data da geração, consultado em `DescontoAluno` com verificação de
+vigência.
 
-**Implementação**: `finance.service.ts`, geração em lote de mensalidade.
+**Implementação**: `finance.service.ts::gerarLoteMensalidades`.
 
-## RN030 — "Vencido" é derivado na leitura, nunca persistido
+## RN030 — O status "vencido" é derivado na leitura, e nunca persistido
 
-Não existe o valor `vencido` na coluna `status`: a condição é "status em aberto **e** vencimento no passado", avaliada na consulta. Persistir esse estado exigiria uma rotina diária para virar o status de cada cobrança na data certa — e qualquer falha dessa rotina deixaria o banco mentindo. Filtrar por `status=vencido` é traduzido para uma cláusula real no banco (não filtrado em memória depois de carregar a página), para não quebrar contagem e paginação.
+O valor `vencido` não é gravado na coluna `status`: a condição corresponde a "status em aberto **e** vencimento
+anterior à data corrente", avaliada na consulta. A persistência desse estado exigiria rotina diária de atualização,
+e qualquer falha dessa rotina tornaria o dado do banco incorreto. O filtro por `status=vencido` é convertido em
+cláusula do banco (e não aplicado em memória após a carga da página), o que preserva a contagem e a paginação.
 
-**Implementação**: `finance.service.ts::whereStatusCobranca`.
+**Implementação**: `finance.service.ts::whereStatusCobranca` e `statusEfetivo`.
 
-## RN031 — Pagamento parcial é aceito e registrado como tal
+## RN031 — O pagamento parcial é aceito e registrado como tal
 
-Marcar como pago registra `valorPago`, `pagoEm` e a forma de pagamento, e move o status para `pago`. **Não há validação de que o valor pago corresponda ao devido**: pagamento parcial é aceito, por decisão operacional — a secretaria financeira precisa conseguir registrar o que de fato entrou. Multa e juros existem como campos e podem ser informados na baixa, mas não são calculados automaticamente a partir do atraso (não há política parametrizável; registrado como melhoria futura).
+A marcação de pagamento registra `valorPago`, `pagoEm` e a forma de pagamento e altera o status para `pago`. **Não há
+validação de correspondência entre o valor pago e o devido**: o pagamento parcial é aceito, por decisão operacional,
+pois a equipe financeira deve registrar o valor efetivamente recebido. Multa e juros podem ser informados
+manualmente ou calculados a partir de política vinculada (RN043).
 
-**Implementação**: `finance.service.ts`, transição de cobrança para paga.
+**Implementação**: `finance.service.ts`, transição da cobrança para paga.
 
-## RN032 — Conclusão de curso Boost e emissão de certificado são automáticas e atômicas
+## RN032 — A conclusão de curso do Boost e a emissão de certificado são automáticas
 
-A matrícula é concluída automaticamente ao atingir 100% de progresso, **na mesma transação** que registra a última aula — não existe marcar como concluída manualmente nem concluir com progresso parcial. Se o curso tiver `emiteCertificado`, o certificado é emitido nesse mesmo momento, com código de verificação único no sistema inteiro. Não há validade, revogação nem página pública de conferência do código (registrado como melhoria futura).
+A matrícula é concluída automaticamente ao atingir 100% de progresso, no mesmo procedimento que registra a última
+aula; não há conclusão manual nem conclusão com progresso parcial. Se o curso emite certificado (RN042), o
+certificado é emitido nesse momento, com código de verificação único em todo o sistema, cuja autenticidade pode ser
+conferida publicamente por `GET /certificados-boost/verificar/:codigo`, com limite de requisições contra a varredura
+de códigos. Não há validade nem revogação de certificado.
 
-**Implementação**: `boost-portal.service.ts` (conclusão de aula) e `certificado-boost.service.ts::emitir`.
+**Implementação**: `boost-portal.service.ts::recalcularProgressoEEmitirCertificado/verificarCertificado` e
+`certificado-boost.service.ts::emitir`.
 
-## RN033 — Acesso ao conteúdo do Boost é por matrícula, não por RBAC
+## RN033 — O acesso ao conteúdo do Boost decorre da matrícula, e não do RBAC
 
-O lado aluno do Boost não usa o RBAC do Hub: o acesso a aulas, materiais e chat é decidido exclusivamente pela existência de uma matrícula real no banco, verificada a cada chamada. Visitante não autenticado vê apenas a prévia pública do curso. Qualquer `BoostUsuario` autenticado pode se matricular em qualquer curso **publicado** (rascunho e arquivado não aceitam matrícula), sem pré-requisito, aprovação do instrutor, limite de vagas ou cobrança — todo curso Boost é gratuito por decisão de escopo. A unicidade de `(boostUsuarioId, cursoId)` impede matrícula duplicada.
+A área do aluno do Boost não utiliza o RBAC do Hub: o acesso a aulas, materiais e conversa é determinado
+exclusivamente pela existência de matrícula, verificada a cada chamada. O visitante não autenticado visualiza apenas a
+prévia pública do curso. Qualquer `BoostUsuario` autenticado e ativo pode matricular-se em qualquer curso
+**publicado** (cursos em rascunho ou arquivados não aceitam matrícula), sem pré-requisito, aprovação, limite de vagas
+ou cobrança, pois todo curso do Boost é gratuito por decisão de escopo. A unicidade de `(boostUsuarioId, cursoId)`
+impede matrícula duplicada.
 
-**Implementação**: `boost-portal.service.ts`, helpers `exigirMatriculaDoCurso`/`exigirMatriculaDaAula`.
+**Implementação**: `boost-portal.service.ts`, métodos `exigirMatriculaDoCurso` e `exigirMatriculaDaAula`.
 
-## RN034 — Token do Hub e token do Boost nunca se aceitam mutuamente
+## RN034 — O token do Hub e o token do Boost não são aceitos reciprocamente
 
-O `BoostPortalController` é marcado `@Public()` na classe inteira, de modo que o `JwtAuthGuard` global não roda, e cada rota é protegida pelo `BoostJwtAuthGuard`, que valida o token contra `boost_usuarios` e exige o claim `tipo: 'boost'`. Um token do Hub é rejeitado no portal, e um token do Boost é rejeitado em qualquer rota do Hub.
+O `BoostPortalController` é marcado com `@Public()` na classe inteira, de modo que o `JwtAuthGuard` global não é
+executado, e cada rota é protegida pelo `BoostJwtAuthGuard`, que valida o token contra `boost_usuarios` e exige a
+declaração `tipo: 'boost'`. O token do Hub é recusado no portal, e o token do Boost é recusado em qualquer rota do Hub.
 
-A razão de não estender os guards globais foi raio de explosão: `JwtAuthGuard` e `PermissionGuard` sustentam a autenticação de todo o resto do sistema, e mexer neles afetaria módulos sem relação nenhuma com o Boost.
+A não extensão dos guards globais decorre do impacto potencial: `JwtAuthGuard` e `PermissionGuard` sustentam a
+autenticação de todo o sistema, e sua alteração afetaria módulos sem relação com o Boost.
 
-**Implementação**: `rooster-boost-portal/boost-jwt-auth.guard.ts`; cobertura e2e nos dois sentidos.
+**Implementação**: `rooster-boost-portal/boost-jwt-auth.guard.ts`, com cobertura e2e nos dois sentidos.
 
-## RN035 — A instituição nunca pode ficar sem administrador
+## RN035 — A instituição não pode ficar sem administrador
 
-Revogar a permissão de administrador, excluir ou desativar o **último administrador ativo** é rejeitado com `409`. Os três caminhos levam ao mesmo resultado irreversível **pela interface**: como "administrador" é quem pode conceder permissões (RN001), perder o último significa que não sobra ninguém capaz de conceder o acesso de volta, e a recuperação passa a exigir acesso direto ao banco. A contagem considera apenas administradores **ativos**, porque usuário inativo não autentica nem resolve permissão.
+A revogação da permissão de administrador, a exclusão e a desativação do **último administrador ativo** são recusadas
+com `409`. Os três caminhos conduzem ao mesmo resultado irreversível **pela interface**: como administrador é quem
+pode conceder permissões (RN001), a perda do último impediria a restituição do acesso, e a recuperação passaria a
+exigir acesso direto ao banco. A contagem considera apenas administradores **ativos**, pois o usuário inativo não se
+autentica nem resolve permissões.
 
-**Implementação**: `roster-hub/shared/administradores.service.ts::assertNaoEhUltimoAdministrador`, chamado em `usuarios.service.ts` (no `update` com `ativo: false` e no `remove`) e em `usuarios-permissoes.service.ts::remove`.
+**Implementação**: `roster-hub/shared/administradores.service.ts::assertNaoEhUltimoAdministrador`, invocado em
+`usuarios.service.ts` (`update` com `ativo: false` e `remove`) e em `usuarios-permissoes.service.ts::remove`.
 
-## RN036 — Vídeo hospedado do Boost é servido por token de vida curta, escopado a uma aula
+## RN036 — O vídeo hospedado do Boost é transmitido por token de curta duração, restrito a uma aula
 
-O vídeo enviado pelo instrutor é gravado em disco no servidor (nunca em serviço externo) e servido com suporte a `Range`, para o player conseguir arrastar a barra sem baixar o arquivo inteiro. A tag `<video>` não anexa o cabeçalho `Authorization`, então a rota de streaming não pode usar a autenticação normal do sistema. Em vez de enfraquecer o guard global (aceitar token por query string em toda rota) ou baixar o vídeo inteiro como Blob (inviável para até 2GB), o acesso é dado por um **token de 5 minutos, escopado a uma única aula**, pedido por um endpoint autenticado normalmente. Para o aluno, esse endpoint ainda exige **matrícula no curso da aula** — o token só existe para quem já provou ter acesso ao conteúdo. Um token emitido para uma aula não serve para pedir o vídeo de outra, mesmo dentro da validade.
+O vídeo enviado é gravado, cifrado, no disco do servidor (e não em serviço externo) e transmitido com suporte a
+`Range`, o que permite ao reprodutor posicionar a reprodução sem transferir o arquivo inteiro. Como o elemento
+`<video>` não envia o cabeçalho `Authorization`, a rota de transmissão não pode utilizar a autenticação usual. Em vez
+de flexibilizar o guard global (aceitação de token na query em todas as rotas) ou transferir o vídeo inteiro como Blob
+(inviável para até 2 GB), o acesso é concedido por **token de 5 minutos, restrito a uma única aula**, obtido em
+endpoint autenticado regularmente. Para o aluno, esse endpoint exige ainda **matrícula no curso da aula**. O token
+emitido para uma aula não é aceito para outra, ainda que dentro da validade.
 
-Substituir um vídeo, removê-lo ou excluir a aula **apaga o arquivo do disco** — diferente de material de apoio e anexo, que hoje deixam o arquivo órfão. Vídeo é a exceção porque um arquivo de até 2GB abandonado a cada substituição esgotaria o disco rápido.
+A substituição ou a remoção do vídeo e a exclusão da aula **removem o arquivo do disco**. Os demais arquivos
+(materiais, anexos e documentos) permanecem em disco após a exclusão do registro (ver
+`docs/engineering/08-divida-tecnica.md`); o vídeo constitui exceção porque um arquivo de até 2 GB abandonado a cada
+substituição esgotaria rapidamente o espaço em disco.
 
-**Implementação**: `common/stream-token.util.ts`, `common/video-stream.util.ts::enviarVideoComRange`, `boost.controller.ts` e `boost-portal.controller.ts` (rotas `stream-token` e `video`), `boost.service.ts::setVideoAula/removeVideoAula`.
+**Implementação**: `common/stream-token.util.ts`, `common/video-stream.util.ts::enviarVideoComRange`,
+`boost.controller.ts` e `boost-portal.controller.ts` (rotas `stream-token` e `video`) e
+`boost.service.ts::setVideoAula/removeVideoAula`.
 
-## RN037 — Progresso de vídeo é real: nunca regride, e completa a aula a partir de 90%
+## RN037 — O progresso de vídeo não regride e conclui a aula a partir de 90%
 
-Ao assistir um vídeo hospedado, o player reporta posição e percentual assistido. O sistema guarda o **maior** percentual já visto — voltar o vídeo não diminui o progresso — e a posição atual, para retomar de onde o aluno parou. Ao cruzar **90%**, a aula é marcada como concluída automaticamente, pelo mesmo caminho do botão manual: recalcula o progresso da matrícula e, se foi a última aula, emite o certificado. O botão manual continua existindo, porque aulas de texto, PDF e link não têm posição de vídeo.
+Durante a reprodução de vídeo hospedado, o reprodutor informa a posição e o percentual assistido. O sistema registra o
+**maior** percentual já assistido (o retrocesso do vídeo não reduz o progresso) e a posição atual, para a retomada da
+reprodução. Ao atingir **90%**, a aula é concluída automaticamente, pelo mesmo procedimento da conclusão manual:
+recálculo do progresso da matrícula e, se for a última aula, emissão do certificado. A conclusão manual permanece
+disponível, pois aulas de texto, PDF e link externo não possuem posição de vídeo.
 
-A contagem de aulas concluídas filtra `concluidoEm` preenchido, e não a mera existência da linha de progresso: com progresso parcial, uma linha pode existir (posição salva) sem a aula estar concluída.
+A contagem de aulas concluídas filtra `concluidoEm` preenchido, e não a mera existência do registro de progresso: com
+o progresso parcial, o registro pode existir (posição armazenada) sem que a aula esteja concluída.
 
-**Implementação**: `boost-portal.service.ts::atualizarProgressoVideo` e `recalcularProgressoEEmitirCertificado` (compartilhado com `concluirAula`).
+**Implementação**: `boost-portal.service.ts::atualizarProgressoVideo` e `recalcularProgressoEEmitirCertificado`
+(compartilhado com `concluirAula`).
 
-## RN038 — Conta externa do Boost pode ser desativada e ter a senha redefinida pelo admin, sem fechar o cadastro
+## RN038 — A conta externa do Boost pode ser desativada e ter a senha redefinida pelo administrador, sem restrição ao cadastro
 
-O cadastro público continua livre e sem aprovação (RN033). O que a RN adiciona é visibilidade e controle: o admin lista as contas externas, desativa uma (que deixa de conseguir logar) e gera uma senha temporária. A gestão é **entre cursos**, então não segue o modelo de posse "dono do curso": usa permissão própria (`/boost/students`) e fica só com o perfil admin — um professor apto a lecionar no Boost não acessa.
+O cadastro público permanece aberto e sem aprovação (RN033). Esta regra acrescenta visibilidade e controle: o
+administrador relaciona as contas externas, desativa uma conta (que deixa de autenticar-se) e gera senha temporária.
+Por ser gestão transversal aos cursos, utiliza permissão própria (`/boost/students`), concedida apenas ao perfil de
+administrador; o professor apto a orientar no Boost não tem acesso.
 
-A senha temporária é aleatória, só o hash é salvo, e o valor em texto plano é devolvido **uma única vez**. Não há fluxo de redefinição por e-mail para conta externa (não existe tabela de token equivalente à do Hub) — simplificação deliberada.
+A senha temporária é aleatória, apenas o hash é armazenado, e o valor em texto claro é devolvido **uma única vez**.
+Não há fluxo de redefinição por e-mail para conta externa (não há tabela de token equivalente à do Hub), por
+simplificação deliberada. As operações são registradas em auditoria.
 
-**Implementação**: `boost.controller.ts` (rotas `boost-alunos-externos`), `boost.service.ts::findAllBoostUsuarios/toggleAtivoBoostUsuario/redefinirSenhaBoostUsuario`.
+**Implementação**: `boost.controller.ts` (rotas `boost-alunos-externos`) e
+`boost.service.ts::findAllBoostUsuarios/toggleAtivoBoostUsuario/redefinirSenhaBoostUsuario`.
 
-## RN039 — Cada usuário lê e marca apenas as próprias notificações, e emitir uma nunca derruba a operação de origem
+## RN039 — Cada usuário lê e marca apenas as próprias notificações, e a emissão não interrompe a operação de origem
 
-A caixa `/notificacoes/minhas` é filtrada pelo usuário do JWT dentro do próprio `where` — inclusive na escrita (`updateMany({ where: { id, usuarioId } })`), de modo que marcar como lida a notificação de outra pessoa responde `404` sem revelar que ela existe. Não exige permissão do catálogo: é dado pessoal do próprio usuário.
+A caixa `/notificacoes/minhas` é filtrada pelo usuário do JWT na própria cláusula `where`, inclusive na escrita
+(`updateMany({ where: { id, usuarioId } })`), de modo que a marcação de notificação de outro usuário resulta em
+`404`, sem revelar sua existência. Não há exigência de permissão do catálogo, por se tratar de dado pessoal do
+próprio usuário.
 
-A emissão (`NotificacoesService.notificar`) engole qualquer falha de propósito: aprovar uma reserva ou gerar uma mensalidade é a operação de negócio, e a notificação é consequência — perdê-la é aceitável, desfazer a operação por causa dela não é. Reserva só notifica o solicitante quando quem age é outra pessoa (não avisa alguém do que ele mesmo acabou de fazer).
+A emissão (`NotificacoesService.notificar`) descarta deliberadamente qualquer falha: a aprovação de uma reserva ou a
+geração de uma mensalidade constitui a operação de negócio, e a notificação é consequência; a perda da notificação é
+aceitável, ao passo que o desfazimento da operação por causa dela não o é. As reservas notificam o solicitante apenas
+quando o autor da ação é outro usuário.
 
-**Implementação**: `notificacoes.service.ts::minhas/marcarLida/marcarTodasLidas/notificar`; emissores em `rooms.service.ts::updateReservaStatus/createMensagemReserva` e `finance.service.ts` (`avisarAluno`).
+**Implementação**: `notificacoes.service.ts::minhas/marcarLida/marcarTodasLidas/notificar`; emissores em
+`rooster-desk.controller.ts`, `rooster-desk.service.ts`, `rooms.service.ts`, `academy.service.ts`,
+`learn.service.ts` e `finance.service.ts`.
 
-## RN040 — O curso do Boost não tem dono: gestão é por permissão, e o professor entra como orientador
+## RN040 — O curso do Boost não possui responsável exclusivo: a gestão é por permissão, e o professor atua como orientador
 
-Quem tem a ação em `/boost/manage` age sobre **qualquer** curso; não existe mais posse por professor (`CursoBoost.professorId` foi removido). O gestor **tira do ar** (`status: arquivado`), o que esconde o curso do catálogo e impede nova matrícula, mas **preserva** o acesso — ao conteúdo e à conversa — de quem já estava matriculado. Professores são vinculados como **orientadores** (`CursoOrientadorBoost`) e só têm acesso à conversa; o vínculo não dá poder de edição nem de ver progresso.
+O usuário com a ação em `/boost/manage` atua sobre **qualquer** curso; não há vínculo de propriedade por professor
+(`CursoBoost.professorId` foi removido). O gestor pode **retirar o curso de publicação** (`status: arquivado`), o que
+o remove do catálogo e impede novas matrículas, mas **preserva** o acesso ao conteúdo e à conversa dos alunos já
+matriculados. Os professores são vinculados como **orientadores** (`CursoOrientadorBoost`) e têm acesso apenas à
+conversa; o vínculo não confere poder de edição nem de consulta ao progresso.
 
-**Implementação**: `boost.controller.ts::exigirPermissao`, `boost.service.ts::definirOrientadores`; migration `20260926120000_boost_gestao_orientadores_conversas` (converte o dono em orientador e rebaixa as permissões de quem era só "professor dono").
+**Implementação**: `boost.controller.ts::exigirPermissao`, `boost.service.ts::definirOrientadores`; migration
+`20260926120000_boost_gestao_orientadores_conversas` (que converteu os antigos responsáveis em orientadores e
+reduziu as permissões dos usuários que eram apenas professores responsáveis).
 
-## RN041 — Conversa contínua por aluno; o orientador só vê as dos cursos a que está vinculado
+## RN041 — A conversa é contínua por aluno, e o orientador acessa apenas as dos cursos a que está vinculado
 
-Há uma `ConversaBoost` por (curso, aluno), criada na primeira consulta do aluno, atendida por qualquer orientador do curso. O orientador precisa da permissão `/boost/conversas` **e** do vínculo com o curso; sem o vínculo, a conversa responde `404` (não revela que existe). O aluno só acessa a **própria** conversa, e só se estiver matriculado. Sem orientador no curso, a mensagem do aluno é recusada com aviso claro em vez de ir para o vazio. "Não lida" é a mensagem da outra ponta sem `lidaEm`.
+Há uma `ConversaBoost` por par (curso, aluno), criada na primeira consulta do aluno e atendida por qualquer
+orientador do curso. O orientador necessita da permissão `/boost/conversas` **e** do vínculo com o curso; sem o
+vínculo, a conversa responde `404`, sem revelar sua existência. O aluno acessa apenas a **própria** conversa, e
+somente se matriculado. Sem orientador no curso, a mensagem do aluno é recusada com aviso descritivo, em vez de ser
+registrada sem destinatário. Considera-se não lida a mensagem da outra parte sem `lidaEm`.
 
-**Implementação**: `boost.service.ts::exigirConversaDoOrientador/findConversasDoOrientador`, `boost-portal.service.ts::obterConversa/createMensagem`, `boost-chat.gateway.ts`.
+**Implementação**: `boost.service.ts::exigirConversaDoOrientador/findConversasDoOrientador`,
+`boost-portal.service.ts::obterConversa/createMensagem` e `boost-chat.gateway.ts`.
 
-## RN042 — Certificado é decisão do curso: pode não existir, e o texto é do gestor
+## RN042 — O certificado é definido pelo curso: pode não existir, e o texto é definido pelo gestor
 
-`emiteCertificado` desligado transforma o curso em **material de apoio**: a matrícula conclui em 100% normalmente, mas nenhum certificado é emitido. A configuração (chave, texto com `{aluno}`, `{curso}`, `{cargaHoraria}`, `{data}` e carga horária) tem ação própria, `certificado`, e **não** passa pelo PATCH genérico do curso — quem edita o curso não muda o certificado por tabela. Vale para quem conclui depois da mudança; certificados já emitidos não são reescritos.
+Com `emiteCertificado` desativado, o curso constitui **material de apoio**: a matrícula é concluída normalmente ao
+atingir 100%, mas nenhum certificado é emitido. A configuração (ativação, texto com `{aluno}`, `{curso}`,
+`{cargaHoraria}` e `{data}` e carga horária) possui ação própria, `certificado`, e **não** é realizada pela edição
+genérica do curso, de modo que quem edita o curso não altera o certificado indiretamente. A alteração aplica-se às
+conclusões posteriores; os certificados já emitidos não são reescritos.
 
-**Implementação**: `boost.service.ts::configurarCertificado`, `certificado-boost.service.ts` (`aplicarModelo`), `boost-portal.service.ts` (emissão condicionada a `emiteCertificado`).
+**Implementação**: `boost.service.ts::configurarCertificado`, `certificado-boost.service.ts` (`aplicarModelo`) e
+`boost-portal.service.ts` (emissão condicionada a `emiteCertificado`).
 
-## RN043 — Multa/juros manuais sempre vencem sobre a política vinculada, e o cálculo por política nunca é persistido
+## RN043 — Multa e juros informados manualmente prevalecem sobre a política vinculada, e o cálculo por política não é persistido
 
-O financeiro cria as próprias regras de multa/juros (`PoliticaMultaJuros`: percentual de multa, percentual de juros por dia, dias de carência), vinculadas a um `Servico` (herdada por toda cobrança gerada a partir dele, ex.: mensalidade) ou diretamente a uma `Cobranca`. Se as colunas `multa`/`juros` da cobrança foram definidas manualmente (> 0), elas **sempre** vencem — a política vinculada é ignorada para aquela cobrança. Sem valor manual e com política vinculada, o valor devido é calculado dinamicamente a partir de `vencimento`/hoje/carência **na leitura**, nunca gravado na cobrança (mesma disciplina da RN030: "vencido" é sempre derivado) — editar a política depois muda o valor de toda cobrança em aberto que a usa, sem precisar migrar dado. Excluir uma política em uso (por serviço ou por cobrança) é bloqueado.
+A equipe financeira define as próprias regras de multa e juros (`PoliticaMultaJuros`: percentual de multa,
+percentual de juros diários e dias de carência), vinculadas a um `Servico` (herdadas por toda cobrança gerada a partir
+dele, como a mensalidade) ou diretamente a uma `Cobranca`. Se as colunas `multa` e `juros` da cobrança foram
+definidas manualmente (valor maior que zero), elas **sempre** prevalecem, e a política vinculada é desconsiderada
+para aquela cobrança. Sem valor manual e com política vinculada, o valor devido é calculado dinamicamente a partir do
+vencimento, da data corrente e da carência **na leitura**, sem gravação na cobrança (mesmo princípio da RN030); a
+alteração posterior da política modifica, portanto, o valor de toda cobrança em aberto que a utiliza, sem migração de
+dados. A exclusão de política em uso (por serviço ou por cobrança) é recusada.
 
-**Implementação**: `finance.service.ts::valorDevido` (prioridade manual → cálculo por política → nenhum dos dois), `createPoliticaMultaJuros`/`removePoliticaMultaJuros`; migration `20260928090000_multa_juros_turma_auditoria_notificacao_rota`.
+**Implementação**: `finance.service.ts::valorDevido` (prioridade: valor manual, cálculo por política, nenhum dos
+dois) e `createPoliticaMultaJuros/removePoliticaMultaJuros`; migration
+`20260928090000_multa_juros_turma_auditoria_notificacao_rota`.
 
-## RN044 — Vínculo de Reserva com Turma é por posse do professor, ou por gestão ampla do Academy
+## RN044 — O vínculo de reserva com turma exige ser o professor da turma ou possuir gestão ampla do Academy
 
-Ao criar uma reserva marcada como finalidade "aula", é possível vincular uma `Turma` (`Reserva.turmaId`, opcional). Quem tem `/academy/manage acessar` vincula qualquer turma; sem essa permissão ampla, só é possível vincular uma turma da qual o próprio usuário é o professor — vincular a turma de outro professor responde `403`. Não existe uma permissão de tela nova para isso: é a mesma regra de posse que já vale para o restante do Academy (RN021), aplicada a um campo opcional do formulário de reserva já existente.
+Na criação de reserva com finalidade de aula, é possível vincular uma `Turma` (`Reserva.turmaId`, opcional). O
+usuário com `/academy/manage acessar` vincula qualquer turma; sem essa permissão ampla, apenas turma em que o próprio
+usuário é o professor, e a vinculação de turma de outro professor resulta em `403`. Não há permissão de tela
+específica: aplica-se a mesma regra de vínculo do restante do Academy (RN021) a campo opcional do formulário de
+reserva existente.
 
-**Implementação**: `rooms.controller.ts::exigirTurmaValida`, `academy.service.ts::isTurmaDoProfessor`; migration `20260928090000_multa_juros_turma_auditoria_notificacao_rota`.
+**Implementação**: `rooms.controller.ts::exigirTurmaValida` e `academy.service.ts::isTurmaDoProfessor`; migration
+`20260928090000_multa_juros_turma_auditoria_notificacao_rota`.
