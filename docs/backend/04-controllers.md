@@ -1,53 +1,112 @@
 # Controllers
 
-Status: cada controller foi lido integralmente. Este documento descreve responsabilidade, não rota-a-rota (isso é escopo de `docs/api/`).
+Situação: cada controller foi lido integralmente (revisão de 01/10/2026). Este documento descreve
+responsabilidades; a relação rota a rota encontra-se em `docs/api/02-endpoints.md`.
 
 ## Rooster Hub
 
-- **`AuthController`** (`usuarios.controller.ts`) — único endpoint público do domínio de negócio: `POST /auth/login`. Delega 100% para `UsuariosService.login`.
-- **`UsuariosController`** — CRUD de usuário + dois endpoints de leitura de acesso efetivo (`/usuarios/:id/acesso`, `/usuarios/:id/acesso/verificar`). Não contém regra de negócio própria além de traduzir `null`/`undefined` do service em `NotFoundException`.
-- **`SetoresController`** — CRUD simples de setor. Sem regra de negócio no controller.
-- **`ModulosController`** — CRUD do catálogo de módulos do sistema. Ações de escrita exigem a permissão `gerenciar-permissoes` em `/hub/acessos` (é tratado como parte da administração de RBAC, não como cadastro livre).
-- **`PermissoesController`** — CRUD do catálogo de permissões. Mesma exigência de `gerenciar-permissoes`.
-- **`UsuariosPermissoesController`** — concede (`POST`) e revoga (`DELETE`) o vínculo direto usuário↔permissão. Ações usam as permissões dedicadas `conceder`/`revogar` em `/hub/acessos`.
-- **`UsuariosSetoresController`** — CRUD do vínculo usuário↔setor, sob a ação `gerenciar-usuarios` em `/hub/setores`.
-- **`NotificacoesController`** — CRUD administrativo de notificação (criação e remoção exigem `gerenciar-permissoes`; leitura e atualização, `acessar` em `/hub`) **mais** a caixa de entrada pessoal `/notificacoes/minhas*` (listar, marcar lida, marcar todas), aberta a qualquer usuário autenticado e sempre restrita ao dono pelo JWT.
-- **`SessoesController`** — CRUD da tabela `sessoes`; todas as ações exigem `gerenciar-permissoes` em `/hub/acessos`. Não é chamado pelo fluxo de login (ver `09-autenticacao.md`).
-- **`LogsAuditoriaController`** — CRUD da tabela `logs_auditoria`; todas as ações exigem `gerenciar-permissoes`. **A escrita real é automática**: `AuditoriaService::registrar` (`src/roster-hub/shared/auditoria.service.ts`) é chamado pelos próprios services do Hub (login, CRUD de usuário, concessão/revogação de permissão, redefinição de senha) sem que o chamador precise fazer nada — o CRUD deste controller é usado para leitura e manutenção administrativa. Ver `12-logs.md` e RN016.
+- **`AuthController`** (`usuarios.controller.ts`): rotas públicas de autenticação (`POST /auth/login`,
+  `/auth/esqueci-senha`, `/auth/redefinir-senha`, `/auth/refresh` e `/auth/logout`), com limite de requisições
+  próprio, exceto o logout. Delega integralmente ao `UsuariosService`.
+- **`UsuariosController`**: CRUD de usuário e dois endpoints de consulta do acesso efetivo
+  (`/usuarios/:id/acesso` e `/usuarios/:id/acesso/verificar`). Não contém regra de negócio própria além da
+  conversão de retorno nulo do service em `NotFoundException`.
+- **`SetoresController`**: CRUD de setor, sem regra de negócio no controller.
+- **`ModulosController`**: CRUD do catálogo de módulos do sistema. As ações de escrita exigem a permissão
+  `gerenciar-permissoes` em `/hub/acessos`, pois integram a administração do RBAC.
+- **`PermissoesController`**: CRUD do catálogo de permissões, com a mesma exigência de `gerenciar-permissoes`.
+- **`UsuariosPermissoesController`**: concede (`POST`) e revoga (`DELETE`) o vínculo direto usuário–permissão, com
+  as permissões dedicadas `conceder` e `revogar` em `/hub/acessos`.
+- **`UsuariosSetoresController`**: CRUD do vínculo usuário–setor, sob a ação `gerenciar-usuarios` em `/hub/setores`.
+- **`NotificacoesController`**: CRUD administrativo de notificações (criação e remoção exigem
+  `gerenciar-permissoes`; leitura e atualização, `acessar` em `/hub`) e a caixa de entrada pessoal
+  `/notificacoes/minhas*` (listagem, marcação individual e marcação de todas como lidas), acessível a qualquer
+  usuário autenticado e sempre restrita ao titular identificado pelo JWT.
+- **`SessoesController`**: CRUD administrativo da tabela `sessoes`, que armazena as sessões de refresh token; todas
+  as ações exigem `gerenciar-permissoes` em `/hub/acessos`. A criação e a revogação das sessões no uso regular são
+  realizadas pelo fluxo de autenticação (ver `09-autenticacao.md`).
+- **`LogsAuditoriaController`**: relatório, exportação em CSV e CRUD administrativo da tabela `logs_auditoria`. A
+  gravação dos eventos é automática: `AuditoriaService.registrar` (`src/roster-hub/shared/auditoria.service.ts`) é
+  invocado pelos próprios services (login, cadastro de usuário, concessão e revogação de permissão, redefinição de
+  senha, operações financeiras, lançamento de notas, entre outros). Ver `12-logs.md` e RN016.
+- **`LogsErroController`**: relatório, exportação em CSV e consulta dos registros de `logs_erro`, gerados
+  exclusivamente pelo `AllExceptionsFilter`. Somente leitura.
+- **`ConfiguracoesController`**: consulta do estado do envio de e-mail e envio de mensagem de teste.
 
 ## Rooster Desk
 
-- **`RoosterDeskController`** — controller único e extenso que concentra **toda** a superfície HTTP do Desk: categorias, subcategorias, prioridades, status, chamados, atribuição de técnico/atendentes, mensagens do chamado, anexos, histórico, avaliações. Diferente dos controllers do Hub, aqui o controller carrega regra de negócio própria, não só tradução de erro:
-  - Métodos privados `requireManagement`, `requireTicketAction`, `registrarHistoricoTicket`, `statusTransitionAction` implementam autorização contextual (setor do gestor) e a gravação do histórico de mudança de campo do chamado — ver `05-services.md` para o detalhe de por que isso está no controller e não no service.
-  - Usa **só rotas em português** (`chamados`, `chamados-categorias`, `chamados-subcategorias`, `chamados-status`, `chamados-prioridades`). Os antigos aliases em inglês (`/tickets`, `/categorias-tickets`, etc.) foram removidos na limpeza de código morto de setembro/2026 — parte deles nem herdava o `@RequirePermission` do handler original, o que abria as rotas para qualquer usuário autenticado. Ver `docs/engineering/08-divida-tecnica.md`.
+- **`RoosterDeskController`**: controller único que concentra **toda** a superfície HTTP do Desk: categorias,
+  subcategorias, prioridades, status, chamados, atribuição de técnico e de atendentes, mensagens, anexos,
+  histórico e avaliações. Ao contrário dos controllers do Hub, contém regra de negócio própria:
+  - os métodos privados `requireManagement`, `requireTicketAction`, `registrarHistoricoTicket` e
+    `statusTransitionAction` implementam a autorização contextual (setor do gestor) e o registro do histórico de
+    alterações do chamado, incluindo a notificação ao técnico que passa a ser responsável; ver `05-services.md` para
+    a justificativa de sua permanência no controller;
+  - utiliza **apenas rotas em português** (`chamados`, `chamados-categorias`, `chamados-subcategorias`,
+    `chamados-status` e `chamados-prioridades`). Os aliases em inglês (`/tickets`, `/categorias-tickets` etc.) foram
+    removidos em setembro de 2026; parte deles não herdava o `@RequirePermission` do handler original, o que
+    expunha as rotas a qualquer usuário autenticado. Ver `docs/engineering/08-divida-tecnica.md`.
 
 ## Rooster Rooms
 
-- **`RoomsController`** — controller único cobrindo campus, blocos, ambientes (incluindo árvore de estrutura e disponibilidade de horário) e reservas (incluindo conversa/mensagens). Contém o método privado `requireReservaAccess`, que decide se quem chama pode alterar uma reserva: ou tem a permissão de gestão (`/rooms/manage`), ou é o dono da reserva e tem a permissão de solicitante (`/rooms/reservations`) — não dá para expressar essa regra com um único `@RequirePermission` estático, por isso a checagem é feita no controller.
+- **`RoomsController`**: controller único para campus, blocos, ambientes (incluindo árvore de estrutura e
+  disponibilidade de horário) e reservas (incluindo mensagens e séries recorrentes). Contém os métodos privados
+  `requireReservaAccess`, que determina se o autor da requisição pode alterar uma reserva (possui a permissão de
+  gestão em `/rooms/manage` ou é o responsável pela reserva e possui a permissão de solicitante em
+  `/rooms/reservations`), `assertDentroDoPrazo` (limite de antecedência) e `exigirTurmaValida` (vínculo com turma).
+  Essas regras não podem ser expressas por um único `@RequirePermission` estático, razão pela qual a verificação é
+  realizada no controller.
 
 ## Rooster Assets
 
-- **`AssetsController`** — controller único cobrindo categorias de patrimônio, setores de patrimônio, patrimônio (incluindo baixa) e movimentações. Sem lógica de autorização contextual própria (diferente de Desk/Rooms) — usa só `@RequirePermission` estático por rota; toda a regra de negócio (transições de status, validação de destino) fica no service.
+- **`AssetsController`**: controller único para categorias de patrimônio, setores de patrimônio, patrimônios
+  (incluindo baixa) e movimentações. Não possui autorização contextual própria (diferentemente de Desk e Rooms):
+  utiliza apenas `@RequirePermission` estático por rota, e toda a regra de negócio (transições de status e validação
+  de destino) reside no service.
 
 ## Rooster Academy
 
-- **`AcademyController`** — cobre cursos, períodos letivos, disciplinas, professores, alunos, turmas, matrículas, frequência em lote, itens avaliativos e notas, calendário e documentos acadêmicos; e também as rotas `/me/*` do portal do aluno (módulo de permissão `Rooster Student`). Implementa os helpers privados `exigirEscopoTurma`/`exigirDonoOuGestor`, que fazem a checagem de **posse de turma**: ter a permissão da ação não basta — o professor precisa ser o `professorId` daquela turma, e o aluno precisa estar matriculado nela. Aluno é sempre resolvido pelo `usuarioId` do JWT, nunca por parâmetro de rota.
+- **`AcademyController`**: abrange cursos, períodos letivos, disciplinas, professores, alunos, turmas, matrículas,
+  frequência em lote, itens avaliativos e notas, calendário e documentos acadêmicos, além das rotas `/me/*` do
+  portal do aluno (módulo de permissão `Rooster Student`). Implementa os métodos privados `exigirEscopoTurma` e
+  `exigirDonoOuGestor`, que verificam o **vínculo com a turma**: a permissão da ação não é suficiente; o professor
+  deve ser o `professorId` da turma, e o aluno deve estar nela matriculado. O aluno é sempre identificado pelo
+  `usuarioId` do JWT, e nunca por parâmetro de rota.
 
 ## Rooster Learn
 
-- **`LearnController`** — atividades (rascunho → publicada → encerrada/arquivada), entregas do aluno (texto + anexo) e correção com nota/feedback. Replica a mesma dupla `exigirEscopoTurma`/`exigirDonoOuGestor` do Academy (não compartilhada, duplicada de propósito). A correção propaga a nota para o `ItemAvaliativo` do Academy na mesma transação.
+- **`LearnController`**: atividades (rascunho, publicada, encerrada ou arquivada), entregas do aluno (texto e
+  anexo) e correção com nota e parecer. Possui implementação própria dos métodos `exigirEscopoTurma` e
+  `exigirDonoOuGestor`, equivalentes aos do Academy (duplicação deliberada, para manter os módulos independentes). A
+  correção propaga a nota ao `ItemAvaliativo` do Academy na mesma transação.
 
 ## Rooster Boost
 
-- **`BoostController`** (lado instrutor) — CRUD de curso, módulo, aula e material de apoio, progresso da turma e chat do curso. Autenticado pelo `JwtAuthGuard` global e autorizado por `@RequirePermission(Rooster Boost, /boost/manage, ...)`, com a mesma checagem de posse do Academy: professor só gerencia o próprio curso.
-- **`BoostPortalController`** (lado aluno externo) — marcado `@Public()` na classe inteira, de forma que o `JwtAuthGuard` global **não roda**; a proteção é feita rota a rota pelo `BoostJwtAuthGuard`, que valida o token contra `boost_usuarios` e exige o claim `tipo: 'boost'`. Autorização aqui é 100% por posse de matrícula (`exigirMatriculaDoCurso`/`exigirMatriculaDaAula`), sem nenhuma relação com o RBAC do Hub.
+- **`BoostController`** (instrutor): cursos, módulos, aulas, materiais de apoio, vídeos hospedados, configuração de
+  certificado, orientadores, progresso dos alunos, conversas com os alunos e administração das contas externas.
+  Autenticado pelo `JwtAuthGuard` global e autorizado por `@RequirePermission` ou pelo método privado
+  `exigirPermissao` sobre `/boost/manage`. Não há responsável exclusivo por curso: qualquer usuário com a permissão
+  atua sobre qualquer curso; o vínculo de orientador restringe apenas o acesso às conversas.
+- **`BoostPortalController`** (aluno externo): marcado com `@Public()` na classe inteira, de modo que o
+  `JwtAuthGuard` global **não é executado**; a proteção é realizada rota a rota pelo `BoostJwtAuthGuard`, que valida
+  o token contra `boost_usuarios` e exige a declaração `tipo: 'boost'`. A autorização baseia-se exclusivamente na
+  titularidade da matrícula (`exigirMatriculaDoCurso` e `exigirMatriculaDaAula`, no `BoostPortalService`), sem
+  relação com o RBAC do Hub.
 
 ## Rooster Finance
 
-- **`FinanceController`** — produtos, serviços, descontos e sua atribuição a alunos, cobranças (criar, marcar pago, negociar, cancelar, exportar), geração de mensalidade em lote, emissão de boleto e de nota fiscal, relatórios e dashboard; mais as rotas `/financeiro/me/*` do portal do aluno. A única checagem manual é `exigirLeituraCobrancas`, que aceita `acessar` em `/finance/charges` **ou** `/finance/tuitions` **ou** `/finance` — as duas primeiras telas são visões diferentes do mesmo recurso `Cobranca`.
+- **`FinanceController`**: produtos, serviços, descontos e sua atribuição a alunos, políticas de multa e juros,
+  cobranças (criação, marcação como paga, negociação, cancelamento e exportação), geração de mensalidades em lote,
+  emissão de boleto e de nota fiscal, relatórios e painel, além das rotas `/financeiro/me/*` do portal do aluno. A
+  única verificação manual é `exigirLeituraCobrancas`, que aceita `acessar` em `/finance/charges`,
+  `/finance/tuitions` ou `/finance`; as duas primeiras telas são visões distintas do mesmo recurso `Cobranca`.
 
-## Padrão comum a todos os controllers de negócio
+## Padrão comum aos controllers de negócio
 
 - `@UseGuards(PermissionGuard)` no nível do controller (o `JwtAuthGuard` já é global).
-- `@RequirePermission(modulo, recurso, acao)` por handler. Quando um handler não declara o decorator, o `PermissionGuard` deixa passar (ele só age quando há metadado) — por isso a remoção dos antigos aliases do Desk também fechou uma brecha real de autorização. Ver `10-autorizacao-rbac.md`.
-- Tradução de retorno `null`/exceção de "não encontrado" do service em `NotFoundException` do NestJS quando o service não lança a exceção ele mesmo.
+- `@RequirePermission(modulo, recurso, acao)` por handler. Quando o handler não declara o decorator, o
+  `PermissionGuard` permite a passagem, pois atua somente na presença do metadado; por isso, a remoção dos aliases
+  do Desk eliminou também uma falha de autorização. Ver `10-autorizacao-rbac.md`.
+- Conversão de retorno nulo ou de ausência de registro em `NotFoundException` quando o service não lança a exceção.
+- Nas rotas de upload, `@RequirePermission` é avaliado antes do recebimento do arquivo, e o conteúdo recebido é
+  verificado por assinatura binária antes da gravação cifrada.

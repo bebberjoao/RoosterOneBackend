@@ -1,38 +1,67 @@
 # Logs
 
-Três coisas diferentes chamadas de "log" neste sistema — não confundir:
+O sistema emprega o termo "log" para três mecanismos distintos, descritos a seguir.
 
-## 1. Log de aplicação (`Logger` do NestJS)
+## 1. Log da aplicação (`Logger` do NestJS)
 
-Usado em só 3 arquivos do backend, todos via `new Logger(NomeDaClasse.name)`:
+Formato: em produção (`NODE_ENV=production`), o log é emitido em **JSON, uma linha por evento**, com nível,
+contexto, mensagem e data (`ConsoleLogger({ json: true })`, `src/main.ts`), formato apto à ingestão por agregador de
+logs; nos demais ambientes, utiliza-se o formato legível padrão do NestJS.
 
-- `src/mail/mail.service.ts` — registra em `warn` o conteúdo do e-mail (incluindo qualquer link, ex.: o de redefinição de senha) quando `SMTP_HOST` não está configurado, em vez de enviar de verdade. É o principal canal de observação do fluxo de e-mail em desenvolvimento.
-- `src/rooster-desk/mensagens.gateway.ts` — eventos de conexão/erro do WebSocket.
-- `src/roster-hub/shared/auditoria.service.ts` — registra em `error` quando a própria gravação de auditoria falha (para não perder o erro silenciosamente, já que a falha de auditoria não pode derrubar a operação principal).
+O `Logger` é instanciado (`new Logger(...)`) nos seguintes arquivos:
 
-Fora desses 3 arquivos, o único log é o log padrão de bootstrap do NestJS (mapeamento de rotas, módulos carregados) — não há logging estruturado de requisição/resposta, nem correlação de id de requisição.
+- `src/main.ts`: aviso de inicialização em produção sem origem de CORS configurada.
+- `src/mail/mail.service.ts`: registra em nível `warn` o conteúdo do e-mail (inclusive links, como o de redefinição
+  de senha) quando `SMTP_HOST` não está configurado, em lugar do envio. Constitui o principal meio de observação do
+  fluxo de e-mail em desenvolvimento.
+- `src/rooster-desk/mensagens.gateway.ts` e `src/rooster-boost/boost-chat.gateway.ts`: eventos de conexão e
+  desconexão dos WebSockets (nível `debug`).
+- `src/roster-hub/shared/auditoria.service.ts`: registra em nível `error` a falha na gravação de auditoria, que não
+  pode interromper a operação principal e, por isso, não é propagada.
+
+Além desses pontos, há o log padrão de inicialização do NestJS (mapeamento de rotas e módulos carregados). Não há
+log de cada requisição e resposta nem identificador de correlação entre as linhas de uma mesma requisição.
 
 ## 2. Log de auditoria (`LogAuditoria`, tabela no banco)
 
-Não é um log de arquivo/console — é uma tabela (`logs_auditoria`) com CRUD próprio e escrita automática via `AuditoriaService::registrar`. Revisado por completo em setembro/2026 (item aberto do Índice de Pendências) para confirmar cobertura real; hoje é chamada a partir de:
+Não se trata de log em arquivo ou console, e sim da tabela `logs_auditoria`, alimentada automaticamente por
+`AuditoriaService.registrar`. Os pontos de gravação são:
 
-- `UsuariosService`/`UsuariosPermissoesService` (Hub) — login (sucesso/falha), logout, renovação de sessão, criação/edição/exclusão de usuário, concessão/revogação de permissão, redefinição de senha (por token ou por admin).
-- `AcademyService` — lançamento de nota (`nota_lancada`).
-- `FinanceService` — cobrança marcada como paga, renegociada ou cancelada (`cobranca_marcada_paga`/`cobranca_renegociada`/`cobranca_cancelada`).
-- `BoostService` — ativação/desativação de conta externa e redefinição de senha de conta externa (`conta_externa_ativada`/`conta_externa_desativada`/`conta_externa_senha_redefinida`).
+- `UsuariosService` e `UsuariosPermissoesService` (Hub): login (`login_sucesso` e `login_falhou`), renovação de
+  sessão (`sessao_renovada`), `logout`, criação, edição e exclusão de usuário (`usuario_criado`, `usuario_editado` e
+  `usuario_excluido`), redefinição de senha pelo administrador (`senha_redefinida_por_admin`), solicitação e
+  conclusão da recuperação de senha (`redefinicao_senha_solicitada` e `senha_redefinida_por_token`), concessão e
+  revogação de permissão (`permissao_concedida` e `permissao_revogada`).
+- `AcademyService`: lançamento de nota (`nota_lancada`).
+- `FinanceService`: cobrança marcada como paga, renegociada ou cancelada (`cobranca_marcada_paga`,
+  `cobranca_renegociada` e `cobranca_cancelada`).
+- `BoostService`: ativação, desativação e redefinição de senha de conta externa (`conta_externa_ativada`,
+  `conta_externa_desativada` e `conta_externa_senha_redefinida`).
 
-Campos gravados: `usuarioId`, `modulo`, `acao`, `entidade`, `entidadeId`, `ip`, `navegador`, `criadoEm`. Falha ao gravar é capturada e só vai para o log de aplicação (item 1) — nunca propaga erro para quem chamou.
+Campos gravados: `usuarioId`, `modulo`, `acao`, `entidade`, `entidadeId`, `ip`, `navegador` e `criadoEm`. A falha
+de gravação é capturada e registrada apenas no log da aplicação (item 1), sem propagação ao chamador.
 
-**Inconsistência conhecida, não corrigida:** nas chamadas de Hub (`UsuariosService`/`UsuariosPermissoesService`), `usuarioId` grava o **sujeito** da ação (ex.: o usuário cujo login falhou, cuja permissão foi concedida) — não necessariamente quem executou a ação (o admin que concedeu). Nas chamadas novas de Academy/Finance/Boost, `usuarioId` grava o **ator** (quem executou). Corrigir a inconsistência do Hub exigiria tocar vários call sites já em produção; ficou registrado aqui e no Índice de Pendências para uma correção futura deliberada, não silenciosa.
+**Semântica de `usuarioId`**: o campo identifica o **autor** da ação. Nas operações administrativas do Hub (criação,
+edição e exclusão de usuário; concessão e revogação de permissão), o autor é o administrador autenticado, e o
+usuário afetado consta em `entidadeId` (com `entidade: 'usuario'`). Nos eventos de autenticação (login, renovação,
+logout e recuperação de senha), autor e usuário afetado coincidem. Até 30/09/2026, as operações administrativas do
+Hub gravavam o usuário afetado em `usuarioId`, em divergência com Academy, Finance e Boost; a correção está coberta
+por teste e2e (`test/app.e2e-spec.ts`, cadastro de usuário).
 
-Relatório e exportação: `GET /logs-auditoria/relatorio` e `/exportar` (permissão `hub.acessos.relatorio-auditoria`) — total do período, distribuição por módulo/ação, usuários mais ativos, 50 eventos mais recentes. Ver `docs/system/04-regras-de-negocio.md` (RN016) e `docs/security/`.
+Relatório e exportação: `GET /logs-auditoria/relatorio` e `GET /logs-auditoria/exportar` (permissão
+`hub.acessos.relatorio-auditoria`), com total do período, distribuição por módulo e por ação, usuários mais ativos
+e os 50 eventos mais recentes. Ver `docs/system/04-regras-de-negocio.md` (RN016) e `docs/security/`.
 
 ## 3. Rastreamento de erros (`LogErro`, tabela no banco)
 
-Também não é um log de arquivo/console — é a tabela `logs_erro`, mas ao contrário de `LogAuditoria` ela **não tem nenhum call site manual**: é alimentada só pelo filtro global `AllExceptionsFilter` (`src/common/all-exceptions.filter.ts`), que grava toda exceção com status HTTP `>= 500` (bug de verdade, nunca uma recusa esperada como 400/403/404). Ver `docs/backend/11-tratamento-erros.md` para o mecanismo completo e `docs/security/03-rbac.md` para a permissão do relatório (`hub.acessos.relatorio-erros`).
+Também não se trata de log em arquivo ou console, e sim da tabela `logs_erro`. Ao contrário de `LogAuditoria`, não há
+gravação explícita nos services: a tabela é alimentada exclusivamente pelo filtro global `AllExceptionsFilter`
+(`src/common/all-exceptions.filter.ts`), que registra toda exceção com status HTTP igual ou superior a 500 (defeito),
+e nunca as recusas esperadas, como 400, 403, 404 ou 409. Ver `11-tratamento-erros.md` para o mecanismo completo e
+`docs/security/03-rbac.md` para a permissão do relatório (`hub.acessos.relatorio-erros`).
 
-## Não identificado
+## Limitações
 
-- Nenhuma ferramenta de observabilidade externa (Sentry, Datadog, ELK, etc.) — `LogErro` é uma aproximação simples, interna ao próprio banco, não um substituto.
-- Nenhum log estruturado em JSON.
-- Nenhuma correlação de requisição (request id) entre as linhas de log de uma mesma chamada.
+- Não há ferramenta externa de observabilidade (Sentry, Datadog, ELK etc.); `LogErro` é uma solução interna e
+  simplificada, armazenada no próprio banco, e não um substituto dessas ferramentas.
+- Não há identificador de correlação (request id) entre as linhas de log de uma mesma requisição.

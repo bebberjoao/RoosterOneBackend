@@ -6,9 +6,11 @@ import {
   NotFoundException,
   Param,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { CreateUsuarioPermissaoDto } from './dto/create-usuario-permissao.dto';
 import { UsuariosPermissoesService } from './usuarios-permissoes.service';
 import { PermissionGuard } from '../../auth/permission.guard';
@@ -25,8 +27,8 @@ export class UsuariosPermissoesController {
 
   @Post()
   @RequirePermission(MODULO, TELA, 'conceder')
-  create(@Body() createUsuarioPermissaoDto: CreateUsuarioPermissaoDto) {
-    return this.usuariosPermissoesService.create(createUsuarioPermissaoDto);
+  create(@Body() createUsuarioPermissaoDto: CreateUsuarioPermissaoDto, @Req() request: Request) {
+    return this.usuariosPermissoesService.create(createUsuarioPermissaoDto, request.user?.id);
   }
 
   @Get()
@@ -47,8 +49,8 @@ export class UsuariosPermissoesController {
 
   @Delete(':id')
   @RequirePermission(MODULO, TELA, 'revogar')
-  async remove(@Param('id') id: string) {
-    const vinculo = await this.usuariosPermissoesService.remove(id);
+  async remove(@Param('id') id: string, @Req() request: Request) {
+    const vinculo = await this.usuariosPermissoesService.remove(id, request.user?.id);
     if (!vinculo) {
       throw new NotFoundException(`Vínculo com id ${id} não encontrado.`);
     }

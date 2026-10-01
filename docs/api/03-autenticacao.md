@@ -7,7 +7,8 @@
 Controller: `AuthController.login` (`src/roster-hub/usuarios/usuarios.controller.ts`).
 Service: `UsuariosService.login` (`src/roster-hub/usuarios/usuarios.service.ts`).
 
-As rotas de autenticação estão sujeitas a limite de requisições próprio (8 por minuto por origem).
+As rotas de login, recuperação de senha, redefinição de senha e renovação de sessão estão sujeitas a limite de
+requisições próprio (8 por minuto por endereço IP); o logout está sujeito apenas ao limite global.
 
 ### Corpo da requisição (`LoginDto`)
 
@@ -145,7 +146,7 @@ por **erro de rede**, a sessão é preservada, pois a instabilidade de conexão 
 | Campo | Tipo | Regras |
 |---|---|---|
 | `token` | string | `@IsString()`, `@IsNotEmpty()` (token recebido por e-mail) |
-| `novaSenha` | string | `@IsString()`, `Length(6, 200)` |
+| `novaSenha` | string | `@IsString()`, `Length(8, 200)` |
 
 ### Resposta 200
 
@@ -158,6 +159,6 @@ por **erro de rede**, a sessão é preservada, pois a instabilidade de conexão 
 | Situação | Status | Exceção |
 |---|---|---|
 | Token inexistente, já utilizado (`usadoEm` preenchido) ou expirado (`expiraEm` anterior ao momento atual) | 400 | `BadRequestException('Link de redefinição inválido ou expirado.')` |
-| Corpo inválido (`novaSenha` fora do intervalo de 6 a 200 caracteres ou `token` vazio) | 400 | `ValidationPipe` |
+| Corpo inválido (`novaSenha` fora do intervalo de 8 a 200 caracteres ou `token` vazio) | 400 | `ValidationPipe` |
 
 Após a redefinição, o token é marcado como utilizado (`usadoEm`) e não pode ser reaproveitado.

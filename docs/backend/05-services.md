@@ -1,48 +1,121 @@
 # Services
 
-Status: cada service foi lido integralmente. Onde a lógica mora de fato foi confirmado linha a linha — não presumido pelo nome do arquivo.
+Situação: cada service foi lido integralmente; a localização de cada regra foi confirmada no código, e não
+presumida pelo nome do arquivo (revisão de 01/10/2026).
 
 ## `UsuariosService` (`src/roster-hub/usuarios/usuarios.service.ts`)
 
-Serviço mais importante do RBAC. Concentra:
+Service central do RBAC. Concentra:
 
-- **CRUD** de usuário, com hash de senha via `bcryptjs` (`SALT_ROUNDS = 10`) em `create`/`update`.
-- **`login(email, senha)`**: valida credenciais, atualiza `ultimoLogin`, retorna `{ usuario, acesso, accessToken }`. `accessToken` é assinado com `{ sub: usuario.id, email: usuario.email }`.
-- **`getAccess(id)`**: carrega o usuário com `permissoes.permissao.modulo` e monta a lista de permissões e módulos efetivos. É a fonte única de "o que este usuário pode fazer" — direto de `usuarios_permissoes`, sem Perfil intermediário.
-- **`hasPermission(usuarioId, modulo, recurso, acao)`**: usado por `PermissionGuard` e por regras de autorização contextual em Desk/Rooms.
-- **`isAdmin(usuarioId)`**: **não é um campo do usuário.** É implementado como `hasPermission(usuarioId, 'Rooster Hub', '/hub/acessos', 'gerenciar-permissoes')` — "administrador" é apenas quem possui essa permissão específica, igual a qualquer outra.
-- **`canAccess(id, moduloId, acao?)`**: variante de checagem por `moduloId` (não por nome do módulo), usada pelo endpoint `GET /usuarios/:id/acesso/verificar`.
+- **CRUD** de usuário, com hash de senha por `bcryptjs` (`SALT_ROUNDS = 10`) em `create` e `update`.
+- **`login(email, senha, contexto)`**: valida as credenciais, atualiza `ultimoLogin`, cria a sessão de refresh token
+  e devolve `{ usuario, acesso, accessToken, refreshToken }`. O `accessToken` é assinado com
+  `{ sub: usuario.id, email: usuario.email }`. Registra `login_sucesso` ou `login_falhou` em auditoria.
+- **`refreshSession` e `logout`**: renovação com rotação da sessão e revogação idempotente (ver
+  `09-autenticacao.md`).
+- **`getAccess(id)`**: carrega o usuário com `permissoes.permissao.modulo` e monta a relação de permissões e
+  módulos efetivos. É a fonte única da resposta à pergunta "o que este usuário pode fazer", obtida diretamente de
+  `usuarios_permissoes`, sem perfil intermediário.
+- **`hasPermission(usuarioId, modulo, recurso, acao)`**: utilizado pelo `PermissionGuard` e pelas regras de
+  autorização contextual dos controllers.
+- **`isAdmin(usuarioId)`**: **não corresponde a um campo do usuário.** É implementado como
+  `hasPermission(usuarioId, 'Rooster Hub', '/hub/acessos', 'gerenciar-permissoes')`; o administrador é o usuário que
+  possui essa permissão específica, concedida como qualquer outra.
+- **`canAccess(id, moduloId, acao?)`**: variante da verificação por `moduloId` (e não pelo nome do módulo),
+  utilizada por `GET /usuarios/:id/acesso/verificar`.
 
-## Services de CRUD simples do Hub
+## Services de CRUD do Hub
 
-`SetoresService`, `ModulosService`, `PermissoesService`, `UsuariosPermissoesService`, `UsuariosSetoresService`, `NotificacoesService`, `SessoesService`, `LogsAuditoriaService` — todos seguem o mesmo formato: `create`/`findAll`/`findOne`/`update`/`remove` direto sobre o Prisma, com `handleError` privado tratando `P2002`. Nenhum contém regra de negócio além de resolver relações (`connect`) nos DTOs de entrada. Nenhum é chamado por outro service como efeito colateral (ex.: nada em `UsuariosService` chama `LogsAuditoriaService`).
+`SetoresService`, `ModulosService`, `PermissoesService`, `UsuariosPermissoesService`, `UsuariosSetoresService`,
+`NotificacoesService`, `SessoesService` e `LogsAuditoriaService` seguem o mesmo formato: `create`, `findAll`,
+`findOne`, `update` e `remove` sobre o Prisma, com o método privado `handleError` delegando a `traduzirErroPrisma`
+(ver `11-tratamento-erros.md`). Particularidades:
+
+- `UsuariosPermissoesService` registra a concessão e a revogação em auditoria e, por meio do
+  `AdministradoresService`, impede a revogação da permissão de administrador do último administrador ativo.
+- `NotificacoesService.notificar(usuarioId, titulo, mensagem, rota?)` é invocado por Desk, Rooms, Academy, Learn e
+  Finance para a emissão de notificações; a falha de gravação é descartada sem propagação, para não interromper
+  a operação de negócio que originou a notificação, e não é registrada em log.
+- `LogsAuditoriaService` fornece, além do CRUD, o relatório agregado e a exportação em CSV.
 
 ## `RoosterDeskService` (`src/rooster-desk/rooster-desk.service.ts`)
 
-- **`onModuleInit`**: faz seed de 4 prioridades fixas (`baixa`, `media`, `alta`, `urgente`) se não existirem — efeito colateral de inicialização do módulo, não de uma requisição.
-- **`createTicket`**: preenche `statusId` (busca o status `"Aberto"`) e gera `protocolo` sequencial `TCK-0001`, `TCK-0002`... quando o DTO não os informa.
-- **`findCategoriesForUser` / `findAgentsForUser` / `findSubcategoriesForUser`**: filtram por setor do usuário (via `usuarios_setores`), com bypass total para quem é admin (`UsuariosService.isAdmin`).
-- **`isReferenceInUserSector`**: valida se uma categoria/subcategoria/setor pertence ao(s) setor(es) do usuário — base da autorização de gestão do Desk.
-- **`canManageTicket`**, **`canViewTicket`**, **`isTicketOwner`**: regras de acesso a um chamado específico.
-- **`getMensagensChamado` / `createMensagemChamado`**: conversa do chamado, com paginação por cursor (`antes`/`limite`) e ocultação de notas internas (`interno: true`) para o solicitante. `createMensagemChamado` roda em uma transação Prisma (`$transaction`) que cria a mensagem, atualiza `atualizadoEm` do ticket, grava uma entrada em `historico_tickets` e (se houver destinatário) cria uma `Notificacao`.
-- **`update`/`remove` genéricos** (`DeskModel` union) operam sobre `(this.prisma as any)[model]` — um único método cobre `categoriaTicket`, `subcategoriaTicket`, `prioridadeTicket`, `statusTicket`, `ticket`, `anexoTicket`, `historicoTicket`, `avaliacaoTicket`.
+- **`onModuleInit`**: cria as quatro prioridades padrão (`baixa`, `media`, `alta` e `urgente`) caso não existam;
+  trata-se de efeito da inicialização do módulo, e não de requisição.
+- **`createTicket`**: preenche `statusId` (status `"Aberto"`) e gera o `protocolo` sequencial (`TCK-0001`,
+  `TCK-0002` etc.) quando o DTO não os informa.
+- **`findCategoriesForUser`, `findAgentsForUser` e `findSubcategoriesForUser`**: filtram pelo setor do usuário (por
+  `usuarios_setores`), sem restrição para o administrador (`UsuariosService.isAdmin`).
+- **`isReferenceInUserSector`**: verifica se a categoria, a subcategoria ou o setor pertence a algum setor do
+  usuário; constitui a base da autorização de gestão do Desk.
+- **`canManageTicket`, `canViewTicket` e `isTicketOwner`**: regras de acesso a um chamado específico.
+- **`getMensagensChamado` e `createMensagemChamado`**: conversa do chamado, com paginação por cursor (`antes` e
+  `limite`) e ocultação das notas internas (`interno: true`) para o solicitante. `createMensagemChamado` é executado
+  em transação Prisma (`$transaction`) que cria a mensagem, atualiza `atualizadoEm` do chamado, grava entrada em
+  `historico_tickets` e, havendo destinatário, cria uma `Notificacao`.
+- **`update` e `remove` genéricos** (tipo união `DeskModel`) operam sobre `(this.prisma as any)[model]`; um único
+  método atende `categoriaTicket`, `subcategoriaTicket`, `prioridadeTicket`, `statusTicket`, `ticket`, `anexoTicket`,
+  `historicoTicket` e `avaliacaoTicket`.
 
-**Confirmação sobre `registrarHistoricoTicket`**: esse método **não está no service**. Ele é um método **privado do `RoosterDeskController`** (`src/rooster-desk/rooster-desk.controller.ts`, linha ~299), chamado depois de `updateTicket`/`updateTicketStatus`/`assignTicket` para decidir, campo a campo (status, prioridade, categoria, técnico), o que mudou e gravar uma entrada em `historico_tickets` via `service.create('historicoTicket', ...)`. O controller também concentra `requireManagement` (autorização contextual por setor), `requireTicketAction` e `statusTransitionAction` (mapeia mudança de status para a ação `encerrar`/`reabrir`/`editar` do catálogo de permissões). Ou seja: no Desk, parte da regra de negócio e de autorização mora no controller, não no service — padrão diferente do resto do backend.
+**Localização de `registrarHistoricoTicket`**: o método **não pertence ao service**; é método **privado do
+`RoosterDeskController`** (`src/rooster-desk/rooster-desk.controller.ts`), invocado após `updateTicket`,
+`updateTicketStatus` e `assignTicket` para identificar, campo a campo (status, prioridade, categoria e técnico), as
+alterações realizadas, gravar as entradas em `historico_tickets` (`service.create('historicoTicket', ...)`) e
+notificar o técnico que passa a ser responsável pelo chamado. O controller concentra também `requireManagement`
+(autorização contextual por setor), `requireTicketAction` e `statusTransitionAction` (associa a mudança de status à
+ação `encerrar`, `reabrir` ou `editar` do catálogo de permissões). No Desk, portanto, parte da regra de negócio e
+da autorização reside no controller, e não no service, padrão distinto do restante do backend.
 
 ## `RoomsService` (`src/rooster-rooms/rooms.service.ts`)
 
-- CRUD de `Campus`, `Bloco`, `Ambiente` com validação de existência antes de update/remove (lança `NotFoundException` diretamente, sem passar por `handleError`).
+- CRUD de `Campus`, `Bloco` e `Ambiente`, com verificação de existência antes da atualização e da remoção
+  (`NotFoundException` lançada diretamente).
 - **`getStructureTree`**: monta a árvore campus → blocos → ambientes para a tela de estrutura física.
-- **`getDisponibilidade(ambienteId, dataStr?)`**: calcula os horários livres de um ambiente em uma data, considerando duração padrão do ambiente (`duracaoMinutos`, default 60min), janela de funcionamento (`horarioAbertura`, parseada por regex `HH:MM` ou `HH:MM-HH:MM`, default `07:00–22:00`) e reservas que bloqueiam agenda (status `analise`, `confirmada`, `andamento`).
-- **`assertReservaDisponivel`** (método **privado**, confirmado em `rooms.service.ts`): valida, para criar ou reagendar uma reserva, que (1) o horário de fim é depois do início, (2) `participantes` não excede `capacidade` do ambiente, (3) a data cai em um dia de funcionamento, (4) o horário está dentro da janela de funcionamento, e (5) não há conflito de horário com outra reserva ativa do mesmo ambiente (lança `ConflictException` citando o evento conflitante). É chamado por `createReserva`, por `updateReserva` (só quando o horário/ambiente/participantes mudam) e por `updateReservaStatus` (ao confirmar, revalida — outra reserva pode ter sido confirmada nesse meio-tempo).
-- **`updateReserva`** e **`updateReservaStatus`** gravam entradas em `ReservaHistorico` quando horário ou status efetivamente mudam.
+- **`getDisponibilidade(ambienteId, dataStr?)`**: calcula os horários livres de um ambiente em uma data,
+  considerando a duração padrão (`duracaoMinutos`, 60 minutos por padrão), a janela de funcionamento
+  (`horarioAbertura`, interpretada pelos formatos `HH:MM` ou `HH:MM-HH:MM`, com padrão de 07:00 a 22:00) e as
+  reservas que bloqueiam a agenda (status `analise`, `confirmada` e `andamento`).
+- **`assertReservaDisponivel`** (método **privado**): verifica, na criação ou no reagendamento de uma reserva, que
+  (1) o término é posterior ao início, (2) `participantes` não excede a `capacidade` do ambiente, (3) a data
+  corresponde a um dia de funcionamento, (4) o horário está contido na janela de funcionamento e (5) não há conflito
+  com outra reserva ativa do mesmo ambiente (`ConflictException` com o nome do evento conflitante). É invocado por
+  `createReserva`, por `createReservaSerie` (para cada ocorrência), por `updateReserva` (apenas quando horário,
+  ambiente ou participantes são alterados) e por `updateReservaStatus` (na confirmação, com nova verificação, pois
+  outra reserva pode ter sido confirmada no intervalo).
+- **`updateReserva`** e **`updateReservaStatus`** gravam entradas em `ReservaHistorico` quando o horário ou o status
+  é efetivamente alterado e notificam o solicitante quando o autor da ação é outro usuário.
 
 ## `AssetsService` (`src/rooster-assets/assets.service.ts`)
 
-- CRUD de categoria/setor/patrimônio, com `updateAsset` montando o `data` campo a campo (comentário no código explica: misturar `categoriaId` direto com a relação `categoria` no mesmo `data` quebra o Prisma).
-- **`createMovement`**: registra uma `PatrimonioMovimento` e atualiza o patrimônio na mesma transação (`$transaction` em array). A regra de negócio calcula `origem` a partir do estado atual do item (localização, setor ou responsável, dependendo do `tipo` de movimentação) e aplica o `patch` correspondente ao patrimônio (ex.: `tipo: 'emprestimo'` → `status: 'emprestado'` + `responsavel: destino`; `tipo: 'devolucao'` → `status: 'disponivel'` + `responsavel: null`). Bloqueia movimentação se o patrimônio já está `baixado`.
-- **`baixaAsset`**: marca o patrimônio como `baixado` e registra uma `PatrimonioMovimento` do tipo `baixa`, também em transação. Bloqueia baixa duplicada.
+- CRUD de categoria, setor e patrimônio; `updateAsset` monta o objeto `data` campo a campo, pois a combinação de
+  `categoriaId` com a relação `categoria` no mesmo objeto não é aceita pelo Prisma.
+- **`createMovement`**: registra uma `PatrimonioMovimento` e atualiza o patrimônio na mesma transação
+  (`$transaction` em lista). A `origem` é calculada a partir do estado atual do item (localização, setor ou
+  responsável, conforme o `tipo` de movimentação), e a alteração correspondente é aplicada ao patrimônio (por
+  exemplo, `tipo: 'emprestimo'` resulta em `status: 'emprestado'` e `responsavel: destino`; `tipo: 'devolucao'`, em
+  `status: 'disponivel'` e `responsavel: null`). A movimentação de patrimônio `baixado` é recusada.
+- **Empréstimos**: listagem de empréstimos com devolução vencida e registro de devolução.
+- **`baixaAsset`**: marca o patrimônio como `baixado` e registra uma `PatrimonioMovimento` do tipo `baixa`, também em
+  transação; a baixa duplicada é recusada.
 
-## Onde a autorização contextual (por setor) mora
+## Services dos módulos acadêmicos, do Boost e do Finance
 
-Confirmado: em Desk e Rooms, a checagem "esse usuário pode agir sobre este recurso específico" (não apenas "tem a permissão da tela") está no **controller** (`requireManagement`/`requireReservaAccess`), que consulta métodos do service (`isReferenceInUserSector`, `findOneReserva`) e do `UsuariosService` (`hasPermission`, `isAdmin`). Em Assets não existe essa camada — a autorização é só `@RequirePermission` estático por rota.
+- **`AcademyService`**: estrutura acadêmica, matrículas (com verificação de capacidade), frequência em lote
+  (`upsert` transacional), itens avaliativos, lançamento de notas (com auditoria e notificação ao aluno), cálculo de
+  média (`calcularMediaTurma`), documentos acadêmicos e consultas do portal do aluno.
+- **`LearnService`**: ciclo de vida das atividades, entregas e correções, com propagação da nota ao Academy na
+  mesma transação e notificação dos alunos na publicação e na correção.
+- **`BoostService`**, **`BoostPortalService`** e **`CertificadoBoostService`**: cursos, conteúdo, orientadores e
+  conversas; matrícula, progresso por aula (inclusive progresso de vídeo) e emissão automática de certificado.
+- **`FinanceService`**, **`BoletoService`** e **`NotaFiscalService`**: cobranças e suas transições (com auditoria e
+  notificação ao aluno), geração de mensalidades em lote, aplicação de descontos e de multa e juros, status
+  derivado (`statusEfetivo`), relatórios, boleto em memória e nota fiscal interna em PDF e XML.
+
+## Localização da autorização contextual
+
+Em Desk e Rooms, a verificação de que o usuário pode atuar sobre um recurso específico (e não apenas de que possui a
+permissão da tela) reside no **controller** (`requireManagement` e `requireReservaAccess`), que consulta métodos do
+service (`isReferenceInUserSector` e `findOneReserva`) e do `UsuariosService` (`hasPermission` e `isAdmin`). No
+Academy e no Learn, a verificação de vínculo com a turma também reside no controller (`exigirEscopoTurma` e
+`exigirDonoOuGestor`). No Assets, não há essa camada: a autorização é realizada apenas por `@RequirePermission`
+estático por rota.

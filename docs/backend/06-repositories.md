@@ -1,11 +1,13 @@
 # Repositórios
 
-**Não identificado padrão Repository — acesso a dados direto via Prisma no service.**
+**O projeto não adota o padrão Repository: o acesso a dados é realizado diretamente pelo Prisma nos services.**
 
-Confirmado por leitura de todos os `*.service.ts` do repositório: não existe nenhuma classe, interface ou pasta `repository`/`repositories` no projeto. Todo service injeta `PrismaService` diretamente no construtor e chama os delegates do Prisma Client (`this.prisma.usuario.findMany(...)`, `this.prisma.ticket.create(...)`, etc.) sem nenhuma camada de abstração intermediária.
+A leitura de todos os arquivos `*.service.ts` confirma a inexistência de classe, interface ou pasta `repository`
+ou `repositories`. Cada service injeta `PrismaService` no construtor e invoca os delegates do Prisma Client
+(`this.prisma.usuario.findMany(...)`, `this.prisma.ticket.create(...)` etc.), sem camada de abstração intermediária.
 
 ```ts
-// src/roster-hub/setores/setores.service.ts — padrão repetido em todos os módulos
+// src/roster-hub/setores/setores.service.ts — padrão adotado em todos os módulos
 @Injectable()
 export class SetoresService {
   constructor(private readonly prisma: PrismaService) {}
@@ -19,13 +21,26 @@ export class SetoresService {
 }
 ```
 
-## Implicações confirmadas
+## Implicações
 
-- **`PrismaService`** (`src/roster-hub/shared/prisma.service.ts`) é a única classe compartilhada de acesso a dados. É exportada por `PrismaModule` e importada por todos os módulos de domínio — funciona como um singleton do Prisma Client, não como um repository por entidade.
-- Alguns services usam o Prisma de forma **genérica/dinâmica**: `RoosterDeskService` indexa `(this.prisma as any)[model]` com um union type `DeskModel` para reaproveitar `create`/`findAll`/`findOne`/`update`/`remove` entre 8 entidades diferentes do Desk (categoria, subcategoria, prioridade, status, ticket, anexo, histórico, avaliação), em vez de ter um método por entidade.
-- Não há mapeamento de entidade de domínio separado do tipo gerado pelo Prisma — os services retornam diretamente o resultado de `this.prisma.<model>.<operacao>(...)` (às vezes com `include` para relações), sem um DTO/entidade de saída própria.
-- Consultas com relações usam `include`/`select` do próprio Prisma dentro do service (ex.: `getAccess` em `UsuariosService` usa `include: { permissoes: { include: { permissao: { include: { modulo: true } } } } }`).
+- **`PrismaService`** (`src/roster-hub/shared/prisma.service.ts`) é a única classe compartilhada de acesso a dados.
+  É exportada por `PrismaModule` e importada pelos módulos de domínio, atuando como instância única do Prisma
+  Client, e não como repositório por entidade.
+- Alguns services utilizam o Prisma de forma **genérica**: `RoosterDeskService` indexa `(this.prisma as any)[model]`
+  com o tipo união `DeskModel` para reaproveitar `create`, `findAll`, `findOne`, `update` e `remove` entre oito
+  entidades do Desk (categoria, subcategoria, prioridade, status, chamado, anexo, histórico e avaliação), em lugar de
+  um método por entidade.
+- Não há entidade de domínio distinta do tipo gerado pelo Prisma: os services devolvem diretamente o resultado de
+  `this.prisma.<model>.<operacao>(...)`, eventualmente com `include` para relações, sem DTO ou entidade de saída
+  próprios. As exceções são as funções de serialização que convertem campos `BigInt` em `Number` antes da resposta
+  (por exemplo, `serializeAnexo` e `serializeDocumento`).
+- As consultas com relações utilizam `include` e `select` do Prisma no próprio service (por exemplo, `getAccess` em
+  `UsuariosService` utiliza `include: { permissoes: { include: { permissao: { include: { modulo: true } } } } }`).
+- A conversão de erros do banco em exceções HTTP é centralizada em `traduzirErroPrisma`
+  (`src/common/prisma-erro.ts`), à qual delega o método `handleError` de cada service.
 
-## Recomendação futura
+## Avaliação de evolução
 
-Não avaliado como parte desta tarefa se a introdução de uma camada de repository traria benefício — está fora do escopo de documentar o código existente. Caso o time decida introduzir esse padrão, hoje toda a superfície a refatorar está concentrada nos `*.service.ts`, já que nenhum controller acessa o Prisma diretamente.
+A introdução de uma camada de repositório não foi avaliada no escopo desta documentação, que descreve o código
+existente. Caso essa decisão seja tomada, toda a superfície a refatorar está concentrada nos arquivos
+`*.service.ts`, pois nenhum controller acessa o Prisma diretamente.

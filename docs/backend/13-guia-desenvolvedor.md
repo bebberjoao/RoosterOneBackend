@@ -1,44 +1,74 @@
 # Guia do Desenvolvedor — Backend
 
-Como estender o backend seguindo os padrões já existentes (ver `docs/engineering/04-padroes-e-convencoes.md` para a lista completa de convenções).
+Procedimentos para a extensão do backend conforme os padrões existentes (ver
+`docs/engineering/04-padroes-e-convencoes.md` para a relação completa de convenções).
 
-## Adicionar um novo endpoint a um módulo existente
+## Inclusão de endpoint em módulo existente
 
-1. Se precisar de novo formato de entrada, crie o DTO em `<modulo>/dto/` (`Create*Dto` com `class-validator`; se for atualização parcial, `Update*Dto extends PartialType(Create*Dto)`).
-2. Adicione o método no `*.service.ts` do módulo — regra de negócio e acesso a dado (via `PrismaService`) ficam aqui, não no controller (exceção conhecida: Desk mistura parte da regra no controller, ver `docs/backend/05-services.md`).
-3. Adicione o handler no `*.controller.ts`, com `@RequirePermission(modulo, recurso, acao)` apontando para uma permissão que já exista no catálogo (`prisma/seed-dev.ts`) ou que você vai criar (próxima seção).
-4. Se a autorização depender de quem é o dono do recurso (não só da permissão), replique o padrão de `requireTicketAction`/`requireReservaAccess`: checagem manual dentro do handler, não dá para expressar isso só com `@RequirePermission`.
+1. Se houver novo formato de entrada, criar o DTO em `<modulo>/dto/` (`Create*Dto` com `class-validator`; para
+   atualização parcial, `Update*Dto extends PartialType(Create*Dto)`).
+2. Incluir o método no `*.service.ts` do módulo; a regra de negócio e o acesso a dados (por `PrismaService`) residem
+   no service, e não no controller (exceção conhecida: o Desk mantém parte da regra no controller; ver
+   `05-services.md`). Envolver as operações de banco em `try/catch` com `this.handleError(error, '<ação>')`.
+3. Incluir o handler no `*.controller.ts`, com `@RequirePermission(modulo, recurso, acao)` referente a uma permissão
+   existente no catálogo (`prisma/seed-dev.ts`) ou a ser criada (seção seguinte).
+4. Se a autorização depender da relação entre o usuário e o recurso, e não apenas da permissão, adotar o padrão de
+   `requireTicketAction` e `requireReservaAccess`: verificação manual no handler, pois essa regra não pode ser
+   expressa apenas por `@RequirePermission`.
+5. Em operação auditável, informar ao service o usuário autenticado (`request.user.id`) como autor do evento.
 
-## Adicionar uma nova entidade (tabela)
+## Inclusão de entidade (tabela)
 
-1. Adicione o `model` em `prisma/schema.prisma` — siga a convenção já usada: campos em camelCase, `@map`/`@@map` para snake_case no banco, `@id @default(uuid())`.
-2. Espelhe o mesmo model em `prisma/schema.test.prisma` (schema SQLite dos testes e2e) — **sem** `@map`/`@@map`/`@db.*` (SQLite não usa esses atributos do jeito do Postgres). Se o model tiver campo `String[]`, SQLite não suporta array nativo — vai precisar de um shim, como o já feito em `PrismaTestService` para `Ticket.tags`/`Ambiente.recursos`.
-3. Rode `npx prisma migrate dev --name <descricao>` (exige banco Postgres acessível via `DATABASE_URL`) — gera a migration em `prisma/migrations/` e regenera o client.
-4. Crie `service`/`controller`/`dto` seguindo o padrão de um módulo existente equivalente (CRUD simples: copie a estrutura de `setores` ou `notificacoes`; CRUD com regra de negócio: copie a estrutura de `rooms`/`assets`).
+1. Incluir o `model` em `prisma/schema.prisma`, conforme a convenção adotada: campos em camelCase, `@map` e `@@map`
+   para snake_case no banco e `@id @default(uuid())`.
+2. Reproduzir o mesmo modelo em `prisma/schema.test.prisma` (schema SQLite dos testes e2e), **sem** `@map`, `@@map`
+   e `@db.*`. O SQLite não suporta listas nativas; campos `String[]` exigem adaptação análoga à de
+   `PrismaTestService` para `Ticket.tags` e `Ambiente.recursos`.
+3. Executar `npx prisma migrate dev --name <descricao>` (requer PostgreSQL acessível por `DATABASE_URL`), que gera a
+   migration em `prisma/migrations/` e regenera o cliente.
+4. Criar service, controller e DTOs a partir de um módulo equivalente (CRUD simples: `setores` ou `notificacoes`;
+   CRUD com regra de negócio: `rooms` ou `assets`).
 
-## Adicionar uma nova permissão
+## Inclusão de permissão
 
-1. Adicione a chave em `prisma/seed-dev.ts`, dentro de `permissionDefinitions(...)` — formato `[chave, nomeDescritivo, moduloAlvo, recurso, acao]`. `recurso` precisa ser exatamente a rota de tela que o frontend usa (confira em `permission-catalog.ts` do frontend).
-2. Use essa combinação `(modulo, recurso, acao)` no `@RequirePermission` do backend.
-3. Rode `npm run db:seed:dev` para recriar o banco de desenvolvimento com a nova permissão disponível (isso **apaga todos os dados atuais**, inclusive usuários criados manualmente fora do seed).
+1. Incluir a chave em `prisma/seed-dev.ts`, em `permissionDefinitions(...)`, no formato
+   `[chave, nomeDescritivo, moduloAlvo, recurso, acao]`. O `recurso` deve corresponder exatamente à rota de tela
+   utilizada pelo frontend (conferir em `permission-catalog.ts` do frontend).
+2. Utilizar a combinação `(modulo, recurso, acao)` no `@RequirePermission` do backend.
+3. Executar `npm run db:seed:dev` para recriar o banco de desenvolvimento com a nova permissão. A operação **apaga
+   todos os dados existentes**, inclusive usuários criados fora do seed.
 
-## Rodar a suíte e2e depois de mudar o schema
+## Inclusão de rota de upload
+
+1. Utilizar `FileInterceptor('arquivo', { ...OPCOES_UPLOAD, storage, limits, fileFilter })`, com as constantes de
+   `src/common/storage.config.ts`.
+2. Declarar `@RequirePermission` no handler, para que a permissão seja verificada antes do recebimento do arquivo.
+3. Verificar o conteúdo com `exigirConteudoCompativel` (`src/common/assinatura-arquivo.ts`) antes da gravação, que
+   deve ser cifrada por `escreverDocumentoEncriptado` (`src/common/file-encryption.util.ts`).
+4. No download, utilizar `response.attachment(nome)` e `lerDocumentoDescriptografado`.
+
+## Execução da suíte e2e após alteração do schema
 
 ```bash
 npm run test:e2e
 ```
 
-Esse comando já recria o banco SQLite de teste (`prisma:db:push:test`) antes de rodar — não precisa de passo manual.
+O comando recria o banco SQLite de teste (`prisma:db:push:test`) antes da execução, sem necessidade de etapa
+manual.
 
-## Checklist antes de considerar uma mudança de backend pronta
+## Verificação antes da conclusão de alteração no backend
 
 - [ ] Migration criada e aplicada (`prisma migrate dev`).
-- [ ] `schema.test.prisma` espelhado, com shim se houver campo array.
-- [ ] Permissão nova (se houver) adicionada ao seed e usada no `@RequirePermission`.
-- [ ] `npm run test:e2e` passando.
-- [ ] `npx tsc --noEmit` sem erro (apague `dist/tsconfig.tsbuildinfo` antes — o cache incremental já mascarou erro real).
-- [ ] Documentação correspondente atualizada — ver o mapa de impacto em `docs/engineering/12-processo-de-desenvolvimento.md`.
+- [ ] `schema.test.prisma` atualizado, com adaptação para campos de lista, se houver.
+- [ ] Permissão nova, se houver, incluída no seed e utilizada no `@RequirePermission`.
+- [ ] `npm test` e `npm run test:e2e` aprovados.
+- [ ] `npx tsc --noEmit` sem erros (remover `dist/tsconfig.tsbuildinfo` antes da execução, pois o cache incremental
+      já ocultou erro real).
+- [ ] Documentação correspondente atualizada; ver o mapa de impacto em
+      `docs/engineering/12-processo-de-desenvolvimento.md`.
 
 ## Processo, commit e revisão
 
-Este guia cobre **como implementar**. Para **como entregar** — padrão de mensagem de commit, branch, pull request e o checklist de revisão de código derivado do histórico de defeitos deste projeto — ver `docs/engineering/12-processo-de-desenvolvimento.md` e o `CONTRIBUTING.md` na raiz do repositório.
+Este guia trata da **implementação**. A **entrega** (padrão de mensagem de commit, branch, pull request e lista de
+verificação de revisão de código derivada do histórico de defeitos do projeto) está descrita em
+`docs/engineering/12-processo-de-desenvolvimento.md` e em `CONTRIBUTING.md`, na raiz do repositório.

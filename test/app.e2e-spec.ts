@@ -342,6 +342,11 @@ describe('Full API e2e tests', () => {
 
     const userId = createRes.body.id;
 
+    // A auditoria registra como autor o administrador autenticado, e o usuário criado como entidade.
+    const admin = await prisma.usuario.findUnique({ where: { email: 'admin.teste@example.com' } });
+    const eventoCriacao = await prisma.logAuditoria.findFirst({ where: { acao: 'usuario_criado', entidadeId: userId } });
+    expect(eventoCriacao?.usuarioId).toBe(admin!.id);
+
     // E-mail duplicado é conflito de dado de entrada (409), e não falha interna: não gera registro em logs_erro.
     const errosAntes = await prisma.logErro.count();
     const duplicadoRes = await request(app.getHttpServer())

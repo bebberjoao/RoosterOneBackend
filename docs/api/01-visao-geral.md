@@ -48,7 +48,7 @@ são as rotas marcadas com o decorator `@Public()`:
 | Rota | Motivo |
 |---|---|
 | `GET /` e `GET /health` | Verificação de saúde, consultada por monitoramento sem credencial. |
-| `POST /auth/login`, `/auth/esqueci-senha`, `/auth/redefinir-senha`, `/auth/refresh` e `/auth/logout` | Fluxos de autenticação, com limite de requisições próprio (8 por minuto). |
+| `POST /auth/login`, `/auth/esqueci-senha`, `/auth/redefinir-senha`, `/auth/refresh` e `/auth/logout` | Fluxos de autenticação; os quatro primeiros possuem limite de requisições próprio (8 por minuto). |
 | `GET /aulas-boost/:id/video` | Reprodução de vídeo pelo elemento `<video>`, que não envia o cabeçalho `Authorization`; o acesso exige token de reprodução de 5 minutos, restrito à aula, informado na query (`?token=`). |
 | Rotas do portal do Boost (`BoostPortalController`) | Portal público com autenticação própria: cadastro, login, catálogo e verificação de certificado são abertos; as rotas do aluno exigem o token do Boost, validado pelo `BoostJwtAuthGuard` (ver `docs/security/03-rbac.md`). |
 

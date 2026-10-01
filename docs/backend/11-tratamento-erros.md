@@ -1,33 +1,75 @@
 # Tratamento de Erros
 
-Existe um filtro de exceção global (`AllExceptionsFilter`, `src/common/all-exceptions.filter.ts`, instanciado em `app-config.ts::configurarApp` — compartilhado entre `main.ts` e a suíte e2e), mas é só uma **rede de segurança**: cada service já intercepta `Prisma.PrismaClientKnownRequestError` no próprio `handleError` (ver abaixo) antes de qualquer erro chegar no filtro global. O filtro só decide a resposta se algum service esquecer o `try/catch` (ex.: um service novo), um código de erro do Prisma escapar do que o `handleError` local trata, ou qualquer exceção não prevista aconteça — por não ter o contexto da ação (`"ao criar X"`), suas mensagens são genéricas ("Já existe um registro com esses dados.", "Registro não encontrado."). Fora do Prisma, o backend usa as exceções nativas do NestJS, que já formatam a resposta JSON padrão (`{ message, error, statusCode }`) e mapeiam para o código HTTP correspondente — o filtro global reproduz esse mesmo formato para qualquer `HttpException` (`exception.getStatus()`/`exception.getResponse()`), então a resposta ao cliente não muda com ou sem o filtro.
+O tratamento de erros está organizado em duas camadas:
 
-Além de responder, o filtro **persiste em `logs_erro` toda exceção cujo status final seja >= 500** — ver "Rastreamento de erros" abaixo. Recusas esperadas (400/401/403/404/409) nunca são gravadas ali; só bug de verdade.
+1. **Services**: o método privado `handleError(error, acao)` de cada service delega a `traduzirErroPrisma`
+   (`src/common/prisma-erro.ts`), que converte os erros do banco em exceções HTTP com mensagem contextualizada
+   ("ao criar usuário", "ao remover turma" etc.).
+2. **Filtro global** (`AllExceptionsFilter`, `src/common/all-exceptions.filter.ts`, registrado por
+   `configurarApp()` em `src/app-config.ts` e, portanto, compartilhado entre `main.ts` e a suíte e2e): atua como
+   proteção para o que não passa pela primeira camada (service sem `try/catch`, código do Prisma não mapeado ou
+   exceção não prevista). Por não dispor do contexto da ação, utiliza mensagens genéricas ("Já existe um registro
+   com esses dados." e "Registro não encontrado.").
 
-## Exceções usadas, por camada
+Fora do Prisma, o backend utiliza as exceções nativas do NestJS, que produzem a resposta JSON padrão
+(`{ message, error, statusCode }`) com o código HTTP correspondente. O filtro global reproduz esse formato para
+qualquer `HttpException` (`exception.getStatus()` e `exception.getResponse()`), de modo que a resposta ao cliente é
+idêntica com ou sem o filtro.
 
-| Exceção NestJS | HTTP | Onde aparece |
+Além de responder, o filtro **registra em `logs_erro` toda exceção cujo status final seja igual ou superior a
+500** (ver "Rastreamento de erros"). As recusas esperadas (400, 401, 403, 404 e 409) não são registradas, pois não
+indicam defeito.
+
+## Exceções utilizadas
+
+| Exceção NestJS | HTTP | Ocorrência |
 |---|---|---|
-| `UnauthorizedException` | 401 | Token ausente/inválido/expirado (`JwtAuthGuard`); login inválido; usuário do solicitante mudando o próprio status de chamado/reserva em alguns fluxos |
-| `ForbiddenException` | 403 | `PermissionGuard`; checagens contextuais de dono do recurso (`requireTicketAction`, `requireReservaAccess`) |
-| `NotFoundException` | 404 | Registro inexistente; também usado deliberadamente em `canViewTicket` para não revelar a existência de um chamado fora do escopo do usuário |
-| `BadRequestException` | 400 | Validação de negócio que não é validação de DTO (ex.: horário de término menor que o de início, capacidade excedida, dia fora da janela de funcionamento, item de patrimônio já baixado) |
-| `ConflictException` | 409 | Conflito de horário de reserva; violação de unicidade tratada explicitamente (ver abaixo) |
-| (`ValidationPipe` nativo) | 400 | Corpo malformado ou fora do formato do DTO — acontece antes de qualquer guard rodar |
+| `UnauthorizedException` | 401 | Token ausente, inválido ou expirado (`JwtAuthGuard`); login inválido; sessão de renovação inválida |
+| `ForbiddenException` | 403 | `PermissionGuard`; verificações contextuais de vínculo com o recurso (`requireTicketAction`, `requireReservaAccess`, `exigirDonoOuGestor` etc.) |
+| `NotFoundException` | 404 | Registro inexistente; também utilizada deliberadamente em `canViewTicket` para não revelar a existência de chamado fora do escopo do usuário |
+| `BadRequestException` | 400 | Regra de negócio que não constitui validação de DTO (por exemplo, término anterior ao início, capacidade excedida, dia fora da janela de funcionamento, patrimônio já baixado) e arquivo com conteúdo incompatível com o tipo declarado |
+| `ConflictException` | 409 | Conflito de horário de reserva; violação de unicidade (`P2002`); proteção do último administrador |
+| `PayloadTooLargeException` | 413 | Arquivo acima do limite do upload |
+| (`ValidationPipe`) | 400 | Corpo malformado ou fora do formato do DTO; ocorre após os guards e antes do handler |
 
-## Erro do Prisma mapeado por service
+## Conversão dos erros do Prisma (`traduzirErroPrisma`)
 
-Cada service tem um método privado `handleError(error, acao)` (nome consistente em todos os módulos) que intercepta `Prisma.PrismaClientKnownRequestError` e traduz o código:
+- **Exceção HTTP** lançada pela regra de negócio dentro do bloco protegido: propagada sem alteração.
+- **`P2002`** (violação de unicidade): `ConflictException` (`409`), com
+  "Não foi possível `<ação>`: já existe um registro com `<campos>`.".
+- **`P2025`** (registro inexistente na operação): `NotFoundException` (`404`).
+- **Demais erros**: `InternalServerErrorException` (`500`), com "Erro inesperado ao `<ação>`.".
 
-- **`P2002`** (violação de unicidade) → `InternalServerErrorException` com mensagem "Não foi possível `<ação>`: conflito de dados único." — **nota**: apesar do nome "unicidade" sugerir um erro do cliente, o código mapeia para 500, não 400/409, na maioria dos services. A checagem de conflito de horário de reserva é a exceção — ali o `ConflictException` (409) é lançado manualmente, antes de a query nem chegar no banco, por uma validação de negócio própria (`assertReservaDisponivel`), não pelo `handleError`.
-- **`P2025`** (registro não encontrado na operação) → `NotFoundException`, onde implementado (nem todo service trata esse código).
+O erro do Prisma é identificado pelo nome da classe (`PrismaClientKnownRequestError`) e pelo código, e não por
+`instanceof`, porque a suíte e2e utiliza um cliente gerado em outro diretório (`prisma-test-client`), cujas classes
+de erro são distintas.
+
+Até 30/09/2026, cada service possuía implementação própria, e doze deles convertiam `P2002` em `500`; a
+consolidação está registrada em `docs/engineering/08-divida-tecnica.md`. O conflito de horário de reserva não
+depende dessa conversão: o `ConflictException` é lançado por validação de negócio própria
+(`assertReservaDisponivel`), antes da gravação.
 
 ## Rastreamento de erros (`logs_erro`)
 
-`AllExceptionsFilter.catch()` calcula o status final da mesma forma que responderia ao cliente (Prisma conhecido → 409/404/500; `HttpException` → o status dela; qualquer outra coisa → 500) e, só quando esse status é `>= 500`, chama `LogsErroService.registrar()` de forma assíncrona (`void`, nunca `await` — a persistência do log jamais deve atrasar ou derrubar a resposta de erro original; falha ao gravar é engolida). Cada linha guarda `metodo`, `rota` (`request.originalUrl`), `statusCode`, `mensagem`, `stack` (truncados em 2000/8000 caracteres) e o `usuarioId` autenticado, se houver.
+`AllExceptionsFilter.catch()` determina o status final pelo mesmo critério da resposta ao cliente (erro conhecido do
+Prisma → 409, 404 ou 500; `HttpException` → o próprio status; qualquer outro caso → 500) e, somente quando esse
+status é igual ou superior a 500, invoca `LogsErroService.registrar()` de forma assíncrona (`void`, sem `await`), de
+modo que a gravação não atrase nem comprometa a resposta; a falha de gravação é descartada. Cada registro contém
+`metodo`, `rota` (`request.originalUrl`), `statusCode`, `mensagem` e `stack` (limitados a 2.000 e 8.000
+caracteres, respectivamente) e o `usuarioId` autenticado, quando houver.
 
-`src/roster-hub/logs-erro/` (`LogsErroService`/`LogsErroController`) é **só leitura** por HTTP — não existe `POST`, porque não há cenário legítimo de um cliente criar uma entrada manualmente. `GET /logs-erro/relatorio` (total, distribuição por rota e por status, 50 mais recentes) e `GET /logs-erro/exportar` (CSV completo, sem paginação) exigem a permissão `hub.acessos.relatorio-erros` — ver `docs/security/03-rbac.md`. Testado em unidade (`src/common/all-exceptions.filter.spec.ts`, cobre a fronteira 4xx-nunca-grava / 5xx-sempre-grava) e em e2e (`test/app.e2e-spec.ts`, semeando uma linha direto no banco e conferindo o relatório/CSV/gate de permissão).
+O módulo `src/roster-hub/logs-erro/` (`LogsErroService` e `LogsErroController`) é **somente leitura** por HTTP: não
+há `POST`, pois não existe cenário legítimo de criação manual de registro. `GET /logs-erro/relatorio` (total,
+distribuição por rota e por status e os 50 registros mais recentes) e `GET /logs-erro/exportar` (CSV completo, sem
+paginação) exigem a permissão `hub.acessos.relatorio-erros` (ver `docs/security/03-rbac.md`). Cobertura: teste
+unitário (`src/common/all-exceptions.filter.spec.ts`, que verifica que respostas 4xx não são registradas e
+respostas 5xx sempre o são) e teste e2e (`test/app.e2e-spec.ts`, que insere registro diretamente no banco e
+verifica relatório, exportação e exigência de permissão; e que verifica que o cadastro com e-mail duplicado
+responde `409` sem gerar registro).
 
-## Padrão geral
+## Princípio geral
 
-O erro é sempre resolvido o mais cedo possível na camada certa: formato de corpo → `ValidationPipe` (400); autenticação → guard (401); autorização → guard/controller (403); estado inconsistente do domínio → `BadRequestException`/`ConflictException` no service, antes de gravar; erro de banco genuinamente inesperado → `handleError` (500).
+O erro é tratado o mais cedo possível, na camada adequada: formato do corpo → `ValidationPipe` (400); autenticação
+→ guard (401); autorização → guard ou controller (403); estado inconsistente do domínio →
+`BadRequestException` ou `ConflictException` no service, antes da gravação; violação de restrição do banco →
+`traduzirErroPrisma` (409 ou 404); erro de banco efetivamente inesperado → `traduzirErroPrisma` (500).

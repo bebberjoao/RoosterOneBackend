@@ -1,10 +1,14 @@
 # Módulos NestJS
 
-Status: cada módulo abaixo foi lido diretamente (`*.module.ts` + controllers/services associados).
+Situação: cada módulo abaixo foi verificado diretamente nos arquivos `*.module.ts` e nos controllers e services
+associados (revisão de 01/10/2026).
 
 ## AppModule (`src/app.module.ts`)
 
-Módulo raiz. Importa `AuthModule`, `RoosterHubModule`, `RoosterDeskModule`, `RoosterRoomsModule`, `RoosterAssetsModule`, `RoosterAcademyModule`, `RoosterLearnModule`, `RoosterBoostModule`, `RoosterBoostPortalModule`, `RoosterFinanceModule`. Declara `AppController`/`AppService` só para `GET /` (health check público).
+Módulo raiz. Importa `AuthModule`, `PrismaModule`, `RoosterHubModule`, `RoosterDeskModule`, `RoosterRoomsModule`,
+`RoosterAssetsModule`, `RoosterAcademyModule`, `RoosterLearnModule`, `RoosterBoostModule`,
+`RoosterBoostPortalModule` e `RoosterFinanceModule`. Declara `AppController` e `AppService`, responsáveis por
+`GET /` e `GET /health`.
 
 ## AuthModule (`src/auth/auth.module.ts`)
 
@@ -22,54 +26,71 @@ Módulo raiz. Importa `AuthModule`, `RoosterHubModule`, `RoosterDeskModule`, `Ro
 })
 ```
 
-Não expõe controllers próprios. Sua função é registrar dois guards globais (`APP_GUARD` aceita múltiplos providers — todos rodam) e disponibilizar o `JwtModule` configurado (`jwt-config.ts`):
+Não possui controllers. Registra dois guards globais (`APP_GUARD` admite múltiplos providers, todos executados) e
+disponibiliza o `JwtModule` configurado (`jwt-config.ts`):
 
-- `ThrottlerGuard` (`@nestjs/throttler`) — limite de requisições por IP, padrão 120/min (`GLOBAL_THROTTLE_LIMIT`, `src/auth/throttle.util.ts`). Rotas sensíveis (`POST /auth/login`, `/auth/esqueci-senha`, `/auth/redefinir-senha`, `POST /boost/login`, `POST /boost/cadastro`) têm um limite bem mais rígido via `@Throttle()` (8/min login, 5/min cadastro). Os três limites em `throttle.util.ts` são automaticamente relaxados quando `NODE_ENV === 'test'` — senão a suíte e2e (que faz dezenas de login na mesma janela de um minuto) ficaria flaky por `429`, não por bug real.
-- `JwtAuthGuard` — reverifica o usuário como ativo no banco a cada request (não confia só na assinatura do token), rotas marcadas `@Public()` pulam essa verificação.
+- `ThrottlerGuard` (`@nestjs/throttler`): limite de requisições por endereço IP, de 120 por minuto por padrão
+  (`GLOBAL_THROTTLE_LIMIT`, `src/auth/throttle.util.ts`). As rotas sensíveis possuem limite mais restritivo por
+  `@Throttle()`: 8 por minuto em `POST /auth/login`, `/auth/esqueci-senha`, `/auth/redefinir-senha`,
+  `/auth/refresh` e `POST /boost/login`; 5 por minuto em `POST /boost/cadastro`; e 20 por minuto na
+  verificação pública de certificado. Os limites são ampliados automaticamente quando `NODE_ENV === 'test'`, pois a
+  suíte e2e realiza dezenas de logins no mesmo intervalo de um minuto e, de outro modo, falharia por `429`, e não
+  por defeito.
+- `JwtAuthGuard`: valida o token e confirma, a cada requisição, que o usuário existe e está ativo no banco, sem se
+  basear apenas na assinatura do token; as rotas marcadas com `@Public()` dispensam essa verificação.
 
-O `PermissionGuard` **não** está aqui — cada módulo de domínio o importa/registra como provider próprio.
+O `PermissionGuard` **não** é registrado neste módulo; cada módulo de domínio o declara como provider próprio.
 
-`main.ts` também registra `helmet()` (headers de segurança: CSP desligado especificamente pra não quebrar o Swagger UI em `/api/docs`, os demais headers do Helmet ficam ativos) antes de qualquer rota.
-
-**Não identificado no código analisado**: não há um `MailModule` no projeto (ver `01-arquitetura.md`).
+O Helmet (cabeçalhos de segurança) é aplicado em `main.ts`, antes de qualquer rota; a Content-Security-Policy é
+desativada somente quando o Swagger está habilitado, pois a interface do Swagger depende de scripts e estilos
+embutidos.
 
 ## RoosterHubModule (`src/roster-hub/roster-hub.module.ts`)
 
-Agrega 9 submódulos, todos com CRUD REST completo (Post/Get/Get:id/Patch:id/Delete:id) sob `PermissionGuard` + `@RequirePermission`, exceto onde indicado:
+Agrega onze submódulos, todos sob `PermissionGuard` e `@RequirePermission`, exceto onde indicado:
 
-| Submódulo | Controller | Expõe |
+| Submódulo | Controller | Recursos expostos |
 |---|---|---|
-| `usuarios` | `AuthController` + `UsuariosController` | `AuthController`: `POST /auth/login` (`@Public()`). `UsuariosController`: CRUD de `/usuarios`, `GET /usuarios/:id/acesso` (permissões efetivas), `GET /usuarios/:id/acesso/verificar` (checagem pontual de módulo/ação). |
+| `usuarios` | `AuthController` e `UsuariosController` | `AuthController`: `POST /auth/login`, `/auth/esqueci-senha`, `/auth/redefinir-senha`, `/auth/refresh` e `/auth/logout` (públicas). `UsuariosController`: CRUD de `/usuarios`, `GET /usuarios/:id/acesso` (permissões efetivas) e `GET /usuarios/:id/acesso/verificar` (verificação pontual de módulo e ação). **Exporta `UsuariosService`**, utilizado pelos demais módulos para autorização. |
 | `setores` | `SetoresController` | CRUD de `/setores`. |
-| `modulos` | `ModulosController` | CRUD de `/modulos` (cadastro dos módulos do sistema, usados como FK em `permissoes`). |
-| `permissoes` | `PermissoesController` | CRUD de `/permissoes` (catálogo de permissões: nome, recurso, ação, módulo). |
-| `usuarios-permissoes` | `UsuariosPermissoesController` | `POST /usuarios-permissoes` (conceder), `GET`, `GET :id`, `DELETE :id` (revogar). É o vínculo direto usuário↔permissão — não existe entidade Perfil/Role. |
-| `usuarios-setores` | `UsuariosSetoresController` | CRUD de `/usuarios-setores` (vínculo usuário↔setor, usado por Desk/Rooms para escopo por setor). |
-| `notificacoes` | `NotificacoesController` | CRUD de `/notificacoes` e caixa de entrada `/notificacoes/minhas*`. **Exporta `NotificacoesService`**, importado por Rooms e Finance para emitir notificações. |
-| `sessoes` | `SessoesController` | CRUD de `/sessoes` (tabela `sessoes`, campo `refreshToken` incluso) — **não é usada pelo fluxo de login atual** (ver `09-autenticacao.md`). |
-| `logs-auditoria` | `LogsAuditoriaController` | CRUD de `/logs-auditoria`. Não há escrita automática de eventos de segurança por outros services — é gravação manual via API (ver `12-logs.md`). |
+| `modulos` | `ModulosController` | CRUD de `/modulos` (catálogo de módulos do sistema, referenciado por `permissoes`). |
+| `permissoes` | `PermissoesController` | CRUD de `/permissoes` (catálogo de permissões: nome, recurso, ação e módulo). |
+| `usuarios-permissoes` | `UsuariosPermissoesController` | `POST /usuarios-permissoes` (concessão), `GET`, `GET :id` e `DELETE :id` (revogação). Constitui o vínculo direto usuário–permissão; não há entidade de perfil ou papel. |
+| `usuarios-setores` | `UsuariosSetoresController` | CRUD de `/usuarios-setores` (vínculo usuário–setor, utilizado por Desk e Rooms para o escopo por setor). |
+| `notificacoes` | `NotificacoesController` | CRUD de `/notificacoes` e caixa de entrada `/notificacoes/minhas*`. **Exporta `NotificacoesService`**, importado por Desk, Rooms, Academy, Learn e Finance para a emissão de notificações. |
+| `sessoes` | `SessoesController` | CRUD administrativo de `/sessoes`. A tabela `sessoes` armazena as sessões de refresh token, criadas e revogadas pelo fluxo de autenticação (ver `09-autenticacao.md`). |
+| `logs-auditoria` | `LogsAuditoriaController` | Relatório, exportação em CSV e CRUD administrativo de `/logs-auditoria`. Os eventos são gravados automaticamente pelo `AuditoriaService` (ver `12-logs.md`). |
+| `logs-erro` | `LogsErroController` | Relatório, exportação e consulta de `/logs-erro` (somente leitura). **Exporta `LogsErroService`**, utilizado pelo `AllExceptionsFilter`. |
+| `configuracoes` | `ConfiguracoesController` | `GET /configuracoes/email` e `POST /configuracoes/email/teste`. Importa `MailModule`. |
 
-Todos compartilham `PrismaModule` (importado por cada `*.module.ts` individualmente).
+Componentes compartilhados em `roster-hub/shared/`: `PrismaModule`, `AuditoriaModule` (registro de eventos de
+auditoria) e `AdministradoresModule` (proteção do último administrador ativo).
 
 ## RoosterDeskModule (`src/rooster-desk/rooster-desk.module.ts`)
 
 ```ts
-imports: [PrismaModule, UsuariosModule, JwtModule.register(jwtModuleOptions())],
+imports: [PrismaModule, UsuariosModule, NotificacoesModule, JwtModule.register(jwtModuleOptions())],
 controllers: [RoosterDeskController],
 providers: [RoosterDeskService, MensagensGateway, PermissionGuard],
 ```
 
-Único controller (`RoosterDeskController`) cobrindo: categorias, subcategorias, prioridades, status, chamados (tickets), atribuição de técnico, vínculo de atendentes por subcategoria, mensagens/conversa do chamado, anexos, histórico, avaliações. Inclui `MensagensGateway` (WebSocket) para push de novas mensagens. Importa `UsuariosModule` porque depende de `UsuariosService.hasPermission`/`isAdmin` para autorização contextual por setor (ver `10-autorizacao-rbac.md`).
+Controller único (`RoosterDeskController`) para categorias, subcategorias, prioridades, status, chamados, atribuição
+de técnico, vínculo de atendentes por subcategoria, mensagens, anexos, histórico e avaliações. Inclui o
+`MensagensGateway` (WebSocket) para a difusão de novas mensagens. Importa `UsuariosModule` em razão de
+`UsuariosService.hasPermission` e `isAdmin`, utilizados na autorização contextual por setor (ver
+`10-autorizacao-rbac.md`), e `NotificacoesModule` para os avisos de mensagem e de atribuição de chamado.
 
 ## RoosterRoomsModule (`src/rooster-rooms/rooster-rooms.module.ts`)
 
 ```ts
-imports: [PrismaModule, UsuariosModule],
+imports: [PrismaModule, UsuariosModule, NotificacoesModule, RoosterAcademyModule],
 controllers: [RoomsController],
 providers: [RoomsService, PermissionGuard],
 ```
 
-Um controller cobrindo campus, blocos, ambientes (com árvore de estrutura e disponibilidade de horário) e reservas (com conversa/mensagens e histórico de mudanças).
+Controller único para campus, blocos, ambientes (com árvore de estrutura e disponibilidade de horário) e reservas
+(com mensagens, séries recorrentes e histórico de alterações). Importa `RoosterAcademyModule` para validar o
+vínculo opcional da reserva com uma turma (RN044).
 
 ## RoosterAssetsModule (`src/rooster-assets/rooster-assets.module.ts`)
 
@@ -79,53 +100,81 @@ controllers: [AssetsController],
 providers: [AssetsService, PermissionGuard],
 ```
 
-Um controller cobrindo categorias de patrimônio, setores de patrimônio, patrimônio (com baixa), e movimentações de patrimônio.
+Controller único para categorias de patrimônio, setores de patrimônio, patrimônios (com baixa) e movimentações
+(com controle de empréstimos).
 
 ## RoosterAcademyModule (`src/rooster-academy/rooster-academy.module.ts`)
 
 ```ts
 @Module({
-  imports: [PrismaModule, UsuariosModule],
+  imports: [PrismaModule, UsuariosModule, NotificacoesModule, AuditoriaModule],
   controllers: [AcademyController],
   providers: [AcademyService, PermissionGuard],
   exports: [AcademyService],
 })
 ```
 
-Um controller (`AcademyController`) cobrindo a gestão acadêmica completa: cursos, períodos letivos, disciplinas (catálogo curricular), professores e alunos (vínculos a `Usuario` do Hub — nunca duplicam a tabela `usuarios`), turmas (a oferta real: disciplina + período + professor + turno/sala/horário), matrículas, frequência (registro em lote por data), itens avaliativos e notas, calendário acadêmico, e documentos acadêmicos (upload real, até 15MB). Também expõe o portal do aluno sob `/me/*` (`me/aluno`, `me/turmas`, `me/frequencia`, `me/notas`, `me/historico`, `me/turmas-lecionadas` para professor) — o escopo de "quais dados" é sempre resolvido a partir do `usuarioId` do JWT, nunca de um parâmetro de rota. `exports: [AcademyService]` porque `RoosterLearnModule` depende dele (turma, professor, aluno e matrícula são conceitos do Academy, reaproveitados pelo Learn).
+Controller único (`AcademyController`) para a gestão acadêmica: cursos, períodos letivos, disciplinas (catálogo
+curricular), professores e alunos (vínculos a `Usuario` do Hub, sem duplicação da tabela `usuarios`), turmas
+(oferta efetiva: disciplina, período, professor, turno, sala e horário), matrículas, frequência (registro em lote
+por data), itens avaliativos e notas, calendário acadêmico e documentos acadêmicos (upload de até 15 MB). Expõe
+também o portal do aluno em `/me/*` (`me/aluno`, `me/turmas`, `me/frequencia`, `me/notas`, `me/historico` e, para o
+professor, `me/turmas-lecionadas`); o escopo dos dados é sempre determinado pelo `usuarioId` do JWT, e nunca por
+parâmetro de rota. Exporta `AcademyService` porque Rooms, Learn, Boost e Finance utilizam os conceitos de turma,
+professor, aluno e matrícula.
 
-Autorização de turma/frequência/notas não usa só `@RequirePermission`: para a maioria das rotas por `turmaId` (leitura de turma, frequência, itens avaliativos, matrículas), o controller usa os helpers privados `exigirEscopoTurma` (leitura: gestão acadêmica, o professor dono da turma, ou o aluno matriculado) e `exigirDonoOuGestor` (escrita: gestão acadêmica, ou o professor dono da turma **e** com a permissão específica da ação) — ver `03-rbac.md`.
+A autorização de turma, frequência e notas não se limita a `@RequirePermission`: nas rotas por `turmaId`, o
+controller utiliza os métodos privados `exigirEscopoTurma` (leitura: gestão acadêmica, professor responsável ou
+aluno matriculado) e `exigirDonoOuGestor` (escrita: gestão acadêmica, ou professor responsável **com** a permissão
+específica da ação). Ver `docs/security/03-rbac.md`.
 
 ## RoosterLearnModule (`src/rooster-learn/rooster-learn.module.ts`)
 
 ```ts
 @Module({
-  imports: [PrismaModule, UsuariosModule, RoosterAcademyModule],
+  imports: [PrismaModule, UsuariosModule, RoosterAcademyModule, NotificacoesModule],
   controllers: [LearnController],
   providers: [LearnService, PermissionGuard],
 })
 ```
 
-Um controller (`LearnController`) cobrindo atividades (rascunho → publicada → encerrada/arquivada), entregas de aluno (envio, reenvio, correção com nota + feedback) e anexos de entrega (upload real, até 15MB). Importa `RoosterAcademyModule` (não só `AcademyService` via DI, mas o módulo inteiro) porque toda atividade referencia uma `Turma` real do Academy — o Learn não tem turma/aluno próprios, ao contrário do mock original do frontend.
+Controller único (`LearnController`) para atividades (rascunho, publicada, encerrada ou arquivada), entregas do
+aluno (envio, reenvio e correção com nota e parecer) e anexos de entrega (upload de até 15 MB). Importa
+`RoosterAcademyModule` porque toda atividade referencia uma `Turma` do Academy; o Learn não possui turmas nem
+alunos próprios.
 
-Integração relevante: `PATCH /atividades/:id/publicar` cria (uma única vez) um `ItemAvaliativo` no Academy com `origem: 'learn'` quando a atividade tem peso > 0; `PATCH /entregas/:id/corrigir` grava a nota tanto em `Entrega.nota` quanto (na mesma transação) na `Nota` do item avaliativo vinculado — assim a média do aluno no Academy (`calcularMediaTurma`) inclui automaticamente as atividades do Learn, sem duplicar dado. **Não identificado no código analisado**: sistema de banco de questões/múltipla escolha (existia no mock do frontend, não foi implementado — ver `10-melhorias-futuras.md`).
+Integração: `PATCH /atividades/:id/publicar` cria, uma única vez, um `ItemAvaliativo` no Academy com
+`origem: 'learn'` quando a atividade possui peso maior que zero; `PATCH /entregas/:id/corrigir` grava a nota em
+`Entrega.nota` e, na mesma transação, na `Nota` do item avaliativo vinculado. Desse modo, a média do aluno no
+Academy (`calcularMediaTurma`) incorpora as atividades do Learn sem duplicação de dados. Não há banco de questões
+nem questões de múltipla escolha (ver `docs/engineering/10-melhorias-futuras.md`).
 
 ## RoosterBoostModule (`src/rooster-boost/rooster-boost.module.ts`)
 
 ```ts
 @Module({
-  imports: [PrismaModule, UsuariosModule, RoosterAcademyModule, JwtModule.register(jwtModuleOptions())],
+  imports: [PrismaModule, UsuariosModule, RoosterAcademyModule, AuditoriaModule, JwtModule.register(jwtModuleOptions())],
   controllers: [BoostController],
   providers: [BoostService, CertificadoBoostService, BoostChatGateway, PermissionGuard],
   exports: [BoostService, CertificadoBoostService, BoostChatGateway],
 })
 ```
 
-Lado **instrutor** do Rooster Boost (autenticado pelo login do Hub de sempre): `BoostController` cobre curso, módulo, aula, material de apoio (upload real, até 25MB), listagem de progresso dos alunos matriculados, e a conversa do curso do lado do instrutor. O "instrutor" é sempre um `Professor` já cadastrado no Academy (`AcademyService.findProfessorByUsuarioId`) — não existe cadastro de instrutor separado. Importa `RoosterAcademyModule` só por causa disso. `exports: [BoostService, CertificadoBoostService, BoostChatGateway]` porque `RoosterBoostPortalModule` depende dos três (matrícula/progresso usam `BoostService.isCursoDoProfessor` indiretamente via o gateway, certificado é emitido pelo portal, e o gateway de chat é compartilhado pelos dois lados).
+Área do **instrutor** do Rooster Boost, autenticada pelo login do Hub. O `BoostController` abrange cursos, módulos,
+aulas, materiais de apoio (upload de até 25 MB), vídeos hospedados (até 2 GB), configuração de certificado,
+orientadores, progresso dos alunos, conversas com os alunos e administração das contas externas. A autorização
+baseia-se exclusivamente em permissão (`/boost/manage`); o vínculo de orientador, obtido de um `Professor` do
+Academy, restringe apenas o acesso às conversas. Os três providers exportados são utilizados por
+`RoosterBoostPortalModule`.
 
-`CertificadoBoostService` gera o PDF do certificado (biblioteca `pdfkit`, sem dependências nativas) e grava o registro `CertificadoBoost` — chamado automaticamente pelo `BoostPortalService` quando uma matrícula chega a 100% de progresso, nunca manualmente (decisão de produto: emissão automática, sem aprovação).
+`CertificadoBoostService` gera o PDF do certificado (`pdfkit`), grava-o cifrado em disco e registra o
+`CertificadoBoost`. É acionado automaticamente pelo `BoostPortalService` quando a matrícula atinge 100% de
+progresso e o curso emite certificado (decisão de produto: emissão automática, sem aprovação).
 
-`BoostChatGateway` (`src/rooster-boost/boost-chat.gateway.ts`, namespace `/boost`) é o único componente do sistema que autentica **os dois tipos de JWT** (Hub e Boost) — decodifica o token e, pelo claim `tipo`, escolhe entre `prisma.usuario` e `prisma.boostUsuario`. Mesmo padrão de push-apenas do `MensagensGateway` do Desk (REST é a fonte da verdade).
+`BoostChatGateway` (`src/rooster-boost/boost-chat.gateway.ts`, namespace `/boost`) é o único componente do sistema
+que autentica **os dois tipos de JWT** (Hub e Boost): decodifica o token e, conforme a declaração `tipo`, consulta
+`prisma.usuario` ou `prisma.boostUsuario`. Segue o padrão de difusão do `MensagensGateway` do Desk (o REST é a fonte
+de verdade).
 
 ## RoosterBoostPortalModule (`src/rooster-boost-portal/rooster-boost-portal.module.ts`)
 
@@ -137,26 +186,41 @@ Lado **instrutor** do Rooster Boost (autenticado pelo login do Hub de sempre): `
 })
 ```
 
-Lado **aluno** do Rooster Boost — cadastro/login públicos e independentes do Hub (`BoostUsuario`, nunca ligado a `Usuario`), catálogo público, matrícula, progresso aula a aula, conclusão automática de certificado, e a conversa do curso do lado do aluno. `BoostPortalController` é marcado `@Public()` na classe inteira (o `JwtAuthGuard` global do Hub nem roda nessas rotas) e cada rota que exige login usa `@UseGuards(BoostJwtAuthGuard)` — um guard próprio (`boost-jwt-auth.guard.ts`) que verifica o token contra `boost_usuarios`, não `usuarios`, e exige o claim `tipo: 'boost'` no payload. Ver `docs/security/03-rbac.md` para o detalhamento completo desse modelo de dois logins paralelos — a primeira vez que o sistema tem isso.
+Área do **aluno** do Rooster Boost: cadastro e login públicos e independentes do Hub (`BoostUsuario`, sem vínculo
+com `Usuario`), catálogo público, matrícula, progresso por aula, emissão automática de certificado, verificação
+pública de certificado e conversa com os orientadores. O `BoostPortalController` é marcado com `@Public()` na classe
+inteira (o `JwtAuthGuard` global não é executado nessas rotas), e cada rota que exige autenticação utiliza
+`@UseGuards(BoostJwtAuthGuard)`, guard próprio (`boost-jwt-auth.guard.ts`) que valida o token contra
+`boost_usuarios`, e não `usuarios`, e exige a declaração `tipo: 'boost'`. Ver `docs/security/03-rbac.md` para o
+detalhamento desse modelo de dois mecanismos de autenticação paralelos.
 
 ## RoosterFinanceModule (`src/rooster-finance/rooster-finance.module.ts`)
 
 ```ts
 @Module({
-  imports: [PrismaModule, UsuariosModule, RoosterAcademyModule],
+  imports: [PrismaModule, UsuariosModule, RoosterAcademyModule, NotificacoesModule, AuditoriaModule],
   controllers: [FinanceController],
   providers: [FinanceService, NotaFiscalService, BoletoService, PermissionGuard],
   exports: [FinanceService],
 })
 ```
 
-Cobranças ligadas a alunos reais do Academy — `FinanceController` cobre produtos, serviços, descontos (com atribuição a um `Aluno`), e a entidade central `Cobranca` (mensalidade/produto/serviço/taxa num único modelo, com transições criar → marcar-pago/negociar/cancelar, geração de mensalidade em lote por competência, emissão de boleto e nota fiscal, relatórios e dashboard). Importa `RoosterAcademyModule` pelo mesmo motivo do Boost: `AcademyService.findAlunoByUsuarioId` resolve o aluno autenticado nas rotas `/financeiro/me/*` do portal do aluno.
+Cobranças vinculadas a alunos do Academy. O `FinanceController` abrange produtos, serviços, descontos (com
+atribuição a `Aluno`), políticas de multa e juros e a entidade central `Cobranca` (mensalidade, produto, serviço ou
+taxa em um único modelo, com as transições criar, marcar como paga, negociar e cancelar), além da geração de
+mensalidades em lote por competência, emissão de boleto e nota fiscal, relatórios e painel. Importa
+`RoosterAcademyModule` porque `AcademyService.findAlunoByUsuarioId` identifica o aluno autenticado nas rotas
+`/financeiro/me/*`.
 
-`NotaFiscalService` e `BoletoService` geram PDF (`pdfkit`) e, no caso da nota fiscal, também um XML simples — os dois são **documentos internos, sem nenhuma integração externa real** (sem gateway de pagamento, sem transmissão à SEFAZ) — ver `docs/engineering/06-integracoes.md` para o detalhamento dessa decisão.
+`NotaFiscalService` e `BoletoService` geram PDF (`pdfkit`) e, no caso da nota fiscal, também um XML simples. Ambos
+são **documentos internos, sem integração externa** (sem intermediador de pagamento e sem transmissão à SEFAZ); ver
+`docs/engineering/06-integracoes.md`.
 
-`status: 'vencido'` de uma `Cobranca` nunca é persistido — é sempre derivado de `vencimento < hoje` no momento da leitura (`FinanceService.statusEfetivo`), pra não repetir o tipo de inconsistência que existia no mock antigo do frontend (rótulo desalinhado do dado real).
+O status `vencido` de uma `Cobranca` não é persistido: é sempre derivado de `vencimento` anterior à data corrente no
+momento da leitura (`FinanceService.statusEfetivo`), o que impede a divergência entre o rótulo exibido e o dado
+registrado.
 
-## Mail (`src/mail/mail.module.ts`)
+## MailModule (`src/mail/mail.module.ts`)
 
 ```ts
 @Module({
@@ -165,4 +229,8 @@ Cobranças ligadas a alunos reais do Academy — `FinanceController` cobre produ
 })
 ```
 
-Não é importado no `AppModule` diretamente — só o `UsuariosModule` importa (usado em `esqueci-senha`/redefinição de senha). `MailService` (`src/mail/mail.service.ts`) usa `nodemailer`; sem `SMTP_HOST` no `.env`, cai em modo dev — registra o e-mail em log (e num array `outbox`, inspecionado pelos testes e2e) em vez de falhar, então o fluxo de token/link/expiração é testável de ponta a ponta sem SMTP real configurado.
+Não é importado diretamente pelo `AppModule`; é importado por `UsuariosModule` (recuperação de senha) e por
+`ConfiguracoesModule` (teste de envio). O `MailService` (`src/mail/mail.service.ts`) utiliza `nodemailer`; na
+ausência de `SMTP_HOST`, opera em modo de desenvolvimento, no qual registra o e-mail em log e em uma lista em
+memória (`outbox`, inspecionada pelos testes e2e), sem falhar. Desse modo, o fluxo de token, link e expiração pode
+ser testado integralmente sem servidor SMTP.

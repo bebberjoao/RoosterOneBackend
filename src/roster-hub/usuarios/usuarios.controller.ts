@@ -117,8 +117,8 @@ export class UsuariosController {
       },
     },
   })
-  create(@Body() createUsuarioDto: CreateUsuarioDto) {
-    return this.usuariosService.create(createUsuarioDto);
+  create(@Body() createUsuarioDto: CreateUsuarioDto, @Req() request: Request) {
+    return this.usuariosService.create(createUsuarioDto, request.user?.id);
   }
 
   @Get()
@@ -159,8 +159,8 @@ export class UsuariosController {
 
   @Patch(':id')
   @RequirePermission(MODULO, TELA, 'editar')
-  async update(@Param('id') id: string, @Body() updateUsuarioDto: UpdateUsuarioDto) {
-    const usuario = await this.usuariosService.update(id, updateUsuarioDto);
+  async update(@Param('id') id: string, @Body() updateUsuarioDto: UpdateUsuarioDto, @Req() request: Request) {
+    const usuario = await this.usuariosService.update(id, updateUsuarioDto, request.user?.id);
     if (!usuario) {
       throw new NotFoundException(`Usuário com id ${id} não encontrado.`);
     }
@@ -169,8 +169,8 @@ export class UsuariosController {
 
   @Delete(':id')
   @RequirePermission(MODULO, TELA, 'excluir')
-  async remove(@Param('id') id: string) {
-    const usuario = await this.usuariosService.remove(id);
+  async remove(@Param('id') id: string, @Req() request: Request) {
+    const usuario = await this.usuariosService.remove(id, request.user?.id);
     if (!usuario) {
       throw new NotFoundException(`Usuário com id ${id} não encontrado.`);
     }

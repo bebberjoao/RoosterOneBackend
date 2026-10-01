@@ -1,22 +1,31 @@
-# Autorização / RBAC
+# Autorização e RBAC
 
 ## Modelo
 
-Não existe Perfil/Role como entidade. Permissão é um vínculo direto `Usuario ↔ Permissao` (tabela `UsuarioPermissao`), e cada `Permissao` é identificada pela combinação `moduloId + recurso + acao` (`recurso` é a rota de tela do frontend, ex.: `/desk/tickets`; `acao` é o id da ação nessa tela, ex.: `criar`, `editar`, `encerrar`).
+Não há perfil ou papel como entidade. A permissão é um vínculo direto `Usuario ↔ Permissao` (tabela
+`UsuarioPermissao`), e cada `Permissao` é identificada pela combinação `moduloId + recurso + acao`, em que `recurso`
+é a rota de tela do frontend (por exemplo, `/desk/tickets`) e `acao` é o identificador da ação nessa tela (por
+exemplo, `criar`, `editar` ou `encerrar`).
 
-## `PermissionGuard` + `@RequirePermission`
+## `PermissionGuard` e `@RequirePermission`
 
-Todo controller de negócio (exceto `AuthController`) declara `@UseGuards(PermissionGuard)` na classe. O guard só bloqueia quando o **handler concreto da rota** tem o decorator:
+Todo controller de negócio, exceto o `AuthController`, declara `@UseGuards(PermissionGuard)` na classe. O guard
+bloqueia a requisição somente quando o **handler da rota** possui o decorator:
 
 ```ts
 @RequirePermission('Rooster Desk', '/desk/tickets', 'encerrar')
 ```
 
-Handler sem esse decorator (e sem checagem manual no corpo do método) passa livre para qualquer usuário autenticado — isso acontece em alguns endpoints e é um ponto a revisar caso a caso (ver `docs/api/02-endpoints.md` para o mapeamento completo endpoint a endpoint).
+O handler sem esse decorator, e sem verificação manual no corpo do método, é acessível a qualquer usuário
+autenticado. As rotas nessa situação estão identificadas em `docs/api/02-endpoints.md`, que relaciona a exigência
+de cada endpoint.
 
-`PermissionGuard` resolve a permissão chamando `UsuariosService::hasPermission(usuarioId, modulo, recurso, acao)`, que por sua vez usa `getAccess(usuarioId)` — carrega `usuario.permissoes.permissao.modulo` e monta o conjunto efetivo de permissões do usuário a partir do zero, a cada chamada (sem cache).
+O `PermissionGuard` resolve a permissão por `UsuariosService.hasPermission(usuarioId, modulo, recurso, acao)`, que
+utiliza `getAccess(usuarioId)`: carrega `usuario.permissoes.permissao.modulo` e monta, a cada chamada e sem cache, o
+conjunto efetivo de permissões do usuário. Em consequência, a concessão ou a revogação de permissão produz efeito
+na requisição seguinte.
 
-## "Administrador" não é um campo
+## Administrador não é atributo do usuário
 
 `isAdmin(usuarioId)` é implementado como:
 
@@ -24,18 +33,32 @@ Handler sem esse decorator (e sem checagem manual no corpo do método) passa liv
 hasPermission(usuarioId, 'Rooster Hub', '/hub/acessos', 'gerenciar-permissoes')
 ```
 
-Ou seja: ser administrador é ter exatamente essa permissão, concedida do mesmo jeito que qualquer outra. Não existe flag `isAdmin`/`role` em `Usuario`.
+Ser administrador consiste, portanto, em possuir essa permissão, concedida da mesma forma que as demais. Não há
+atributo `isAdmin` ou `role` em `Usuario`. O `AdministradoresService` impede a remoção, a desativação ou a
+revogação dessa permissão do último administrador ativo (`409`).
 
-## Autorização contextual (além do guard genérico)
+## Autorização contextual
 
-Em Desk e Rooms, alguns controllers fazem uma checagem adicional dentro do próprio handler, porque a regra depende de **quem é o dono do recurso**, não só da permissão:
+Em alguns módulos, o controller realiza verificação adicional no próprio handler, pois a regra depende da relação
+entre o usuário e o recurso, e não apenas da permissão:
 
-- `requireTicketAction` (Desk) — bloqueia o solicitante de mudar o status do próprio chamado, mesmo que ele tenha a permissão `editar`.
-- `requireReservaAccess` (Rooms) — libera quem gerencia (`rooms.manage.*`) **ou** o próprio responsável pela reserva (`rooms.reservations.*`), com nomes de ação diferentes dos dois lados (ex.: "responder" para a equipe vs. "mensagem" para o solicitante).
-- `canViewTicket` (Desk) — além da permissão de acesso, exige que o usuário seja o solicitante, seja admin, ou pertença a um setor vinculado à categoria do chamado; fora isso, responde 404 (não 403) para não revelar a existência do chamado.
+- `requireTicketAction` (Desk): impede que o solicitante altere o status, a categoria ou o encerramento do próprio
+  chamado, ainda que possua a permissão `editar`.
+- `requireReservaAccess` (Rooms): autoriza o gestor (`/rooms/manage`) **ou** o responsável pela reserva
+  (`/rooms/reservations`), com nomes de ação distintos para cada lado (por exemplo, `responder` para a equipe e
+  `mensagem` para o solicitante).
+- `canViewTicket` (Desk): além da permissão de acesso, exige que o usuário seja o solicitante, seja administrador
+  ou pertença a setor vinculado à categoria do chamado; nos demais casos, responde `404`, e não `403`, para não
+  revelar a existência do chamado.
+- `exigirEscopoTurma` e `exigirDonoOuGestor` (Academy e Learn): exigem vínculo com a turma (professor responsável
+  ou aluno matriculado), em conjunto com a permissão da ação.
+- `exigirLeituraCobrancas` (Finance): aceita a permissão de leitura em qualquer das telas que exibem cobranças.
 
-Essas checagens **não aparecem no Swagger nem no decorator** — só lendo o código do controller.
+Essas verificações **não constam do Swagger nem do decorator**; estão documentadas por endpoint em
+`docs/api/02-endpoints.md`.
 
 ## Escopo por setor
 
-`Setor` é usado para restringir visibilidade em Desk (categoria vinculada a setor → só quem está nesse setor, ou admin, vê os chamados dessa categoria) e para vincular atendente a subcategoria. Rooms e Assets não têm essa mesma restrição de escopo por setor na leitura — a permissão de módulo já é suficiente.
+O `Setor` restringe a visibilidade no Desk (a categoria vinculada a um setor é visível apenas aos integrantes desse
+setor e ao administrador) e vincula atendentes a subcategorias. Rooms e Assets não aplicam restrição de escopo por
+setor na leitura; a permissão do módulo é suficiente.

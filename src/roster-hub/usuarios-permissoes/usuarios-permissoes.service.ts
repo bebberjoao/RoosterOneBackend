@@ -18,7 +18,11 @@ export class UsuariosPermissoesService {
   // CRUD
   // =====================================================
 
-  async create(createUsuarioPermissaoDto: CreateUsuarioPermissaoDto) {
+  /**
+   * `atorId`: usuário autenticado que concede ou revoga a permissão, registrado como autor do
+   * evento de auditoria; o usuário afetado consta em `entidadeId`.
+   */
+  async create(createUsuarioPermissaoDto: CreateUsuarioPermissaoDto, atorId?: string) {
     const data: Prisma.UsuarioPermissaoCreateInput = {
       usuario: { connect: { id: createUsuarioPermissaoDto.usuarioId } },
       permissao: { connect: { id: createUsuarioPermissaoDto.permissaoId } },
@@ -28,11 +32,11 @@ export class UsuariosPermissoesService {
     try {
       const vinculo = await this.prisma.usuarioPermissao.create({ data });
       await this.auditoria.registrar({
-        usuarioId: createUsuarioPermissaoDto.usuarioId,
+        usuarioId: atorId ?? createUsuarioPermissaoDto.usuarioId,
         modulo: 'Rooster Hub',
         acao: 'permissao_concedida',
-        entidade: 'usuario_permissao',
-        entidadeId: vinculo.id,
+        entidade: 'usuario',
+        entidadeId: createUsuarioPermissaoDto.usuarioId,
       });
       return vinculo;
     } catch (error) {
@@ -50,7 +54,7 @@ export class UsuariosPermissoesService {
     return this.prisma.usuarioPermissao.findUnique({ where: { id } });
   }
 
-  async remove(id: string) {
+  async remove(id: string, atorId?: string) {
     const existing = await this.prisma.usuarioPermissao.findUnique({ where: { id } });
     if (!existing) {
       return null;
@@ -68,11 +72,11 @@ export class UsuariosPermissoesService {
     try {
       const vinculo = await this.prisma.usuarioPermissao.delete({ where: { id } });
       await this.auditoria.registrar({
-        usuarioId: existing.usuarioId,
+        usuarioId: atorId ?? existing.usuarioId,
         modulo: 'Rooster Hub',
         acao: 'permissao_revogada',
-        entidade: 'usuario_permissao',
-        entidadeId: id,
+        entidade: 'usuario',
+        entidadeId: existing.usuarioId,
       });
       return vinculo;
     } catch (error) {

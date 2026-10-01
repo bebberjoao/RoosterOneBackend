@@ -193,6 +193,18 @@ estão indicadas; as demais não alteram o banco de dados.
 
 ### Corrigido
 
+- **Violação de unicidade respondia HTTP 500** (01/10/2026). Doze services convertiam o erro `P2002` do Prisma em
+  `500` e o registravam em `logs_erro`, e a maioria convertia também em `500` as exceções HTTP lançadas pela regra
+  de negócio no bloco protegido; o cadastro de usuário com e-mail já existente, por exemplo, era apresentado como
+  falha interna. A conversão foi centralizada em `traduzirErroPrisma` (`src/common/prisma-erro.ts`): exceção HTTP é
+  propagada sem alteração, `P2002` resulta em `409`, `P2025` em `404` e os demais erros em `500`. O erro do Prisma
+  passou a ser identificado pelo nome da classe e pelo código, compatível com o cliente de teste, também no
+  `AllExceptionsFilter`. Cobertura: `src/common/prisma-erro.spec.ts` e teste e2e de e-mail duplicado.
+- **Auditoria do Hub registrava o usuário afetado como autor** (01/10/2026). Nas operações administrativas
+  (criação, edição e exclusão de usuário; concessão e revogação de permissão), `usuarioId` recebia o usuário
+  afetado, e não o administrador que executou a ação, em divergência com Academy, Finance e Boost. O autor passou a
+  ser o usuário autenticado, e o usuário afetado consta em `entidadeId` (`entidade: 'usuario'`). Coberto por teste
+  e2e.
 - **Download com nome de arquivo não-ASCII resultava em HTTP 500** (30/09/2026). O cabeçalho `Content-Disposition`
   era montado manualmente com o nome original; caracteres fora do Latin-1 eram recusados pelo Node.js e nomes
   acentuados chegavam corrompidos ao navegador. Corrigido com `response.attachment()` (RFC 6266) nos cinco pontos

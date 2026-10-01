@@ -52,7 +52,11 @@ export class UsuariosService {
   // CRUD
   // =====================================================
 
-  async create(createUsuarioDto: CreateUsuarioDto) {
+  /**
+   * `atorId`: usuário autenticado que executa a operação, registrado como autor do evento de
+   * auditoria; o usuário afetado consta em `entidadeId`.
+   */
+  async create(createUsuarioDto: CreateUsuarioDto, atorId?: string) {
     const data: Prisma.UsuarioCreateInput = {
       ...createUsuarioDto,
       senhaHash: await bcrypt.hash(createUsuarioDto.senhaHash, SALT_ROUNDS),
@@ -63,7 +67,7 @@ export class UsuariosService {
     try {
       const usuario = await this.prisma.usuario.create({ data, select: USUARIO_SAFE_SELECT });
       await this.auditoria.registrar({
-        usuarioId: usuario.id,
+        usuarioId: atorId ?? usuario.id,
         modulo: 'Rooster Hub',
         acao: 'usuario_criado',
         entidade: 'usuario',
@@ -307,7 +311,7 @@ export class UsuariosService {
     return this.hasPermission(usuarioId, 'Rooster Hub', '/hub/acessos', 'gerenciar-permissoes');
   }
 
-  async update(id: string, updateUsuarioDto: UpdateUsuarioDto) {
+  async update(id: string, updateUsuarioDto: UpdateUsuarioDto, atorId?: string) {
     const existing = await this.prisma.usuario.findUnique({ where: { id } });
     if (!existing) {
       return null;
@@ -332,7 +336,7 @@ export class UsuariosService {
         select: USUARIO_SAFE_SELECT,
       });
       await this.auditoria.registrar({
-        usuarioId: id,
+        usuarioId: atorId ?? id,
         modulo: 'Rooster Hub',
         acao: updateUsuarioDto.senhaHash ? 'senha_redefinida_por_admin' : 'usuario_editado',
         entidade: 'usuario',
@@ -344,7 +348,7 @@ export class UsuariosService {
     }
   }
 
-  async remove(id: string) {
+  async remove(id: string, atorId?: string) {
     const existing = await this.prisma.usuario.findUnique({ where: { id } });
     if (!existing) {
       return null;
@@ -355,6 +359,7 @@ export class UsuariosService {
     try {
       const usuario = await this.prisma.usuario.delete({ where: { id }, select: USUARIO_SAFE_SELECT });
       await this.auditoria.registrar({
+        usuarioId: atorId,
         modulo: 'Rooster Hub',
         acao: 'usuario_excluido',
         entidade: 'usuario',
