@@ -1,84 +1,140 @@
 # Seeds — Rooster One
 
-Script: `prisma/seed-dev.ts`, executado com `npm run db:seed:dev`. **Apaga tudo** (`clearDatabase()`, na ordem correta de FK) antes de recriar — não é incremental.
+Script: `prisma/seed-dev.ts`, executado por `npm run db:seed:dev`. O script **apaga todos os dados**
+(`clearDatabase()`, na ordem exigida pelas chaves estrangeiras) antes de recriá-los; não é incremental. Situação
+verificada em 01/10/2026.
 
-## O que é criado
+## Arquivos de demonstração
+
+Os registros que referenciam arquivo (anexo de chamado, anexos de entrega, documentos acadêmicos, nota fiscal,
+material de apoio e certificado do Boost) recebem PDFs reais, gerados com `pdfkit` e gravados **cifrados** nas
+pastas de upload configuradas, pelo mesmo mecanismo da aplicação (`escreverDocumentoEncriptadoComNome`). Os
+arquivos recebem nome determinístico (`seed-<chave>.pdf`), de modo que a reexecução do seed os sobrescreve, sem
+acumular cópias. A execução exige, portanto, `FILE_ENCRYPTION_KEY` definida, a mesma utilizada pela aplicação.
+
+## Dados criados
 
 ### Módulos e permissões
 
-9 `Modulo` (Rooster Hub, Rooster Desk, Rooster Rooms, Rooster Assets, Rooster Academy, Rooster Learn, Rooster Student, Rooster Boost, Rooster Finance) e **132 permissões** (`Permissao`), cada uma com a chave `módulo + recurso (rota de tela) + ação` usada por `@RequirePermission` no backend e por `permission-catalog.ts` no frontend. `Rooster Student` é só um módulo de permissão (sem controller/tabela próprios) para as rotas `/me/*` servidas pelo `AcademyController`/`LearnController`/`FinanceController` — ver `docs/security/03-rbac.md`. `Rooster Boost` só cobre o lado **instrutor** (login do Hub) — o aluno Boost usa `BoostUsuario`, uma tabela de login própria sem nenhuma relação com este catálogo de permissões (ver seção Boost abaixo e `docs/security/03-rbac.md`).
+Nove registros de `Modulo` (Rooster Hub, Rooster Desk, Rooster Rooms, Rooster Assets, Rooster Academy, Rooster
+Learn, Rooster Student, Rooster Boost e Rooster Finance) e **141 permissões** (`Permissao`), cada qual identificada
+pela combinação `módulo + recurso (rota de tela) + ação` utilizada por `@RequirePermission` no backend e por
+`permission-catalog.ts` no frontend. O `Rooster Student` é módulo exclusivamente de permissão (sem controller ou
+tabela próprios), aplicado às rotas `/me/*` atendidas por `AcademyController`, `LearnController` e
+`FinanceController`; ver `docs/security/03-rbac.md`. O `Rooster Boost` abrange apenas a área do **instrutor**
+(login do Hub); o aluno do Boost utiliza `BoostUsuario`, tabela de autenticação própria, sem relação com este
+catálogo de permissões.
 
-### Usuários e permissões concedidas
+### Usuários do Hub, Desk, Rooms, Assets e Finance
 
-| Usuário | E-mail | Senha | Perfil de permissão |
+| Usuário | E-mail | Senha | Conjunto de permissões |
 |---|---|---|---|
-| Administrador Rooster | `admin@rooster.local` | `Admin123!` | Todas as 132 permissões |
-| Atendente Secretaria | `atendente.secretaria@rooster.local` | `Atendente123!` | Perfil "atendente" (operacional em Desk + leitura em Rooms/Assets), setor Secretaria Acadêmica |
+| Administrador Rooster | `admin@rooster.local` | `Admin123!` | Todas as 141 permissões. Possui também cadastro de professor (turma POO101-A) e de aluno (matriculado em ALG101-A e BD101-A), para a verificação das três perspectivas com uma única conta |
+| Atendente Secretaria | `atendente.secretaria@rooster.local` | `Atendente123!` | Conjunto "atendente" (operação no Desk e leitura em Rooms e Assets), setor Secretaria Acadêmica |
 | Atendente Suporte | `atendente.suporte@rooster.local` | `Atendente123!` | Idem, setor Suporte de TI |
 | Atendente Coordenação | `atendente.coordenacao@rooster.local` | `Atendente123!` | Idem, setor Coordenação |
-| Coordenador Secretaria | `coordenador.secretaria@rooster.local` | `Coordenador123!` | Perfil "coordenador" (operacional + gestão em Desk/Rooms/Assets), setor Secretaria Acadêmica |
+| Coordenador Secretaria | `coordenador.secretaria@rooster.local` | `Coordenador123!` | Conjunto "coordenador" (operação e gestão em Desk, Rooms e Assets), setor Secretaria Acadêmica |
 | Coordenador Suporte | `coordenador.suporte@rooster.local` | `Coordenador123!` | Idem, setor Suporte de TI |
 | Coordenador Coordenação | `coordenador.coordenacao@rooster.local` | `Coordenador123!` | Idem, setor Coordenação |
-| Ana Solicitante | `ana.solicitante@rooster.local` | `Senha123` | Perfil "solicitante" (autoatendimento em Desk/Rooms), setor Secretaria Acadêmica |
-| Bruno Atendente | `bruno.atendente@rooster.local` | `Senha123` | Perfil "atendente", setor Suporte de TI |
-| Carla Visualizadora | `carla.visualizadora@rooster.local` | `Senha123` | Perfil "visualizador" (só leitura), setor Coordenação |
-| Marcos Financeiro | `financeiro@rooster.local` | `Financeiro123!` | `financeStaffKeys` — gestão completa do Rooster Finance (cobranças, produtos, serviços, descontos, NF, relatórios) |
+| Ana Solicitante | `ana.solicitante@rooster.local` | `Senha123` | Conjunto "solicitante" (autoatendimento em Desk e Rooms), setor Secretaria Acadêmica |
+| Bruno Atendente | `bruno.atendente@rooster.local` | `Senha123` | Conjunto "atendente", setor Suporte de TI |
+| Carla Visualizadora | `carla.visualizadora@rooster.local` | `Senha123` | Conjunto "visualizador" (somente leitura), setor Coordenação |
+| Marcos Financeiro | `financeiro@rooster.local` | `Financeiro123!` | `financeStaffKeys`: gestão completa do Rooster Finance (cobranças, produtos, serviços, descontos, políticas, notas fiscais e relatórios) |
 
-Os "perfis" acima (atendente/coordenador/solicitante/visualizador) **não são uma entidade do banco** — são só um agrupamento de chaves de permissão dentro do próprio script de seed, para dar variedade de cenário de teste. Ver `docs/system/04-regras-de-negocio.md` (RN001, RN002) — não existe tabela de Perfil.
+Os conjuntos acima (atendente, coordenador, solicitante e visualizador) **não constituem entidade do banco**: são
+agrupamentos de chaves de permissão definidos no próprio script, para diversificar os cenários de teste. Não há
+tabela de perfil; ver `docs/system/04-regras-de-negocio.md` (RN001 e RN002).
 
-### Usuários e permissões do Academy/Learn/Student
+### Usuários do Academy, Learn e Student
 
-| Usuário | E-mail | Senha | Perfil de permissão |
+| Usuário | E-mail | Senha | Conjunto de permissões |
 |---|---|---|---|
-| Coordenadora Julia Prado | `coordenacao.academica@rooster.local` | `Coordenador123!` | `academyCoordenadorKeys` — gestão ampla de Academy + Learn (bypass de dono em turma alheia) |
-| Prof. Ricardo Lima | `ricardo.lima@rooster.local` | `Professor123!` | `academyProfessorKeys` — só o necessário para lecionar as próprias turmas |
+| Coordenadora Julia Prado | `coordenacao.academica@rooster.local` | `Coordenador123!` | `academyCoordenadorKeys` e `boostGestaoKeys`: gestão ampla de Academy e Learn (acesso a turmas de qualquer professor) e gestão do Boost |
+| Prof. Ricardo Lima | `ricardo.lima@rooster.local` | `Professor123!` | `academyProfessorKeys`: o necessário para lecionar as próprias turmas e orientar no Boost |
 | Profa. Fernanda Costa | `fernanda.costa@rooster.local` | `Professor123!` | `academyProfessorKeys` |
-| João Pereira | `joao.pereira@rooster.local` | `Aluno123!` | `alunoKeys` — portal `Rooster Student` + respondente do `Rooster Learn` |
+| João Pereira | `joao.pereira@rooster.local` | `Aluno123!` | `alunoKeys`: portal `Rooster Student` e respostas no `Rooster Learn` |
 | Maria Santos | `maria.santos@rooster.local` | `Aluno123!` | `alunoKeys` |
+| Pedro Alves | `pedro.alves@rooster.local` | `Aluno123!` | `alunoKeys` |
 
-Esses cinco usuários (`Usuario`) são criados **antes** dos vínculos `Professor`/`Aluno` correspondentes — a ordem no script reforça a regra "vínculo, não usuário novo": primeiro o `Usuario` do Hub, depois `prisma.professor.create`/`prisma.aluno.create` apontando `usuarioId` para ele.
+Os registros de `Usuario` são criados **antes** dos vínculos de `Professor` e `Aluno` correspondentes, conforme a
+regra de vínculo sem criação de novo usuário: primeiro o `Usuario` do Hub, depois `prisma.professor.create` ou
+`prisma.aluno.create` com `usuarioId` correspondente.
 
-### Rooster Boost — gestor e orientador (Hub) + aluno externo (login próprio)
+### Rooster Boost: gestão, orientadores e alunos externos
 
 | Usuário | E-mail | Senha | Observação |
 |---|---|---|---|
-| Prof. Ricardo Lima | `ricardo.lima@rooster.local` | `Professor123!` | Reaproveitado do Academy — **orientador** (`CursoOrientadorBoost`) do curso de exemplo. Só recebe `boost.conversas.acessar/responder` (em `academyProfessorKeys`): conversa com os alunos, não gere curso |
-| Coordenação acadêmica | `coordenacao.academica@rooster.local` | `Coordenador123!` | **Gestora do Boost**: recebe `boostGestaoKeys` (gerenciar cursos e conteúdo, ver progresso, certificado, vincular orientadores) — vale para todos os cursos. O administrador também gere |
-| Camila Nogueira | `camila.externa@example.com` | `Boost123!` | **`BoostUsuario`, não `Usuario`** — cadastro público, sem login no Hub, sem nenhuma permissão do catálogo acima |
+| Coordenadora Julia Prado | `coordenacao.academica@rooster.local` | `Coordenador123!` | **Gestora do Boost** (`boostGestaoKeys`: gestão de cursos e conteúdo, progresso, certificado e vínculo de orientadores), aplicável a todos os cursos. O administrador também possui essas permissões |
+| Prof. Ricardo Lima | `ricardo.lima@rooster.local` | `Professor123!` | **Orientador** (`CursoOrientadorBoost`) do curso de demonstração, com `boost.conversas.acessar` e `responder`: comunica-se com os alunos, sem gerir o curso. O administrador também é orientador |
+| Camila Nogueira | `camila.externa@example.com` | `Boost123!` | **`BoostUsuario`**, e não `Usuario`: matrícula ativa, com 50% de progresso |
+| Rafael Torres | `rafael.torres@example.com` | `Boost123!` | `BoostUsuario`: matrícula concluída (100%), com certificado `CERT-2026-0001` |
+| Bianca Alves | `bianca.alves@example.com` | `Boost123!` | `BoostUsuario`: matrícula cancelada |
 
-Curso de exemplo: "Fundamentos de Lógica de Programação" (publicado, 20h, certificado habilitado), 2 módulos, 4 aulas (uma com material de apoio anexado), 1 orientador vinculado (Ricardo Lima), 1 matrícula da Camila com 2 das 4 aulas concluídas (`progressoPct: 50`, ainda sem certificado — o script de seed não simula a conclusão via `CertificadoBoostService` porque é um `ts-node` standalone, fora do container de DI do Nest; o fluxo de 100% → certificado automático é validado ao vivo via e2e/curl, não pré-populado) e uma troca de mensagem no chat do curso.
+Curso de demonstração: "Fundamentos de Lógica de Programação" (publicado, 20 horas, com emissão de certificado),
+dois módulos, quatro aulas (duas de texto e duas com link externo de vídeo; a primeira com material de apoio em
+PDF), dois orientadores (Ricardo Lima e o administrador) e duas conversas (Camila com troca de mensagens com o
+orientador; Rafael com mensagem ao orientador). O certificado de Rafael Torres é criado diretamente pelo script,
+com PDF de demonstração, pois o seed é executado fora do contêiner de injeção de dependências do NestJS e não
+aciona o `CertificadoBoostService`; o fluxo automático de emissão ao atingir 100% é verificado pelos testes e2e.
 
-### Rooster Finance — cobranças ligadas a alunos reais do Academy
+### Rooster Finance: cobranças vinculadas a alunos do Academy
 
-Sem tabela de aluno fictícia: toda `Cobranca` do seed aponta pra um `Aluno` já criado na seção do Academy (João Pereira/Maria Santos), nunca um id inventado.
+Não há identidade de aluno fictícia: toda `Cobranca` do seed referencia um `Aluno` criado na seção do Academy.
 
-- 2 `Produto` (Apostila de Algoritmos, Uniforme oficial), 2 `Servico` (Mensalidade — Graduação R$1.250, 2ª via de documento), 1 `Desconto` (Bolsa Mérito 50%, atribuída à Maria via `DescontoAluno`).
-- João (sem desconto): mensalidade de julho paga, mensalidade de agosto com boleto já emitido (`nossoNumero`/`linhaDigitavel`/`pixCopiaECola` preenchidos) e ainda em aberto/vencida, mensalidade de outubro futura. Mais uma cobrança de produto (apostila) paga com nota fiscal interna já emitida (`NFP-2026-0001`).
-- Maria (bolsista 50%): mensalidade de agosto paga com o desconto já aplicado (`valorDesconto: 625`), mensalidade de outubro futura com o mesmo desconto.
+- Catálogo: dois `Produto` (Apostila de Algoritmos, com estoque abaixo do mínimo para a verificação do alerta
+  do painel, e Uniforme oficial), dois `Servico` (Mensalidade — Graduação, R$ 1.250,00, e 2ª via de
+  documento), uma `PoliticaMultaJuros` (multa de 2%, juros de 0,033% ao dia e carência de 3 dias, vinculada à
+  mensalidade) e um `Desconto` (Bolsa Mérito 50%, atribuído a Maria por `DescontoAluno`).
+- João (sem desconto): mensalidade de julho paga; mensalidade de agosto com boleto emitido (`nossoNumero`,
+  `linhaDigitavel` e `pixCopiaECola` preenchidos), em aberto e vencida; mensalidade de outubro futura; e compra da
+  apostila paga, com nota fiscal interna `NFP-2026-0001` (PDF e XML cifrados).
+- Maria (bolsista 50%): mensalidade de agosto paga com desconto aplicado (`valorDesconto: 625`) e mensalidade de
+  outubro futura com o mesmo desconto.
+- Administrador (cadastro de aluno): mensalidade vencida com multa e juros, mensalidade negociada e taxa cancelada.
 
-Esses dados cobrem os três estados que a UI precisa mostrar (pago/vencido/aberto) e os dois fluxos de documento (boleto, nota fiscal) sem precisar de nenhuma chamada manual depois do seed.
+Os dados abrangem, em conjunto, todos os status de cobrança (aberto, pago, vencido, negociado e cancelado) e os dois
+fluxos documentais (boleto e nota fiscal), sem necessidade de operação manual após o seed.
 
 ### Setores
 
-Secretaria Acadêmica, Suporte de TI, Coordenação.
+Secretaria Acadêmica, Suporte de TI e Coordenação.
 
-### Dados de exemplo por módulo
+### Dados de demonstração por módulo
 
-- **Desk**: 3 categorias (Acesso e Contas, Sistemas Acadêmicos, Infraestrutura, uma por setor), 4 subcategorias, 4 prioridades fixas, 4 status (Aberto, Em atendimento, Resolvido, Encerrado), 3 tickets de exemplo em status diferentes.
-- **Rooms**: 1 campus, 2 blocos, 5 ambientes, 5 reservas (2 em status "análise", prontas para aprovar/recusar no teste manual).
-- **Assets**: 3 categorias, 3 setores de patrimônio, 6 itens, 4 movimentações de exemplo.
-- **Academy**: 2 cursos (Engenharia de Software `ENGSOFT`, Administração `ADM`), 1 período letivo ativo (`2026.2`), 2 disciplinas (`ALG101` Algoritmos, `BD101` Banco de Dados, ambas de Engenharia de Software), 2 professores, 2 alunos, 2 turmas (`ALG101-A` do Prof. Lima, `BD101-A` da Profa. Costa), 2 registros de frequência, 1 item avaliativo manual com nota lançada, 1 evento de calendário (início do semestre).
-- **Learn**: 1 atividade já publicada (`ALG101-L1`, "Lista 1 — Complexidade de algoritmos", peso 0.4) com o item avaliativo `origem: 'learn'` correspondente já criado no Academy — demonstra a integração Learn → Academy sem chamar a API, direto no seed.
+- **Desk**: três categorias (Acesso e Contas, Sistemas Acadêmicos e Infraestrutura, uma por setor), quatro
+  subcategorias, quatro prioridades fixas, quatro status (Aberto, Em atendimento, Resolvido e Encerrado) e quatro
+  chamados, um em cada status; o chamado encerrado (`TCK-0004`) possui histórico de status, mensagens pública e
+  interna, anexo em PDF e avaliação.
+- **Rooms**: um campus, dois blocos, cinco ambientes e seis reservas (duas em análise, prontas para aprovação ou
+  recusa, e uma vinculada à turma ALG101-A).
+- **Assets**: três categorias, três setores de patrimônio, seis patrimônios (em uso, disponível, em manutenção e
+  emprestado) e quatro movimentações.
+- **Academy**: dois cursos (Engenharia de Software `ENGSOFT` e Administração `ADM`), um período letivo ativo
+  (`2026.2`), três disciplinas (`ALG101`, `BD101` e `POO101`), três professores (Ricardo Lima, Fernanda Costa e o
+  administrador), quatro alunos (João, Maria, Pedro e o administrador), três turmas (`ALG101-A` de Ricardo Lima,
+  `BD101-A` de Fernanda Costa e `POO101-A` do administrador), registros de frequência com os quatro tipos de
+  presença, itens avaliativos manuais com notas lançadas (e um item da turma POO101-A sem nota, para a verificação
+  de pendências), três documentos acadêmicos em PDF (plano de ensino, ementa e regulamento) e um evento de
+  calendário.
+- **Learn**: duas atividades publicadas com o respectivo item avaliativo `origem: 'learn'` no Academy:
+  `ALG101-L1` (lista, com entrega de João corrigida e entrega do administrador pendente de correção, ambas com
+  anexo) e `POO101-T1` (trabalho com prazo vencido, com entrega de Pedro corrigida e entrega do administrador em
+  atraso).
+- **Notificações**: cinco notificações de demonstração (lidas e não lidas), com rota de destino.
 
-João só é matriculado em Algoritmos (turma do Prof. Lima) e Maria só em Banco de Dados (turma da Profa. Costa) — de propósito, para exercitar no teste manual os casos negativos de escopo (aluno/professor de uma turma não deveria ver dado da outra).
+As matrículas são deliberadamente isoladas: João está matriculado apenas em ALG101-A, Maria apenas em BD101-A e
+Pedro apenas em POO101-A, para a verificação dos casos negativos de escopo (aluno ou professor de uma turma não
+deve acessar dados de outra). O administrador, como aluno, é a única exceção, para a verificação da perspectiva do
+aluno em turmas de outros professores.
 
-## O que o seed NÃO cria
+## Dados não criados
 
-- Nenhuma `Sessao`, `Notificacao` ou `LogAuditoria` de exemplo — essas tabelas ficam vazias até o uso real do sistema gerar dados (login gera log de auditoria automaticamente, por exemplo).
-- Nenhuma `RedefinicaoSenha` de exemplo.
-- Nenhum `CertificadoBoost` de exemplo pré-populado (ver ressalva na seção Boost acima) nem `NotaFiscal` cancelada/adicional além da única já emitida no seed do Finance.
-- Nenhuma `Entrega`/`AnexoEntrega`/`DocumentoAcademico` de exemplo — a atividade publicada do Learn não tem nenhuma entrega de aluno pré-cadastrada (fluxo de entrega/correção fica para teste manual ou e2e, ver `test/app.e2e-spec.ts`).
+- Nenhuma `Sessao`, `LogAuditoria` ou `LogErro`: essas tabelas permanecem vazias até o uso do sistema (o login, por
+  exemplo, gera registro de auditoria automaticamente).
+- Nenhuma `RedefinicaoSenha`.
+- Nenhum vídeo hospedado no Boost: as aulas de vídeo utilizam link externo.
 
 ## Aviso operacional
 
-Rodar o seed **apaga qualquer usuário criado manualmente** que não esteja no próprio script (ex.: uma conta criada via `POST /usuarios` fora do seed some na próxima execução). Isso já é mencionado em `docs/operations/02-instalacao.md`.
+A execução do seed **apaga todo usuário criado manualmente** que não conste do script (por exemplo, conta criada
+por `POST /usuarios`). O aviso consta também de `docs/operations/02-instalacao.md`.

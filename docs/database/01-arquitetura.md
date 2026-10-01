@@ -4,13 +4,13 @@
 
 | Item | Valor |
 |---|---|
-| SGBD (produção/desenvolvimento) | PostgreSQL |
-| ORM | Prisma ORM (`@prisma/client` ^6.0.0, `prisma` ^6.0.0 como devDependency) |
-| Linguagem/Framework do backend | NestJS (TypeScript) |
-| Schema de produção | `prisma/schema.prisma` |
-| Schema paralelo de testes e2e | `prisma/schema.test.prisma` (SQLite) — ver seção *Schema de testes* abaixo |
+| SGBD (produção e desenvolvimento) | PostgreSQL |
+| ORM | Prisma ORM (`@prisma/client` ^6.0.0, versão instalada 6.19.3; `prisma` como dependência de desenvolvimento) |
+| Linguagem e framework do backend | NestJS (TypeScript) |
+| Schema de produção | `prisma/schema.prisma` (64 modelos) |
+| Schema da suíte e2e | `prisma/schema.test.prisma` (SQLite); ver a seção *Schema de testes* |
 
-O `datasource` do schema principal é declarado assim:
+O `datasource` do schema principal é declarado da seguinte forma:
 
 ```prisma
 datasource db {
@@ -19,7 +19,7 @@ datasource db {
 }
 ```
 
-E o gerador do client:
+E o gerador do cliente:
 
 ```prisma
 generator client {
@@ -29,25 +29,33 @@ generator client {
 
 ## Conexão (`DATABASE_URL`)
 
-A string de conexão nunca é hard-coded no schema — ela vem exclusivamente da variável de ambiente `DATABASE_URL`, lida de um arquivo `.env` na raiz do projeto (não versionado). O `.env` do projeto também define `JWT_SECRET` e `FRONTEND_URL`, mas nenhum desses valores reais é reproduzido nesta documentação. Para fins de referência, o formato esperado de uma URL Postgres é:
+A cadeia de conexão não é fixada no schema: provém exclusivamente da variável de ambiente `DATABASE_URL`, lida do
+arquivo `.env` na raiz do projeto (não versionado). O `.env` define também `JWT_SECRET`, `FILE_ENCRYPTION_KEY` e
+`FRONTEND_URL`, entre outras variáveis, cujos valores reais não são reproduzidos nesta documentação. O formato
+esperado de uma URL do PostgreSQL é:
 
 ```
 DATABASE_URL=<DATABASE_URL>
 ```
 
-onde `<DATABASE_URL>` segue o padrão `postgresql://usuario:senha@host:porta/banco?schema=public`.
+em que `<DATABASE_URL>` segue o padrão `postgresql://usuario:senha@host:porta/banco?schema=public`.
 
-O acesso ao Prisma Client dentro da aplicação NestJS é centralizado em um serviço único, injetável em todos os módulos:
+O acesso ao Prisma Client na aplicação NestJS é centralizado em um serviço único, injetável em todos os módulos:
 
-- `src/roster-hub/shared/prisma.service.ts` — `PrismaService extends PrismaClient`, conecta em `onModuleInit` e desconecta em `onModuleDestroy`.
-- `src/roster-hub/shared/prisma.module.ts` — módulo Nest que expõe `PrismaService` via `exports`, reutilizado pelos módulos Hub, Desk, Rooms, Assets, Academy e Learn.
-- `src/roster-hub/shared/prisma-test.service.ts` — variante usada nos testes e2e, apontando para o client gerado a partir de `schema.test.prisma`.
+- `src/roster-hub/shared/prisma.service.ts`: `PrismaService extends PrismaClient`, que estabelece a conexão em
+  `onModuleInit` e a encerra em `onModuleDestroy`;
+- `src/roster-hub/shared/prisma.module.ts`: módulo que exporta `PrismaService`, importado por todos os módulos de
+  domínio;
+- `src/roster-hub/shared/prisma-test.service.ts`: variante utilizada nos testes e2e, baseada no cliente gerado a
+  partir de `schema.test.prisma`.
 
-Não há múltiplas conexões/pools configurados manualmente: a aplicação usa uma única instância de `PrismaClient`, com o pool de conexões gerenciado internamente pelo Prisma/engine Rust a partir da mesma `DATABASE_URL`.
+Não há múltiplas conexões ou pools configurados manualmente: a aplicação utiliza uma única instância de
+`PrismaClient`, com o pool de conexões gerenciado internamente pelo Prisma a partir da mesma `DATABASE_URL`.
 
 ## Padrão de nomenclatura
 
-O schema usa **camelCase no lado do Prisma** (nomes de model, campos e relações) e **snake_case no banco real**, via os atributos `@map` (campo) e `@@map` (tabela). Isso foi confirmado lendo `prisma/schema.prisma` linha a linha — por exemplo:
+O schema utiliza **camelCase no Prisma** (nomes de modelos, campos e relações) e **snake_case no banco**, por meio
+dos atributos `@map` (campo) e `@@map` (tabela). Exemplo de `prisma/schema.prisma`:
 
 ```prisma
 model Usuario {
@@ -63,40 +71,74 @@ model Usuario {
 }
 ```
 
-Regras observadas de forma consistente em todos os 62 models do schema:
+Regras aplicadas de forma consistente nos 64 modelos do schema:
 
-- **Nome do model**: `PascalCase` (singular), ex.: `Usuario`, `CategoriaTicket`, `PatrimonioMovimento`.
-- **Nome da tabela** (`@@map`): `snake_case`, geralmente plural, ex.: `usuarios`, `categorias_tickets`, `patrimonio_movimentacoes`. Exceções pontuais ao plural: `patrimonio` (singular, tabela do model `Patrimonio`) e `campus` (invariável em português).
-- **Campos simples**: quando o nome já é uma palavra única em camelCase trivial (ex.: `nome`, `email`, `ativo`, `tipo`), não há `@map` porque coincide com snake_case.
-- **Campos compostos**: sempre mapeados, ex.: `senhaHash` → `senha_hash`, `criadoEm` → `criado_em`, `atualizadoEm` → `atualizado_em`, `usuarioId` → `usuario_id`, `dataDevolucaoPrevista` → `data_devolucao_prevista`.
-- **Chaves estrangeiras**: sempre `<entidade>Id` no Prisma → `<entidade>_id` no banco (ex.: `ticketId` → `ticket_id`, `categoriaId` → `categoria_id`).
-- **Tabelas de junção N:N**: nome do model composto (ex.: `UsuarioPermissao`, `UsuarioSetor`, `AtendimentoSubcategoria`) mapeado para tabela `snake_case` plural (`usuarios_permissoes`, `usuarios_setores`, `atendimentos_subcategorias`).
+- **Nome do modelo**: `PascalCase`, no singular (por exemplo, `Usuario`, `CategoriaTicket` e `PatrimonioMovimento`).
+- **Nome da tabela** (`@@map`): `snake_case`, em geral no plural (por exemplo, `usuarios`, `categorias_tickets` e
+  `patrimonio_movimentacoes`). Exceções: `patrimonio` (singular, tabela do modelo `Patrimonio`) e `campus`
+  (invariável em português).
+- **Campos simples**: quando o nome é uma palavra única (por exemplo, `nome`, `email`, `ativo` e `tipo`), não há
+  `@map`, pois coincide com a forma snake_case.
+- **Campos compostos**: sempre mapeados (por exemplo, `senhaHash` → `senha_hash`, `criadoEm` → `criado_em`,
+  `usuarioId` → `usuario_id` e `dataDevolucaoPrevista` → `data_devolucao_prevista`).
+- **Chaves estrangeiras**: `<entidade>Id` no Prisma e `<entidade>_id` no banco (por exemplo, `ticketId` →
+  `ticket_id`).
+- **Tabelas de junção N:N**: nome composto do modelo (por exemplo, `UsuarioPermissao`, `UsuarioSetor` e
+  `AtendimentoSubcategoria`), mapeado para tabela em `snake_case` no plural (`usuarios_permissoes`,
+  `usuarios_setores` e `atendimentos_subcategorias`).
 
 ## Tipos de coluna explícitos (`@db.*`)
 
-O schema usa tipagem nativa do Postgres via atributos `@db.*` do Prisma para controlar precisão/tamanho, em vez de deixar o Prisma inferir o tipo genérico:
+O schema utiliza tipos nativos do PostgreSQL, por meio dos atributos `@db.*`, para controlar precisão e tamanho, em
+vez de admitir a inferência do tipo genérico pelo Prisma:
 
-- `@db.Uuid` em todas as chaves primárias/estrangeiras do tipo `String` (exceto `PrioridadeTicket.id`, que é `String` sem `@db.Uuid` — ver `02-entidades.md`).
-- `@db.VarChar(N)` em campos de texto curto/limitado (nomes, e-mails, tags, tokens).
-- `@db.Timestamp()` / `@db.Timestamp(3)` para datas com hora.
-- `@db.Date` para datas sem hora (`Reserva.data`, `PatrimonioMovimento.dataDevolucaoPrevista`, `Patrimonio.adquiridoEm`).
-- `@db.Decimal(p, s)` para valores monetários/numéricos de precisão fixa (`Ambiente.area` → `Decimal(8,2)`, `Patrimonio.valor` → `Decimal(12,2)`).
-- `BigInt` (sem `@db.*` adicional) em `AnexoTicket.tamanho` — ver justificativa em `02-entidades.md`.
+- `@db.Uuid` nas chaves primárias e estrangeiras do tipo `String` (exceto `PrioridadeTicket.id`, `String` sem
+  `@db.Uuid`; ver `02-entidades.md`);
+- `@db.VarChar(N)` em campos de texto de tamanho limitado (nomes, e-mails, etiquetas e tokens);
+- `@db.Timestamp()` e `@db.Timestamp(3)` para data e hora;
+- `@db.Date` para datas sem hora (por exemplo, `Reserva.data`, `PatrimonioMovimento.dataDevolucaoPrevista` e
+  `Patrimonio.adquiridoEm`);
+- `@db.Decimal(p, s)` para valores monetários e numéricos de precisão fixa (por exemplo, `Ambiente.area` →
+  `Decimal(8,2)`, `Patrimonio.valor` → `Decimal(12,2)` e os valores de cobrança do Finance);
+- `BigInt`, sem `@db.*` adicional, nos tamanhos de arquivo (`AnexoTicket.tamanho`, `DocumentoAcademico.tamanho`,
+  `AnexoEntrega.tamanho`, `MaterialApoio.tamanho` e `AulaBoost.videoTamanho`), pois o tamanho em bytes pode exceder
+  o intervalo de um inteiro de 32 bits; ver `02-entidades.md`.
 
-## Geração do client
+## Geração do cliente
 
 - `npm run prisma:generate` → `prisma generate` (schema de produção, PostgreSQL).
-- `npm run prisma:generate:test` → `prisma generate --schema ./prisma/schema.test.prisma` (schema de testes, SQLite), com saída customizada para `../prisma-test-client` (diretório `prisma-test-client/` na raiz do repo).
+- `npm run prisma:generate:test` → `prisma generate --schema ./prisma/schema.test.prisma` (schema de testes,
+  SQLite), com saída em `../prisma-test-client` (diretório `prisma-test-client/` na raiz do repositório).
 
 ## Schema de testes (`schema.test.prisma`)
 
-Existe um segundo schema, `prisma/schema.test.prisma`, usado exclusivamente pela suíte de testes e2e (`npm run test:e2e`). Diferenças em relação ao schema de produção:
+O segundo schema, `prisma/schema.test.prisma`, é utilizado exclusivamente pela suíte e2e (`npm run test:e2e`).
+Diferenças em relação ao schema de produção:
 
-- `datasource` usa `provider = "sqlite"` com `url = "file:./dev-test.db"` (fixo no arquivo, não via `env()`).
-- Nenhum atributo `@map`/`@@map`/`@db.*` é usado — os nomes de tabela/coluna no SQLite de teste são os mesmos identificadores camelCase do Prisma.
-- Campos `String[]` do Postgres (ex.: `Ticket.tags`, `Ambiente.galeria`, `Ambiente.recursos`, `Ambiente.diasFuncionamento`) não existem nativamente em SQLite; no schema de teste eles viram `String?` simples, guardando JSON serializado (documentado no próprio arquivo: `// JSON — SQLite não suporta String[] nativo`), com a serialização/deserialização feita em `prisma-test.service.ts`.
-- Índices `@@index` explícitos (`mensagens_tickets`, `reservas_mensagens`, `reservas` por `serieId`) não estão presentes no schema de teste na mesma extensão (SQLite/Prisma cria os índices únicos automaticamente, mas os `@@index` de performance não foram replicados em todos os casos).
+- o `datasource` utiliza `provider = "sqlite"` com `url = "file:./dev-test.db"` (fixo no arquivo, e não obtido por
+  `env()`);
+- não há atributos `@map`, `@@map` ou `@db.*`; os nomes de tabelas e colunas no SQLite coincidem com os
+  identificadores camelCase do Prisma;
+- os campos `String[]` do PostgreSQL (por exemplo, `Ticket.tags`, `Ambiente.galeria`, `Ambiente.recursos` e
+  `Ambiente.diasFuncionamento`) não são suportados nativamente pelo SQLite e são declarados como `String?`, com JSON
+  serializado (conforme comentário no próprio arquivo); a serialização e a desserialização são realizadas em
+  `prisma-test.service.ts`;
+- dos treze `@@index` de desempenho do schema de produção, nove estão reproduzidos no schema de teste; não constam
+  os índices de `Reserva` (`serieId`, `turmaId` e `ambienteId, data`) e de `MensagemBoost` (`conversaId, criadoEm`).
+  Os índices únicos são criados em ambos.
 
-Em resumo: o schema de testes é um **espelho funcional, não uma cópia fiel** — ele existe para permitir testes e2e rápidos e isolados (arquivo SQLite local, sem depender de um Postgres real), mas a fonte de verdade estrutural do banco é sempre `prisma/schema.prisma`. Não existe diffing automático entre os dois arquivos — a sincronia é 100% manual, e desalinhamentos só aparecem quando algo os exercita.
+O schema de testes constitui, portanto, um **espelho funcional, e não uma cópia fiel**: destina-se a testes e2e
+rápidos e isolados (arquivo SQLite local, sem dependência de PostgreSQL), e a referência estrutural do banco é sempre
+`prisma/schema.prisma`. Não há comparação automática entre os dois arquivos; a sincronia é manual, e eventuais
+divergências manifestam-se apenas quando exercitadas por algum teste.
 
-> **Drift real encontrado e corrigido (setembro/2026).** O model `AtendimentoSubcategoria` (vínculo atendente↔subcategoria) existia em `schema.prisma` mas **não** em `schema.test.prisma` havia algum tempo. Como `RoosterDeskService.findCategoriesForUser` inclui esse relacionamento (`include: { subcategorias: { include: { atendentes: {...} } } }`), qualquer chamada a `GET /chamados-categorias` sob o schema de teste (SQLite) sempre retornaria `500` — e como nenhum teste e2e chamava esse endpoint até então, o bug ficou invisível. Corrigido adicionando o model completo (mesmos campos/relações do schema de produção: `id`, `subcategoriaId`, `usuarioId`, `criadoEm`, `@@unique([subcategoriaId, usuarioId])`) e os campos que faltavam em `SubcategoriaTicket` (`slaHoras`, `atendentes`) e `Usuario` (`subcategoriasAtendidas`) ao schema de teste, e cobrindo o endpoint com um teste novo em `test/app.e2e-spec.ts` (ver `docs/operations/03-execucao.md`). Acionado ao investigar o bug relatado pelo usuário de dropdowns de categoria vazios no formulário de novo chamado — ver `docs/api/02-endpoints.md`, seção 2.1.
+> **Divergência identificada e corrigida em setembro de 2026.** O modelo `AtendimentoSubcategoria` (vínculo
+> atendente–subcategoria) existia em `schema.prisma`, mas **não** em `schema.test.prisma`. Como
+> `RoosterDeskService.findCategoriesForUser` inclui esse relacionamento
+> (`include: { subcategorias: { include: { atendentes: {...} } } }`), toda chamada a `GET /chamados-categorias` sob
+> o schema de teste resultaria em `500`; como nenhum teste e2e exercitava esse endpoint, o defeito permanecia
+> oculto. A correção incluiu o modelo completo (`id`, `subcategoriaId`, `usuarioId`, `criadoEm` e
+> `@@unique([subcategoriaId, usuarioId])`) e os campos ausentes em `SubcategoriaTicket` (`slaHoras` e `atendentes`)
+> e em `Usuario` (`subcategoriasAtendidas`), com novo teste em `test/app.e2e-spec.ts`. A divergência foi
+> identificada durante a análise do defeito de listas de categoria vazias no formulário de novo chamado (ver
+> `docs/api/02-endpoints.md`, seção 2.1).

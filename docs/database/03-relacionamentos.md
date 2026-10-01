@@ -1,8 +1,8 @@
 # Relacionamentos — Rooster One
 
-Todas as relações abaixo foram extraídas diretamente das declarações `@relation` de `prisma/schema.prisma`. Não há nenhuma tabela de junção implícita além das explicitamente modeladas (`UsuarioPermissao`, `UsuarioSetor`, `AtendimentoSubcategoria`) — todas as demais relações são 1:N simples (uma FK opcional ou obrigatória apontando para uma PK).
+As relações abaixo foram extraídas diretamente das declarações `@relation` de `prisma/schema.prisma`. Não há tabela de junção implícita além das modeladas explicitamente (`UsuarioPermissao`, `UsuarioSetor`, `AtendimentoSubcategoria`, `CursoOrientadorBoost` e `DescontoAluno`); as demais relações são 1:N simples (chave estrangeira opcional ou obrigatória que referencia uma chave primária).
 
-Importante: vários campos que parecem FKs (`Reserva.responsavelId`, `Reserva.setorId`, `Reserva.decididoPor`, `Patrimonio.localizacaoId`, `Patrimonio.responsavelUserId`, `Patrimonio.setorId` vs `setorRef`, `Patrimonio.chamadoManutencaoId`, e — no Academy/Learn — `DocumentoAcademico.autorId`, `RegistroFrequencia.registradoPorId`, `Nota.lancadoPorId`, `Entrega.corrigidoPorId`) **não têm `@relation` no Prisma** — são apenas colunas `Uuid?`/texto sem constraint de FK real navegável pelo client (ver `05-indices-e-constraints.md` para quais delas viram FK no banco vs. quais são apenas guardadas como dado solto). Este documento cobre apenas relações que o Prisma efetivamente modela com `@relation`.
+Observação: diversos campos com aparência de chave estrangeira (`Reserva.responsavelId`, `Reserva.setorId`, `Reserva.decididoPor`, `Patrimonio.localizacaoId`, `Patrimonio.responsavelUserId`, `Patrimonio.chamadoManutencaoId` e, no Academy e no Learn, `DocumentoAcademico.autorId`, `RegistroFrequencia.registradoPorId`, `Nota.lancadoPorId` e `Entrega.corrigidoPorId`) **não possuem `@relation` no Prisma**: são colunas `Uuid?` sem restrição de chave estrangeira navegável pelo cliente (ver `05-indices-e-constraints.md`). Este documento abrange apenas as relações modeladas com `@relation`.
 
 ## Módulo Hub
 
@@ -15,8 +15,9 @@ Importante: vários campos que parecem FKs (`Reserva.responsavelId`, `Reserva.se
 | Usuario → Notificacao | 1:N | `Notificacao.usuarioId` | (padrão, opcional) |
 | Usuario → Sessao | 1:N | `Sessao.usuarioId` | (padrão, opcional) |
 | Usuario → LogAuditoria | 1:N | `LogAuditoria.usuarioId` | (padrão, opcional) |
+| Usuario → LogErro | 1:N | `LogErro.usuarioId` | SetNull (opcional) |
 
-Não existe model `Perfil`/`Role` no schema atual — a ligação de autorização é direta entre `Usuario` e `Permissao` via `UsuarioPermissao`. Essa arquitetura substituiu um modelo anterior (`Perfil`/`usuarios_perfis`/`perfis_permissoes`) removido na migration `20260916125542_usuarios_permissoes` (ver `04-migrations.md`).
+Não há modelo `Perfil` ou `Role` no schema atual: o vínculo de autorização é direto entre `Usuario` e `Permissao`, por meio de `UsuarioPermissao`. Essa arquitetura substituiu um modelo anterior (`Perfil`, `usuarios_perfis` e `perfis_permissoes`), removido pela migration `20260916125542_usuarios_permissoes` (ver `04-migrations.md`).
 
 ## Módulo Desk
 
@@ -40,7 +41,7 @@ Não existe model `Perfil`/`Role` no schema atual — a ligação de autorizaç�
 | Ticket → AvaliacaoTicket | 1:N | `AvaliacaoTicket.ticketId` | (padrão, opcional) |
 | Usuario → AvaliacaoTicket | 1:N | `AvaliacaoTicket.usuarioId` | (padrão, opcional) |
 
-`Ticket` tem **duas** relações distintas com `Usuario` (solicitante e técnico), por isso o Prisma exige nomes de relação explícitos (`@relation("TicketSolicitante")` e `@relation("TicketTecnico")`) para desambiguar as duas FKs que apontam para a mesma tabela.
+`Ticket` possui **duas** relações distintas com `Usuario` (solicitante e técnico); por isso, o Prisma exige nomes de relação explícitos (`@relation("TicketSolicitante")` e `@relation("TicketTecnico")`) para distinguir as duas chaves estrangeiras que referenciam a mesma tabela.
 
 ## Módulo Rooms
 
@@ -50,12 +51,13 @@ Não existe model `Perfil`/`Role` no schema atual — a ligação de autorizaç�
 | Campus → Ambiente | 1:N | `Ambiente.campusId` | Cascade |
 | Bloco → Ambiente | 1:N | `Ambiente.blocoId` | Cascade |
 | Ambiente → Reserva | 1:N | `Reserva.ambienteId` | Restrict |
+| Turma (Academy) → Reserva | 1:N (opcional) | `Reserva.turmaId` | SetNull |
 | Reserva → ReservaMensagem | 1:N | `ReservaMensagem.reservaId` | Cascade |
 | Usuario → ReservaMensagem | 1:N | `ReservaMensagem.usuarioId` | (padrão, obrigatório → Restrict implícito) |
 | Reserva → ReservaHistorico | 1:N | `ReservaHistorico.reservaId` | Cascade |
 | Usuario → ReservaHistorico | 1:N | `ReservaHistorico.usuarioId` | (padrão, opcional) |
 
-`Reserva` tem campos `responsavelId`, `setorId` e `decididoPor` que guardam UUIDs de usuário/setor **sem** `@relation` Prisma — são referências "soltas" (denormalizadas, com o nome também salvo em texto ao lado: `responsavel`, `setor`). O mesmo padrão se repete em `Patrimonio` (`localizacaoId`, `responsavelUserId`, `chamadoManutencaoId`). Essas colunas não aparecem no diagrama ER abaixo por não serem relações Prisma navegáveis.
+`Reserva` possui os campos `responsavelId`, `setorId` e `decididoPor`, que armazenam identificadores de usuário e de setor **sem** `@relation` no Prisma: são referências desnormalizadas, com o nome correspondente gravado em texto no campo adjacente (`responsavel` e `setor`). O mesmo padrão ocorre em `Patrimonio` (`localizacaoId`, `responsavelUserId` e `chamadoManutencaoId`). Essas colunas não constam do diagrama ER, por não constituírem relações navegáveis no Prisma.
 
 ## Módulo Assets
 
@@ -85,13 +87,13 @@ Não existe model `Perfil`/`Role` no schema atual — a ligação de autorizaç�
 | ItemAvaliativo → Nota | 1:N | `Nota.itemAvaliativoId` | Cascade |
 | Aluno → Nota | 1:N | `Nota.alunoId` | Cascade |
 
-`EventoCalendarioAcademico` não tem nenhuma FK modelada (sem `@relation`) — é uma tabela isolada, sem relação com as demais entidades do Academy. `DocumentoAcademico.autorId` e `RegistroFrequencia.registradoPorId`/`Nota.lancadoPorId` guardam `Uuid` de `Usuario` **sem** `@relation` Prisma (mesmo padrão "solto" já usado em `Reserva.responsavelId`/`Patrimonio.localizacaoId` — ver nota do módulo Rooms acima) — não aparecem no diagrama abaixo.
+`EventoCalendarioAcademico` não possui chave estrangeira modelada (sem `@relation`) e constitui tabela isolada em relação às demais entidades do Academy. `DocumentoAcademico.autorId`, `RegistroFrequencia.registradoPorId` e `Nota.lancadoPorId` armazenam identificador de `Usuario` **sem** `@relation` no Prisma (mesmo padrão de `Reserva.responsavelId` e `Patrimonio.localizacaoId`; ver a nota do módulo Rooms) e não constam do diagrama.
 
-**Professor e Aluno não duplicam a tabela `usuarios`**: `Professor.usuarioId` e `Aluno.usuarioId` são FKs `@unique` obrigatórias para `Usuario.id` — criar um professor/aluno sempre vincula um `Usuario` do Hub já existente, nunca cria conta nova. `AcademyService.createProfessor`/`createAluno` verificam explicitamente que o `usuarioId` existe e ainda não tem vínculo (`ConflictException` se já tiver).
+**Professor e Aluno não duplicam a tabela `usuarios`**: `Professor.usuarioId` e `Aluno.usuarioId` são chaves estrangeiras obrigatórias e únicas para `Usuario.id`; a criação de professor ou de aluno sempre vincula um `Usuario` existente no Hub, sem criar nova conta. `AcademyService.createProfessor` e `createAluno` verificam que o `usuarioId` existe e ainda não possui vínculo (`ConflictException` em caso contrário).
 
 ## Módulo Learn
 
-Toda entidade do Learn referencia entidades do Academy — não há turma, professor ou aluno próprios do Learn.
+Todas as entidades do Learn referenciam entidades do Academy; o Learn não possui turmas, professores ou alunos próprios.
 
 | Relação | Cardinalidade | Campo FK | onDelete |
 |---|---|---|---|
@@ -102,13 +104,13 @@ Toda entidade do Learn referencia entidades do Academy — não há turma, profe
 | Entrega → AnexoEntrega | 1:N | `AnexoEntrega.entregaId` | Cascade |
 | Atividade ↔ ItemAvaliativo (Academy) | 1:1 (opcional) | `ItemAvaliativo.atividadeId` (`@unique`) | SetNull |
 
-A última linha é a integração Learn → Academy: ao publicar uma atividade com peso, o Learn cria um `ItemAvaliativo` no Academy apontando de volta para a `Atividade` (`atividadeId`, único — no máximo um item avaliativo por atividade). `Entrega.corrigidoPorId` guarda `Uuid` de `Usuario` sem `@relation` Prisma (mesmo padrão "solto" citado acima).
+A última linha corresponde à integração Learn → Academy: ao publicar atividade com peso, o Learn cria um `ItemAvaliativo` no Academy que referencia a `Atividade` (`atividadeId`, único: no máximo um item avaliativo por atividade). `Entrega.corrigidoPorId` armazena identificador de `Usuario` sem `@relation` no Prisma (mesmo padrão citado acima).
 
 ---
 
 ## Módulo Boost
 
-`BoostUsuario` é uma raiz de relacionamento própria — não se conecta a `Usuario` (Hub) de forma alguma. `Professor` (Academy) é reaproveitado como instrutor.
+`BoostUsuario` constitui raiz de relacionamento própria, sem qualquer vínculo com `Usuario` (Hub). O `CursoBoost` não possui responsável exclusivo; o `Professor` (Academy) participa como orientador, por meio de `CursoOrientadorBoost`, e como autor de mensagens nas conversas.
 
 | Relação | Cardinalidade | Campo FK | onDelete |
 |---|---|---|---|
@@ -128,13 +130,31 @@ A última linha é a integração Learn → Academy: ao publicar uma atividade c
 | BoostUsuario → MensagemBoost | 1:N (opcional) | `MensagemBoost.boostUsuarioId` | — (sem `onDelete` explícito) |
 | Professor (Academy) → MensagemBoost | 1:N (opcional) | `MensagemBoost.professorId` | — (sem `onDelete` explícito) |
 
-`MatriculaBoost` tem `@@unique([boostUsuarioId, cursoId])` (matricular de novo é idempotente) e `ProgressoAula` tem `@@unique([matriculaId, aulaId])` (concluir a mesma aula de novo faz upsert, não duplica). `MensagemBoost` tem os dois campos de autor opcionais — exatamente um dos dois é preenchido por chamada, garantido pela aplicação (`BoostService`/`BoostPortalService`), não por uma constraint do banco.
+`MatriculaBoost` possui `@@unique([boostUsuarioId, cursoId])` (nova matrícula no mesmo curso é idempotente), `ProgressoAula` possui `@@unique([matriculaId, aulaId])` (nova conclusão da mesma aula executa `upsert`, sem duplicidade) e `ConversaBoost` possui `@@unique([cursoId, boostUsuarioId])` (uma conversa por aluno em cada curso). `MensagemBoost` possui dois campos de autor opcionais, dos quais exatamente um é preenchido em cada mensagem, condição garantida pela aplicação (`BoostService` e `BoostPortalService`), e não por restrição do banco.
+
+## Módulo Finance
+
+Toda cobrança referencia um `Aluno` do Academy; o Finance não possui identidade de aluno própria.
+
+| Relação | Cardinalidade | Campo FK | onDelete |
+|---|---|---|---|
+| Aluno (Academy) → Cobranca | 1:N | `Cobranca.alunoId` | (padrão, obrigatório → Restrict implícito) |
+| Produto → Cobranca | 1:N (opcional) | `Cobranca.produtoId` | (padrão, opcional) |
+| Servico → Cobranca | 1:N (opcional) | `Cobranca.servicoId` | (padrão, opcional) |
+| Desconto → Cobranca | 1:N (opcional) | `Cobranca.descontoId` | (padrão, opcional) |
+| PoliticaMultaJuros → Cobranca | 1:N (opcional) | `Cobranca.politicaMultaJurosId` | (padrão, opcional) |
+| PoliticaMultaJuros → Servico | 1:N (opcional) | `Servico.politicaMultaJurosId` | (padrão, opcional) |
+| Usuario → PoliticaMultaJuros | 1:N (opcional) | `PoliticaMultaJuros.criadoPorId` | (padrão, opcional) |
+| Aluno ↔ Desconto (via DescontoAluno) | N:N | `DescontoAluno.alunoId` / `.descontoId` | Cascade / Cascade |
+| Cobranca ↔ NotaFiscal | 1:1 (opcional) | `NotaFiscal.cobrancaId` (`@unique`) | Cascade |
+
+`Cobranca` possui três chaves estrangeiras opcionais de origem (`produtoId`, `servicoId` e `descontoId`), pois a cobrança pode referir-se a mensalidade (serviço), a produto ou a taxa avulsa. Cada `NotaFiscal` documenta exatamente uma cobrança.
 
 ---
 
 ## Diagrama ER (Mermaid)
 
-O diagrama cobre as entidades centrais dos quatro módulos e todas as relações Prisma reais (`@relation`) entre elas, incluindo as três tabelas de junção N:N modeladas explicitamente (`UsuarioPermissao`, `UsuarioSetor`, `AtendimentoSubcategoria`).
+O diagrama abrange as entidades centrais dos oito módulos com tabelas próprias e todas as relações Prisma (`@relation`) entre elas, incluindo as tabelas de junção N:N modeladas explicitamente (`UsuarioPermissao`, `UsuarioSetor`, `AtendimentoSubcategoria`, `CursoOrientadorBoost` e `DescontoAluno`).
 
 ```mermaid
 erDiagram
@@ -148,6 +168,7 @@ erDiagram
     USUARIO ||--o{ NOTIFICACAO : "recebe"
     USUARIO ||--o{ SESSAO : "abre"
     USUARIO ||--o{ LOG_AUDITORIA : "gera"
+    USUARIO ||--o{ LOG_ERRO : "associado a"
 
     %% ===== Desk =====
     SETOR ||--o{ CATEGORIA_TICKET : "responde por"
@@ -174,6 +195,7 @@ erDiagram
     CAMPUS ||--o{ AMBIENTE : "possui"
     BLOCO ||--o{ AMBIENTE : "possui"
     AMBIENTE ||--o{ RESERVA : "reservado em"
+    TURMA ||--o{ RESERVA : "vinculada a (opcional)"
     RESERVA ||--o{ RESERVA_MENSAGEM : "possui"
     USUARIO ||--o{ RESERVA_MENSAGEM : "escreve"
     RESERVA ||--o{ RESERVA_HISTORICO : "possui"
@@ -210,7 +232,8 @@ erDiagram
     ATIVIDADE ||--o| ITEM_AVALIATIVO : "gera (origem learn)"
 
     %% ===== Boost =====
-    PROFESSOR ||--o{ CURSO_BOOST : "leciona"
+    CURSO_BOOST ||--o{ CURSO_ORIENTADOR_BOOST : "possui"
+    PROFESSOR ||--o{ CURSO_ORIENTADOR_BOOST : "orienta"
     CURSO_BOOST ||--o{ MODULO_BOOST : "possui"
     MODULO_BOOST ||--o{ AULA_BOOST : "possui"
     AULA_BOOST ||--o{ MATERIAL_APOIO : "possui"
@@ -219,9 +242,23 @@ erDiagram
     MATRICULA_BOOST ||--o{ PROGRESSO_AULA : "registra"
     AULA_BOOST ||--o{ PROGRESSO_AULA : "possui"
     MATRICULA_BOOST ||--o| CERTIFICADO_BOOST : "gera ao concluir"
-    CURSO_BOOST ||--o{ MENSAGEM_BOOST : "possui"
+    CURSO_BOOST ||--o{ CONVERSA_BOOST : "possui"
+    BOOST_USUARIO ||--o{ CONVERSA_BOOST : "participa de"
+    CONVERSA_BOOST ||--o{ MENSAGEM_BOOST : "contém"
     BOOST_USUARIO ||--o{ MENSAGEM_BOOST : "escreve (aluno)"
-    PROFESSOR ||--o{ MENSAGEM_BOOST : "escreve (instrutor)"
+    PROFESSOR ||--o{ MENSAGEM_BOOST : "escreve (orientador)"
+
+    %% ===== Finance =====
+    ALUNO ||--o{ COBRANCA : "é cobrado em"
+    PRODUTO ||--o{ COBRANCA : "origina"
+    SERVICO ||--o{ COBRANCA : "origina"
+    DESCONTO ||--o{ COBRANCA : "aplicado em"
+    POLITICA_MULTA_JUROS ||--o{ COBRANCA : "rege"
+    POLITICA_MULTA_JUROS ||--o{ SERVICO : "padrão de"
+    USUARIO ||--o{ POLITICA_MULTA_JUROS : "cria"
+    ALUNO ||--o{ DESCONTO_ALUNO : "recebe"
+    DESCONTO ||--o{ DESCONTO_ALUNO : "atribuído em"
+    COBRANCA ||--o| NOTA_FISCAL : "documentada por"
 
     USUARIO {
         uuid id PK
@@ -507,7 +544,6 @@ erDiagram
     }
     CURSO_BOOST {
         uuid id PK
-        uuid professor_id FK
         string titulo
         string slug UK
         string status
@@ -544,9 +580,20 @@ erDiagram
         uuid aula_id FK
         timestamp concluido_em
     }
-    MENSAGEM_BOOST {
+    CURSO_ORIENTADOR_BOOST {
         uuid id PK
         uuid curso_id FK
+        uuid professor_id FK
+    }
+    CONVERSA_BOOST {
+        uuid id PK
+        uuid curso_id FK
+        uuid boost_usuario_id FK
+        timestamp ultima_mensagem_em
+    }
+    MENSAGEM_BOOST {
+        uuid id PK
+        uuid conversa_id FK
         uuid boost_usuario_id FK
         uuid professor_id FK
         string mensagem
@@ -557,19 +604,81 @@ erDiagram
         string codigo UK
         string caminho_pdf
     }
+    PRODUTO {
+        uuid id PK
+        string codigo UK
+        string nome
+    }
+    SERVICO {
+        uuid id PK
+        uuid politica_multa_juros_id FK
+        string nome
+    }
+    DESCONTO {
+        uuid id PK
+        string nome
+        string tipo
+        decimal valor
+    }
+    DESCONTO_ALUNO {
+        uuid id PK
+        uuid aluno_id FK
+        uuid desconto_id FK
+    }
+    POLITICA_MULTA_JUROS {
+        uuid id PK
+        uuid criado_por_id FK
+        string nome
+    }
+    COBRANCA {
+        uuid id PK
+        uuid aluno_id FK
+        uuid produto_id FK
+        uuid servico_id FK
+        uuid desconto_id FK
+        uuid politica_multa_juros_id FK
+        string tipo
+        date vencimento
+        string status
+    }
+    NOTA_FISCAL {
+        uuid id PK
+        uuid cobranca_id FK
+        string numero UK
+        string status
+    }
 ```
 
-### Conferência do diagrama contra o schema
+### Conferência do diagrama com o schema
 
-Cada aresta do diagrama acima foi checada linha a linha contra `prisma/schema.prisma`:
+Cada aresta do diagrama foi verificada contra `prisma/schema.prisma` (revisão de 01/10/2026):
 
-- **Hub**: 7 relações 1:N/N:N diretas de `Usuario`, `Setor`, `Modulo` e `Permissao` — todas conferem com os blocos `model Usuario`, `model RedefinicaoSenha`, `model Setor`, `model Modulo`, `model Permissao`, `model UsuarioPermissao`, `model UsuarioSetor`, `model Notificacao`, `model Sessao`, `model LogAuditoria`.
-- **Desk**: 17 relações — conferidas contra `CategoriaTicket`, `SubcategoriaTicket`, `AtendimentoSubcategoria`, `PrioridadeTicket`, `StatusTicket`, `Ticket` (incluindo as duas relações nomeadas para `Usuario`), `MensagemTicket`, `AnexoTicket`, `HistoricoTicket`, `AvaliacaoTicket`.
-- **Rooms**: 8 relações — conferidas contra `Campus`, `Bloco`, `Ambiente`, `Reserva`, `ReservaMensagem`, `ReservaHistorico`.
-- **Assets**: 3 relações — conferidas contra `PatrimonioCategoria`, `PatrimonioSetor`, `Patrimonio`, `PatrimonioMovimento`.
-- **Academy**: 15 relações — conferidas contra `Curso`, `PeriodoLetivo`, `Disciplina`, `Professor`, `Aluno`, `Turma`, `Matricula`, `RegistroFrequencia`, `ItemAvaliativo`, `Nota`, `DocumentoAcademico`, incluindo as duas relações 1:1 opcionais novas em `Usuario` (`professorAcademico`, `alunoAcademico`). `EventoCalendarioAcademico` foi deliberadamente deixada de fora do diagrama — não tem nenhuma FK/`@relation` no schema.
-- **Learn**: 6 relações — conferidas contra `Atividade`, `Entrega`, `AnexoEntrega`, incluindo a relação cruzada 1:1 opcional `Atividade ↔ ItemAvaliativo` (Learn → Academy), que é como uma atividade publicada passa a contar nota no Academy sem duplicar dado.
-- **Boost**: 12 relações — conferidas contra `BoostUsuario`, `CursoBoost`, `ModuloBoost`, `AulaBoost`, `MaterialApoio`, `MatriculaBoost`, `ProgressoAula`, `MensagemBoost`, `CertificadoBoost`, incluindo a relação cruzada `Professor (Academy) → CursoBoost`/`MensagemBoost` (Boost reaproveita o instrutor do Academy) e a 1:1 opcional `MatriculaBoost ↔ CertificadoBoost`. `BoostUsuario` não tem nenhuma relação com `Usuario` (Hub) — cadastro deliberadamente independente, ver `docs/security/03-rbac.md`.
-- **Finance**: 7 relações — conferidas contra `Produto`, `Servico`, `Desconto`, `DescontoAluno`, `Cobranca`, `NotaFiscal`. O eixo é a relação cruzada `Aluno (Academy) 1:N Cobranca`: toda cobrança aponta para um `Aluno` real do Academy, nunca para uma identidade de aluno paralela. `Cobranca` tem três FKs opcionais de origem (`produtoId`, `servicoId`, `descontoId`), pois uma cobrança pode ser de mensalidade (serviço), de produto, de taxa avulsa ou nenhum dos três; `Cobranca ↔ NotaFiscal` é 1:1 opcional (toda nota documenta exatamente uma cobrança existente); `DescontoAluno` é a junção N:N entre `Aluno` e `Desconto`, com `@@unique([alunoId, descontoId])`.
+- **Hub**: 10 arestas, verificadas contra `Usuario`, `RedefinicaoSenha`, `Setor`, `Modulo`, `Permissao`,
+  `UsuarioPermissao`, `UsuarioSetor`, `Notificacao`, `Sessao`, `LogAuditoria` e `LogErro`.
+- **Desk**: 18 arestas, verificadas contra `CategoriaTicket`, `SubcategoriaTicket`, `AtendimentoSubcategoria`,
+  `PrioridadeTicket`, `StatusTicket`, `Ticket` (incluindo as duas relações nomeadas com `Usuario`),
+  `MensagemTicket`, `AnexoTicket`, `HistoricoTicket` e `AvaliacaoTicket`.
+- **Rooms**: 9 arestas, verificadas contra `Campus`, `Bloco`, `Ambiente`, `Reserva` (incluindo o vínculo opcional
+  com `Turma`), `ReservaMensagem` e `ReservaHistorico`.
+- **Assets**: 3 arestas, verificadas contra `PatrimonioCategoria`, `PatrimonioSetor`, `Patrimonio` e
+  `PatrimonioMovimento`.
+- **Academy**: 15 arestas, verificadas contra `Curso`, `PeriodoLetivo`, `Disciplina`, `Professor`, `Aluno`, `Turma`,
+  `Matricula`, `RegistroFrequencia`, `ItemAvaliativo`, `Nota` e `DocumentoAcademico`, incluindo as duas relações
+  1:1 opcionais em `Usuario` (`professorAcademico` e `alunoAcademico`). `EventoCalendarioAcademico` não consta do
+  diagrama, por não possuir chave estrangeira nem `@relation`.
+- **Learn**: 6 arestas, verificadas contra `Atividade`, `Entrega` e `AnexoEntrega`, incluindo a relação 1:1 opcional
+  `Atividade ↔ ItemAvaliativo` (Learn → Academy), pela qual a atividade publicada passa a compor a nota no Academy
+  sem duplicação de dados.
+- **Boost**: 15 arestas, verificadas contra `BoostUsuario`, `CursoBoost`, `CursoOrientadorBoost`, `ModuloBoost`,
+  `AulaBoost`, `MaterialApoio`, `MatriculaBoost`, `ProgressoAula`, `ConversaBoost`, `MensagemBoost` e
+  `CertificadoBoost`, incluindo as relações com `Professor` (Academy), na condição de orientador e de autor de
+  mensagens, e a relação 1:1 opcional `MatriculaBoost ↔ CertificadoBoost`. `BoostUsuario` não possui relação com
+  `Usuario` (Hub), por decisão de projeto; ver `docs/security/03-rbac.md`.
+- **Finance**: 10 arestas, verificadas contra `Produto`, `Servico`, `Desconto`, `DescontoAluno`,
+  `PoliticaMultaJuros`, `Cobranca` e `NotaFiscal`. O eixo é a relação `Aluno (Academy) 1:N Cobranca`: toda cobrança
+  referencia um `Aluno` do Academy, e nunca uma identidade de aluno paralela.
 
-Nenhuma relação foi inventada ou simplificada: campos sem `@relation` no Prisma (`Reserva.responsavelId/setorId/decididoPor`, `Patrimonio.localizacaoId/responsavelUserId/chamadoManutencaoId`, `DocumentoAcademico.autorId`, `RegistroFrequencia.registradoPorId`, `Nota.lancadoPorId`, `Entrega.corrigidoPorId`) foram deliberadamente deixados de fora do diagrama, pois não são relações reconhecidas pelo Prisma Client (apenas colunas UUID/texto sem constraint FK modelada).
+Nenhuma relação foi acrescentada ou simplificada: os campos sem `@relation` no Prisma
+(`Reserva.responsavelId`, `setorId` e `decididoPor`; `Patrimonio.localizacaoId`, `responsavelUserId` e
+`chamadoManutencaoId`; `DocumentoAcademico.autorId`; `RegistroFrequencia.registradoPorId`; `Nota.lancadoPorId`;
+`Entrega.corrigidoPorId`) não constam do diagrama, por não constituírem relações reconhecidas pelo Prisma Client.

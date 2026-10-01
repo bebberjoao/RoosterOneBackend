@@ -1,10 +1,10 @@
 # Entidades — Rooster One
 
-Fonte: `prisma/schema.prisma`. Todos os models estão documentados (**64 no total**), agrupados pelos **8 módulos de negócio com tabelas próprias** (Hub, Desk, Rooms, Assets, Academy, Learn, Boost, Finance). Rooster Student não tem tabela própria — usa as do Academy/Learn/Finance. Nomes de coluna reais indicados quando há `@map`; nome da tabela real indicado pelo `@@map`.
+Fonte: `prisma/schema.prisma`. Todos os modelos estão documentados (**64 no total**), agrupados pelos **oito módulos de negócio com tabelas próprias** (Hub, Desk, Rooms, Assets, Academy, Learn, Boost e Finance). O Rooster Student não possui tabela própria e utiliza as do Academy, do Learn e do Finance. Os nomes reais de coluna são indicados quando há `@map`, e o nome real da tabela, pelo `@@map`.
 
-Legenda de nullability: **obrigatório** = coluna `NOT NULL` no Postgres (campo sem `?` no Prisma); **opcional** = coluna aceita `NULL` (campo com `?`).
+Legenda de obrigatoriedade: **obrigatório** = coluna `NOT NULL` no PostgreSQL (campo sem `?` no Prisma); **opcional** = coluna que aceita `NULL` (campo com `?`).
 
-**Nota sobre todo campo "nome do arquivo em disco" abaixo** (`AnexoTicket.caminho`, `DocumentoAcademico.caminho`, `AnexoEntrega.caminho`, `MaterialApoio.caminho`, `AulaBoost.videoArquivo`, `CertificadoBoost.caminhoPdf`, `NotaFiscal.caminhoPdf`): desde setembro/2026 o arquivo referenciado é gravado **cifrado em repouso** (AES-256-GCM ou, só para vídeo, AES-256-CTR) — ver `src/common/file-encryption.util.ts` e `docs/security/05-analise-de-seguranca.md`. O campo continua sendo só o nome do arquivo, sem mudança de schema.
+**Nota sobre os campos que armazenam nome de arquivo em disco** (`AnexoTicket.caminho`, `DocumentoAcademico.caminho`, `AnexoEntrega.caminho`, `MaterialApoio.caminho`, `AulaBoost.videoArquivo`, `CertificadoBoost.caminhoPdf` e `NotaFiscal.caminhoPdf`): desde setembro de 2026, o arquivo referenciado é gravado **cifrado em repouso** (AES-256-GCM ou, exclusivamente para vídeo, AES-256-CTR); ver `src/common/file-encryption.util.ts` e `docs/security/05-analise-de-seguranca.md`. O campo armazena apenas o nome do arquivo, sem alteração de schema.
 
 ---
 
@@ -22,14 +22,14 @@ PK: `id`.
 | senhaHash | senha_hash | VarChar(255) | obrigatório | hash bcrypt |
 | cpf | cpf | VarChar(14) | opcional | |
 | telefone | telefone | VarChar(20) | opcional | |
-| ativo | ativo | Boolean | obrigatório | default `true` |
+| ativo | ativo | Boolean | obrigatório | padrão `true` |
 | ultimoLogin | ultimo_login | Timestamp | opcional | |
 | criadoEm | criado_em | Timestamp | opcional | |
 | atualizadoEm | atualizado_em | Timestamp | opcional | |
 
 Relações (lado "1"): `UsuarioPermissao[]`, `UsuarioSetor[]`, `Notificacao[]`, `Sessao[]`, `LogAuditoria[]`, `LogErro[]`, `Ticket[]` (como solicitante — relação nomeada `TicketSolicitante`), `Ticket[]` (como técnico — relação nomeada `TicketTecnico`), `MensagemTicket[]`, `AnexoTicket[]`, `HistoricoTicket[]`, `AvaliacaoTicket[]`, `AtendimentoSubcategoria[]`, `ReservaMensagem[]`, `ReservaHistorico[]`, `RedefinicaoSenha[]`, `Professor?` (relação `professorAcademico`, ver módulo Academy), `Aluno?` (relação `alunoAcademico`, ver módulo Academy).
 
-> **Nota (Academy/Learn)**: `professorAcademico`/`alunoAcademico` são as duas relações opcionais 1:1 adicionadas pela migration `20260917173343_academy_learn_base`. Um `Usuario` do Hub pode (opcionalmente) ter um vínculo `Professor` e/ou `Aluno` — os dois módulos **reaproveitam** a tabela `usuarios` por FK obrigatória e única (`Professor.usuarioId`, `Aluno.usuarioId`), em vez de criar uma tabela de usuário própria. Isso implementa diretamente a regra de produto "nunca duplicar a tabela usuarios" (ver `docs/system/04-regras-de-negocio.md` e `docs/security/03-rbac.md`).
+> **Nota (Academy e Learn)**: `professorAcademico` e `alunoAcademico` são as duas relações opcionais 1:1 introduzidas pela migration `20260917173343_academy_learn_base`. Um `Usuario` do Hub pode possuir, opcionalmente, vínculo de `Professor` e/ou de `Aluno`; os dois módulos **reaproveitam** a tabela `usuarios` por chave estrangeira obrigatória e única (`Professor.usuarioId` e `Aluno.usuarioId`), sem criar tabela de usuários própria. Essa estrutura implementa a regra de produto de não duplicar a tabela `usuarios` (ver `docs/system/04-regras-de-negocio.md` e `docs/security/03-rbac.md`).
 
 ### RedefinicaoSenha — tabela `redefinicoes_senha`
 
@@ -53,7 +53,7 @@ PK: `id`.
 | id | id | Uuid | obrigatório |
 | nome | nome | VarChar(100) | obrigatório |
 | descricao | descricao | Text | opcional |
-| ativo | ativo | Boolean | obrigatório, default `true` |
+| ativo | ativo | Boolean | obrigatório, padrão `true` |
 | criadoEm | criado_em | Timestamp | opcional |
 
 Relações: `UsuarioSetor[]`, `CategoriaTicket[]`.
@@ -68,14 +68,14 @@ PK: `id`.
 | nome | nome | VarChar(80) | obrigatório, `@unique` |
 | rota | rota | VarChar(150) | opcional |
 | icone | icone | VarChar(80) | opcional |
-| ativo | ativo | Boolean | obrigatório, default `true` |
+| ativo | ativo | Boolean | obrigatório, padrão `true` |
 | criadoEm | criado_em | Timestamp | opcional |
 
 Relações: `Permissao[]`.
 
 ### Permissao — tabela `permissoes`
 
-PK: `id`. FK: `moduloId` → `Modulo.id` (sem `onDelete` explícito → padrão Prisma `SET NULL` gerado na migration inicial).
+PK: `id`. FK: `moduloId` → `Modulo.id` (sem `onDelete` explícito; comportamento padrão do Prisma `SET NULL`, gerado na migration inicial).
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability |
 |---|---|---|---|
@@ -91,7 +91,7 @@ Relações: `modulo` (N:1), `usuarios` → `UsuarioPermissao[]`.
 
 ### UsuarioPermissao — tabela `usuarios_permissoes`
 
-Tabela de junção N:N **direta** entre `Usuario` e `Permissao` (não existe Perfil/Role no banco — ver `03-relacionamentos.md`). PK: `id` (surrogate). FKs: `usuarioId` → `Usuario.id` (`onDelete: Cascade`), `permissaoId` → `Permissao.id` (`onDelete: Cascade`). `@@unique([usuarioId, permissaoId])`.
+Tabela de junção N:N **direta** entre `Usuario` e `Permissao` (não há perfil ou papel no banco; ver `03-relacionamentos.md`). PK: `id` (chave substituta). FKs: `usuarioId` → `Usuario.id` (`onDelete: Cascade`) e `permissaoId` → `Permissao.id` (`onDelete: Cascade`). `@@unique([usuarioId, permissaoId])`.
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability |
 |---|---|---|---|
@@ -121,11 +121,11 @@ PK: `id`. FK: `usuarioId` → `Usuario.id` (opcional, sem `onDelete` explícito)
 | usuarioId | usuario_id | Uuid | opcional |
 | titulo | titulo | VarChar(150) | opcional |
 | mensagem | mensagem | Text | opcional |
-| lida | lida | Boolean | obrigatório, default `false` |
+| lida | lida | Boolean | obrigatório, padrão `false` |
 | rota | rota | VarChar(200) | opcional |
 | criadoEm | criado_em | Timestamp | opcional |
 
-`rota` guarda a tela de origem do evento (ex.: `/rooms/reservations/:id`) — clicar na notificação navega até ela em vez de só marcar como lida.
+`rota` armazena a tela de origem do evento (por exemplo, `/rooms/reservations/:id`); a seleção da notificação conduz o usuário a essa tela, além de marcá-la como lida.
 
 ### Sessao — tabela `sessoes`
 
@@ -139,7 +139,7 @@ PK: `id`. FK: `usuarioId` → `Usuario.id` (opcional, sem `onDelete` explícito)
 | ip | ip | VarChar(45) | opcional |
 | navegador | navegador | Text | opcional |
 | expiraEm | expira_em | Timestamp | opcional |
-| revogada | revogada | Boolean | obrigatório, default `false` |
+| revogada | revogada | Boolean | obrigatório, padrão `false` |
 | criadoEm | criado_em | Timestamp | opcional |
 
 ### LogAuditoria — tabela `logs_auditoria`
@@ -173,7 +173,7 @@ PK: `id`. FK: `usuarioId` → `Usuario.id` (opcional, `onDelete: SetNull`). Índ
 | stack | stack | Text | opcional |
 | criadoEm | criado_em | Timestamp | opcional |
 
-Sem CRUD por HTTP — a única escrita é `LogsErroService.registrar()`, chamada pelo `AllExceptionsFilter` global para toda exceção com status `>= 500` (bug de verdade; recusas esperadas como 400/403/404/409 nunca são gravadas aqui). Ver `docs/backend/11-tratamento-erros.md`.
+Não há CRUD por HTTP: a única gravação é `LogsErroService.registrar()`, invocada pelo `AllExceptionsFilter` global para toda exceção com status igual ou superior a 500 (defeito); recusas esperadas, como 400, 403, 404 e 409, não são registradas. Ver `docs/backend/11-tratamento-erros.md`.
 
 ---
 
@@ -188,8 +188,8 @@ PK: `id`. FK: `setorId` → `Setor.id` (opcional).
 | id | id | Uuid | obrigatório |
 | nome | nome | VarChar(100) | obrigatório |
 | descricao | descricao | Text | opcional |
-| ativo | ativo | Boolean | obrigatório, default `true` |
-| slaHoras | sla_horas | Int | obrigatório, default `8` |
+| ativo | ativo | Boolean | obrigatório, padrão `true` |
+| slaHoras | sla_horas | Int | obrigatório, padrão `8` |
 | setorId | setor_id | Uuid | opcional |
 | criadoEm | criado_em | Timestamp | opcional |
 
@@ -205,8 +205,8 @@ PK: `id`. FK: `categoriaId` → `CategoriaTicket.id` (opcional).
 | categoriaId | categoria_id | Uuid | opcional |
 | nome | nome | VarChar(100) | obrigatório |
 | descricao | descricao | Text | opcional |
-| ativo | ativo | Boolean | obrigatório, default `true` |
-| slaHoras | sla_horas | Int | obrigatório, default `8` |
+| ativo | ativo | Boolean | obrigatório, padrão `true` |
+| slaHoras | sla_horas | Int | obrigatório, padrão `8` |
 | criadoEm | criado_em | Timestamp | opcional |
 
 Relações: `categoria` (N:1), `tickets` → `Ticket[]`, `atendentes` → `AtendimentoSubcategoria[]`.
@@ -224,9 +224,9 @@ Tabela de junção N:N entre `SubcategoriaTicket` e `Usuario` (atendentes vincul
 
 ### PrioridadeTicket — tabela `prioridades_tickets`
 
-PK: `id String @id @default(uuid())`, **sem** `@db.Uuid` (coluna é `TEXT`, não `UUID`, mas o valor gerado é um UUID em formato de texto). As 4 prioridades do seed (`"1"`..`"4"`) têm id manual/curado, inserido pela migration `20260819203000_fixed_ticket_priorities`; qualquer prioridade criada depois via API recebe um id gerado pelo `@default(uuid())`.
+PK: `id String @id @default(uuid())`, **sem** `@db.Uuid` (a coluna é `TEXT`, e não `UUID`, embora o valor gerado seja um UUID em formato textual). As quatro prioridades do seed (`"1"` a `"4"`) possuem identificador definido manualmente, inserido pela migration `20260819203000_fixed_ticket_priorities`; as prioridades criadas posteriormente pela API recebem identificador gerado por `@default(uuid())`.
 
-> **Bug de schema corrigido (setembro/2026).** Essa migration, ao converter a coluna de UUID pra TEXT, tinha derrubado o `@default(uuid())` do `schema.prisma` de produção (só `schema.test.prisma`, o schema de teste em SQLite, mantinha o default — por isso o bug nunca apareceu nos testes e2e). Qualquer `PrioridadeTicket` criada via API real (PostgreSQL) teria falhado com violação de `NOT NULL` na coluna `id`. Restaurado o `@default(uuid())`; como esse default é gerado pelo **Prisma Client**, não uma `DEFAULT` do Postgres (confirmado por auditoria do histórico de migrations — nenhuma gerou SQL para esse default em nenhum model do projeto), a correção não exigiu nenhuma migration nova, só regenerar o client (`prisma generate`). Ver também o bug irmão em `CreateTicketDto.prioridadeId` (`docs/api/02-endpoints.md`, seção "POST /chamados").
+> **Defeito de schema corrigido em setembro de 2026.** Essa migration, ao converter a coluna de UUID para TEXT, havia removido o `@default(uuid())` do `schema.prisma` de produção (apenas `schema.test.prisma`, o schema de teste em SQLite, mantinha o valor padrão, razão pela qual o defeito não se manifestava nos testes e2e). Qualquer `PrioridadeTicket` criada pela API sobre PostgreSQL falharia por violação de `NOT NULL` na coluna `id`. O `@default(uuid())` foi restabelecido; como esse valor padrão é gerado pelo **Prisma Client**, e não por `DEFAULT` do PostgreSQL (conforme verificado no histórico de migrations, que não contém SQL para esse valor em nenhum modelo), a correção não exigiu migration, apenas a regeneração do cliente (`prisma generate`). Ver também o defeito correlato em `CreateTicketDto.prioridadeId` (`docs/api/02-endpoints.md`, seção "POST /chamados").
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability |
 |---|---|---|---|
@@ -246,7 +246,7 @@ PK: `id`.
 | id | id | Uuid | obrigatório |
 | nome | nome | VarChar(60) | obrigatório |
 | ordem | ordem | Int | opcional |
-| encerrado | encerrado | Boolean | obrigatório, default `false` |
+| encerrado | encerrado | Boolean | obrigatório, padrão `false` |
 | criadoEm | criado_em | Timestamp | opcional |
 
 Relações: `tickets` → `Ticket[]`.
@@ -267,8 +267,8 @@ PK: `id`. FKs: `usuarioId` → `Usuario.id` (relação nomeada `TicketSolicitant
 | subcategoriaId | subcategoria_id | Uuid | opcional |
 | prioridadeId | prioridade_id | Text (sem `@db.Uuid`) | opcional |
 | statusId | status_id | Uuid | opcional |
-| tags | tags | Text[] | obrigatório, default `[]` |
-| favorito | favorito | Boolean | obrigatório, default `false` |
+| tags | tags | Text[] | obrigatório, padrão `[]` |
+| favorito | favorito | Boolean | obrigatório, padrão `false` |
 | criadoEm | criado_em | Timestamp | opcional |
 | atualizadoEm | atualizado_em | Timestamp | opcional |
 | encerradoEm | encerrado_em | Timestamp | opcional |
@@ -277,7 +277,7 @@ Relações: `usuario`, `tecnico`, `categoria`, `subcategoria`, `prioridade`, `st
 
 ### MensagemTicket — tabela `mensagens_tickets`
 
-PK: `id`. FKs: `ticketId` → `Ticket.id` (`onDelete: Cascade`), `usuarioId` → `Usuario.id` (sem `onDelete` explícito → `Restrict` implícito do Prisma para relação obrigatória).
+PK: `id`. FKs: `ticketId` → `Ticket.id` (`onDelete: Cascade`) e `usuarioId` → `Usuario.id` (sem `onDelete` explícito; `Restrict` implícito do Prisma para relação obrigatória).
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability |
 |---|---|---|---|
@@ -285,7 +285,7 @@ PK: `id`. FKs: `ticketId` → `Ticket.id` (`onDelete: Cascade`), `usuarioId` →
 | ticketId | ticket_id | Uuid | obrigatório |
 | usuarioId | usuario_id | Uuid | obrigatório |
 | mensagem | mensagem | Text | obrigatório |
-| interno | interno | Boolean | obrigatório, default `false` |
+| interno | interno | Boolean | obrigatório, padrão `false` |
 | criadoEm | criado_em | Timestamp | obrigatório, `@default(now())` |
 | removidoEm | removido_em | Timestamp | opcional (soft delete) |
 
@@ -306,7 +306,7 @@ PK: `id`. FKs: `ticketId` → `Ticket.id`, `usuarioId` → `Usuario.id` (ambas o
 | **tamanho** | tamanho | **BigInt** | opcional |
 | criadoEm | criado_em | Timestamp | opcional |
 
-> **Nota sobre `tamanho`**: o campo é `BigInt?` (coluna Postgres `BIGINT`) em vez de `Int?`. O tipo `Int` do Postgres é um inteiro de 32 bits (intervalo até ~2,1 bilhões), o que não comporta com segurança o tamanho de arquivos em bytes acima de ~2 GB. Usar `BigInt` (64 bits) evita overflow ao armazenar o tamanho de anexos grandes em bytes.
+> **Nota sobre `tamanho`**: o campo é `BigInt?` (coluna PostgreSQL `BIGINT`), e não `Int?`. O tipo `Int` do PostgreSQL é um inteiro de 32 bits (limite aproximado de 2,1 bilhões), insuficiente para representar com segurança o tamanho, em bytes, de arquivos acima de aproximadamente 2 GB. O tipo `BigInt` (64 bits) elimina o risco de estouro.
 
 ### HistoricoTicket — tabela `historico_tickets`
 
@@ -353,7 +353,7 @@ PK: `id`.
 | estado | estado | Text | opcional |
 | cep | cep | Text | opcional |
 | responsavel | responsavel | Text | opcional |
-| ativo | ativo | Boolean | obrigatório, default `true` |
+| ativo | ativo | Boolean | obrigatório, padrão `true` |
 | observacoes | observacoes | Text | opcional |
 | cor | cor | Text | opcional |
 | criadoEm | criado_em | Timestamp | opcional |
@@ -371,9 +371,9 @@ PK: `id`. FK: `campusId` → `Campus.id` (`onDelete: Cascade`).
 | campusId | campus_id | Uuid | obrigatório |
 | nome | nome | VarChar(120) | obrigatório |
 | codigo | codigo | VarChar(20) | obrigatório |
-| andares | andares | Int | obrigatório, default `1` |
+| andares | andares | Int | obrigatório, padrão `1` |
 | responsavel | responsavel | Text | opcional |
-| ativo | ativo | Boolean | obrigatório, default `true` |
+| ativo | ativo | Boolean | obrigatório, padrão `true` |
 | criadoEm | criado_em | Timestamp | opcional |
 | atualizadoEm | atualizado_em | Timestamp | opcional |
 
@@ -390,18 +390,18 @@ PK: `id`. FKs: `campusId` → `Campus.id` (`onDelete: Cascade`), `blocoId` → `
 | blocoId | bloco_id | Uuid | obrigatório |
 | nome | nome | VarChar(120) | obrigatório |
 | codigo | codigo | VarChar(30) | obrigatório, `@unique` |
-| andar | andar | Int | obrigatório, default `0` |
+| andar | andar | Int | obrigatório, padrão `0` |
 | numero | numero | Text | opcional |
 | tipo | tipo | VarChar(40) | obrigatório |
-| capacidade | capacidade | Int | obrigatório, default `0` |
+| capacidade | capacidade | Int | obrigatório, padrão `0` |
 | area | area | Decimal(8,2) | opcional |
 | descricao | descricao | Text | opcional |
 | capa | capa | Text | opcional |
-| galeria | galeria | Text[] | obrigatório, default `[]` |
-| recursos | recursos | Text[] | obrigatório, default `[]` |
-| status | status | VarChar(30) | obrigatório, default `"disponivel"` |
+| galeria | galeria | Text[] | obrigatório, padrão `[]` |
+| recursos | recursos | Text[] | obrigatório, padrão `[]` |
+| status | status | VarChar(30) | obrigatório, padrão `"disponivel"` |
 | horarioAbertura | horario_abertura | VarChar(20) | opcional |
-| diasFuncionamento | dias_funcionamento | Text[] | obrigatório, default `[]` |
+| diasFuncionamento | dias_funcionamento | Text[] | obrigatório, padrão `[]` |
 | duracaoMinutos | duracao_minutos | Int | opcional |
 | criadoEm | criado_em | Timestamp | opcional |
 | atualizadoEm | atualizado_em | Timestamp | opcional |
@@ -410,14 +410,14 @@ Relações: `campus` (N:1), `bloco` (N:1), `reservas` → `Reserva[]`.
 
 ### Reserva — tabela `reservas`
 
-PK: `id`. FKs: `ambienteId` → `Ambiente.id` (`onDelete: Restrict` — impede excluir um ambiente que tenha reservas); `turmaId` → `Turma.id` (opcional, `onDelete: SetNull`).
+PK: `id`. FKs: `ambienteId` → `Ambiente.id` (`onDelete: Restrict`, que impede a exclusão de ambiente com reservas) e `turmaId` → `Turma.id` (opcional, `onDelete: SetNull`).
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability |
 |---|---|---|---|
 | id | id | Uuid | obrigatório |
 | codigo | codigo | VarChar(40) | obrigatório, `@unique` |
 | ambienteId | ambiente_id | Uuid | obrigatório |
-| responsavelId | responsavel_id | Uuid | opcional (FK "solta", sem relação Prisma nomeada para `Usuario` — apenas guarda o id) |
+| responsavelId | responsavel_id | Uuid | opcional (referência sem relação Prisma declarada para `Usuario`; armazena apenas o identificador) |
 | responsavel | responsavel | VarChar(120) | obrigatório (nome em texto) |
 | setorId | setor_id | Uuid | opcional (idem, sem relação Prisma) |
 | setor | setor | VarChar(120) | opcional (nome em texto) |
@@ -426,24 +426,24 @@ PK: `id`. FKs: `ambienteId` → `Ambiente.id` (`onDelete: Restrict` — impede e
 | data | data | Date | obrigatório |
 | horarioInicio | horario_inicio | VarChar(20) | obrigatório |
 | horarioFim | horario_fim | VarChar(20) | obrigatório |
-| participantes | participantes | Int | obrigatório, default `1` |
-| status | status | VarChar(20) | obrigatório, default `"analise"` |
+| participantes | participantes | Int | obrigatório, padrão `1` |
+| status | status | VarChar(20) | obrigatório, padrão `"analise"` |
 | **turmaId** | turma_id | Uuid | opcional |
-| recorrencia | recorrencia | VarChar(20) | obrigatório, default `"unica"` |
+| recorrencia | recorrencia | VarChar(20) | obrigatório, padrão `"unica"` |
 | **serieId** | serie_id | Uuid | opcional |
 | **serieTotal** | serie_total | Int | opcional |
 | observacoes | observacoes | Text | opcional |
-| decididoPor | decidido_por | Uuid | opcional (id solto, sem relação Prisma) |
+| decididoPor | decidido_por | Uuid | opcional (identificador sem relação Prisma) |
 | decididoEm | decidido_em | Timestamp | opcional |
 | motivoCancelamento | motivo_cancelamento | Text | opcional |
 | criadoEm | criado_em | Timestamp | opcional |
 | atualizadoEm | atualizado_em | Timestamp | opcional |
 
-> **Nota sobre `serieId`/`serieTotal`**: usados para agrupar reservas recorrentes geradas de uma vez (ex.: uma reserva semanal que gera N ocorrências). `serieId` identifica o grupo (mesmo valor em todas as reservas da série) e `serieTotal` guarda quantas ocorrências a série tem no total. Ambos nullable porque uma reserva `recorrencia = "unica"` não pertence a série alguma. Há um índice `@@index([serieId])` para consultas por série.
+> **Nota sobre `serieId` e `serieTotal`**: agrupam as reservas recorrentes geradas em uma única operação (por exemplo, reserva semanal que gera N ocorrências). `serieId` identifica o grupo (mesmo valor em todas as reservas da série), e `serieTotal` registra o total de ocorrências. Ambos são opcionais, pois a reserva com `recorrencia = "unica"` não pertence a série. O índice `@@index([serieId])` atende às consultas por série.
 
-> **Nota sobre `turmaId`**: vínculo opcional com uma `Turma` do Academy, só preenchido quando a reserva é para uma aula. Liberado por posse (professor da turma) ou gestão ampla do Academy, checado no controller, não por uma permissão de tela própria — ver RN044 em `docs/system/04-regras-de-negocio.md` e `docs/security/03-rbac.md`.
+> **Nota sobre `turmaId`**: vínculo opcional com uma `Turma` do Academy, preenchido apenas quando a reserva se destina a uma aula. É autorizado pelo vínculo do professor com a turma ou pela gestão ampla do Academy, com verificação no controller, e não por permissão de tela própria; ver RN044 em `docs/system/04-regras-de-negocio.md` e `docs/security/03-rbac.md`.
 
-Índices: `@@index([serieId])`, `@@index([turmaId])`. Relações: `ambiente` (N:1), `turma` (N:1, opcional), `mensagens` → `ReservaMensagem[]`, `historico` → `ReservaHistorico[]`.
+Índices: `@@index([serieId])`, `@@index([turmaId])` e `@@index([ambienteId, data])` (este último atende à verificação de conflito de horário; migration `20260930170607_reserva_ambiente_data_idx`). Relações: `ambiente` (N:1), `turma` (N:1, opcional), `mensagens` → `ReservaMensagem[]` e `historico` → `ReservaHistorico[]`.
 
 ### ReservaMensagem — tabela `reservas_mensagens`
 
@@ -487,7 +487,7 @@ PK: `id`.
 | nome | nome | VarChar(100) | obrigatório, `@unique` |
 | descricao | descricao | Text | opcional |
 | tom | tom | VarChar(40) | opcional |
-| sistema | sistema | Boolean | obrigatório, default `false` |
+| sistema | sistema | Boolean | obrigatório, padrão `false` |
 | criadoEm | criado_em | Timestamp | opcional |
 | atualizadoEm | atualizado_em | Timestamp | opcional |
 
@@ -510,7 +510,7 @@ Relações: `patrimonios` → `Patrimonio[]`.
 
 ### Patrimonio — tabela `patrimonio`
 
-PK: `id`. FKs: `categoriaId` → `PatrimonioCategoria.id` (obrigatória, sem `onDelete` explícito → `Restrict` implícito), `setorId` → `PatrimonioSetor.id` (opcional, sem `onDelete` explícito).
+PK: `id`. FKs: `categoriaId` → `PatrimonioCategoria.id` (obrigatória, sem `onDelete` explícito; `Restrict` implícito) e `setorId` → `PatrimonioSetor.id` (opcional, sem `onDelete` explícito).
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability |
 |---|---|---|---|
@@ -521,19 +521,19 @@ PK: `id`. FKs: `categoriaId` → `PatrimonioCategoria.id` (obrigatória, sem `on
 | marca | marca | Text | opcional |
 | modelo | modelo | Text | opcional |
 | serial | serial | Text | opcional |
-| localizacaoId | localizacao_id | Uuid | opcional (id solto, sem relação Prisma declarada) |
+| localizacaoId | localizacao_id | Uuid | opcional (identificador sem relação Prisma declarada) |
 | localizacao | localizacao | VarChar(200) | opcional (texto livre) |
 | setorId | setor_id | Uuid | opcional |
 | setor | setor | VarChar(120) | opcional (texto livre) |
-| responsavelUserId | responsavel_user_id | Uuid | opcional (id solto, sem relação Prisma declarada) |
+| responsavelUserId | responsavel_user_id | Uuid | opcional (identificador sem relação Prisma declarada) |
 | responsavel | responsavel | VarChar(120) | opcional (texto livre) |
-| status | status | VarChar(30) | obrigatório, default `"disponivel"` |
-| condicao | condicao | VarChar(30) | obrigatório, default `"bom"` |
+| status | status | VarChar(30) | obrigatório, padrão `"disponivel"` |
+| condicao | condicao | VarChar(30) | obrigatório, padrão `"bom"` |
 | adquiridoEm | adquirido_em | Date | opcional |
-| valor | valor | Decimal(12,2) | obrigatório, default `0` |
+| valor | valor | Decimal(12,2) | obrigatório, padrão `0` |
 | observacoes | observacoes | Text | opcional |
 | foto | foto | Text | opcional |
-| chamadoManutencaoId | chamado_manutencao_id | Uuid | opcional (id solto, sem relação Prisma) |
+| chamadoManutencaoId | chamado_manutencao_id | Uuid | opcional (identificador sem relação Prisma) |
 | criadoEm | criado_em | Timestamp | opcional |
 | atualizadoEm | atualizado_em | Timestamp | opcional |
 
@@ -556,13 +556,13 @@ PK: `id`. FK: `patrimonioId` → `Patrimonio.id` (`onDelete: Cascade`).
 | **devolvidoEm** | devolvido_em | Timestamp | opcional |
 | criadoEm | criado_em | Timestamp | opcional |
 
-> **Nota sobre `dataDevolucaoPrevista`/`devolvidoEm`**: controlam o prazo de empréstimo de um patrimônio (movimentação do tipo `"emprestimo"`). `dataDevolucaoPrevista` marca até quando o item deveria voltar; `devolvidoEm` é preenchido no momento real da devolução. Ambos nullable porque só se aplicam a movimentações de empréstimo — uma movimentação de tipo `"setor"` ou `"manutencao"`, por exemplo, não tem prazo de devolução. Adicionados na migration `20260917120449_emprestimo_prazo_devolucao`.
+> **Nota sobre `dataDevolucaoPrevista` e `devolvidoEm`**: controlam o prazo de empréstimo de um patrimônio (movimentação do tipo `"emprestimo"`). `dataDevolucaoPrevista` indica a data prevista para a devolução, e `devolvidoEm` é preenchido no momento efetivo da devolução. Ambos são opcionais, pois aplicam-se apenas a movimentações de empréstimo; movimentações dos tipos `"setor"` ou `"manutencao"`, por exemplo, não possuem prazo de devolução. Introduzidos pela migration `20260917120449_emprestimo_prazo_devolucao`.
 
 ---
 
 ## Módulo Academy (12 entidades)
 
-> Introduzido pela migration `20260917173343_academy_learn_base`. Comentário de cabeçalho no schema (`prisma/schema.prisma`, acima de `model Curso`): *"Disciplina é o catálogo (curricular, independente de período) — corrige o modelo do mock do frontend, que prendia termId/teacherId direto na disciplina e travava a oferta a um único período/professor por vez. A oferta de fato (período + professor + horário + sala + turno) é a Turma. Aluno/Professor são entidades acadêmicas ligadas por FK a Usuario (Hub) — não duplicam a tabela usuarios."*
+> Introduzido pela migration `20260917173343_academy_learn_base`. Comentário de cabeçalho no schema (`prisma/schema.prisma`, antes de `model Curso`): *"Disciplina é o catálogo (curricular, independente de período) — corrige o modelo do mock do frontend, que prendia termId/teacherId direto na disciplina e travava a oferta a um único período/professor por vez. A oferta de fato (período + professor + horário + sala + turno) é a Turma. Aluno/Professor são entidades acadêmicas ligadas por FK a Usuario (Hub) — não duplicam a tabela usuarios."*
 
 ### Curso — tabela `cursos`
 
@@ -574,7 +574,7 @@ PK: `id`.
 | nome | nome | VarChar(150) | obrigatório | |
 | codigo | codigo | VarChar(30) | obrigatório | `@unique` |
 | grau | grau | VarChar(30) | obrigatório | valores usados no DTO: `Graduação`, `Pós-graduação`, `Técnico`, `Extensão` |
-| ativo | ativo | Boolean | obrigatório | default `true` |
+| ativo | ativo | Boolean | obrigatório | padrão `true` |
 | criadoEm | criado_em | Timestamp | opcional | |
 | atualizadoEm | atualizado_em | Timestamp | opcional | |
 
@@ -590,7 +590,7 @@ PK: `id`.
 | nome | nome | VarChar(20) | obrigatório | `@unique` (ex.: `"2026.1"`) |
 | dataInicio | data_inicio | Date | obrigatório | |
 | dataFim | data_fim | Date | obrigatório | |
-| ativo | ativo | Boolean | obrigatório | default `false` |
+| ativo | ativo | Boolean | obrigatório | padrão `false` |
 | criadoEm | criado_em | Timestamp | opcional | |
 
 Relações: `turmas` → `Turma[]`.
@@ -607,11 +607,11 @@ PK: `id`. FK: `cursoId` → `Curso.id` (`ON DELETE RESTRICT`).
 | descricao | descricao | Text | opcional | |
 | cursoId | curso_id | Uuid | obrigatório | |
 | cargaHoraria | carga_horaria | Int | obrigatório | |
-| status | status | VarChar(20) | obrigatório | default `"ativa"` (`ativa`\|`arquivada`\|`inativa`) |
+| status | status | VarChar(20) | obrigatório | padrão `"ativa"` (`ativa`\|`arquivada`\|`inativa`) |
 | criadoEm | criado_em | Timestamp | opcional | |
 | atualizadoEm | atualizado_em | Timestamp | opcional | |
 
-> **Disciplina vs. Turma**: `Disciplina` é o catálogo curricular — código, nome, curso, carga horária — independente de período letivo e de professor. A oferta real (quando, com quem, onde) é modelada em `Turma`. Uma disciplina pode ter várias turmas ao longo de vários períodos, cada uma com seu próprio professor/turno/sala/horário. Isso é uma correção deliberada em relação ao mock anterior do frontend, que prendia `termId`/`teacherId` direto na disciplina.
+> **Disciplina e Turma**: `Disciplina` é o catálogo curricular (código, nome, curso e carga horária), independente de período letivo e de professor. A oferta efetiva (período, professor e local) é modelada em `Turma`. Uma disciplina pode ter várias turmas em diversos períodos, cada qual com professor, turno, sala e horário próprios. Trata-se de correção deliberada em relação ao protótipo anterior do frontend, que vinculava `termId` e `teacherId` diretamente à disciplina.
 
 Relações: `curso` (N:1), `turmas` → `Turma[]`, `documentos` → `DocumentoAcademico[]`.
 
@@ -622,11 +622,11 @@ PK: `id`. FK: `usuarioId` → `Usuario.id` (`ON DELETE RESTRICT`, `@unique`).
 | Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
 |---|---|---|---|---|
 | id | id | Uuid | obrigatório | |
-| usuarioId | usuario_id | Uuid | obrigatório | `@unique` — um `Usuario` só pode ter **um** vínculo de professor |
+| usuarioId | usuario_id | Uuid | obrigatório | `@unique`: cada `Usuario` pode ter no máximo **um** vínculo de professor |
 | titulacao | titulacao | VarChar(50) | opcional | ex.: `"Prof. Dr."` |
 | departamento | departamento | VarChar(100) | opcional | |
 | cargaHorariaSemanal | carga_horaria_semanal | Int | opcional | |
-| status | status | VarChar(20) | obrigatório | default `"ativo"` (`ativo`\|`afastado`\|`inativo`) |
+| status | status | VarChar(20) | obrigatório | padrão `"ativo"` (`ativo`\|`afastado`\|`inativo`) |
 | criadoEm | criado_em | Timestamp | opcional | |
 | atualizadoEm | atualizado_em | Timestamp | opcional | |
 
@@ -639,11 +639,11 @@ PK: `id`. FKs: `usuarioId` → `Usuario.id` (`ON DELETE RESTRICT`, `@unique`), `
 | Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
 |---|---|---|---|---|
 | id | id | Uuid | obrigatório | |
-| usuarioId | usuario_id | Uuid | obrigatório | `@unique` — um `Usuario` só pode ter **um** vínculo de aluno |
+| usuarioId | usuario_id | Uuid | obrigatório | `@unique`: cada `Usuario` pode ter no máximo **um** vínculo de aluno |
 | ra | ra | VarChar(20) | obrigatório | `@unique` |
 | cursoId | curso_id | Uuid | obrigatório | |
-| semestre | semestre | Int | obrigatório | default `1` |
-| situacao | situacao | VarChar(20) | obrigatório | default `"ativo"` (`ativo`\|`trancado`\|`formado`\|`inativo`) |
+| semestre | semestre | Int | obrigatório | padrão `1` |
+| situacao | situacao | VarChar(20) | obrigatório | padrão `"ativo"` (`ativo`\|`trancado`\|`formado`\|`inativo`) |
 | criadoEm | criado_em | Timestamp | opcional | |
 | atualizadoEm | atualizado_em | Timestamp | opcional | |
 
@@ -661,16 +661,16 @@ PK: `id`. FKs: `disciplinaId` → `Disciplina.id` (`ON DELETE RESTRICT`), `perio
 | periodoLetivoId | periodo_letivo_id | Uuid | obrigatório | |
 | professorId | professor_id | Uuid | opcional | |
 | turno | turno | VarChar(20) | opcional | `Matutino`\|`Vespertino`\|`Noturno` |
-| capacidade | capacidade | Int | obrigatório | default `0` (`0` = sem limite, ver `system/04-regras-de-negocio.md`) |
+| capacidade | capacidade | Int | obrigatório | padrão `0` (`0` = sem limite, ver `system/04-regras-de-negocio.md`) |
 | **sala** | sala | VarChar(150) | opcional | **texto livre — não é FK para `Ambiente` do Rooster Rooms** |
 | horario | horario | VarChar(100) | opcional | texto livre (ex.: `"Ter/Qui 19:00-22:30"`) |
-| status | status | VarChar(20) | obrigatório | default `"aberta"` (`aberta`\|`em-andamento`\|`encerrada`) |
+| status | status | VarChar(20) | obrigatório | padrão `"aberta"` (`aberta`\|`em-andamento`\|`encerrada`) |
 | criadoEm | criado_em | Timestamp | opcional | |
 | atualizadoEm | atualizado_em | Timestamp | opcional | |
 
-`@@unique([codigo, periodoLetivoId])` — o mesmo código de turma pode se repetir em períodos diferentes, mas não dentro do mesmo período.
+`@@unique([codigo, periodoLetivoId])`: o mesmo código de turma pode repetir-se em períodos distintos, mas não no mesmo período.
 
-> **Nota sobre `sala`**: campo `VarChar` de texto livre, digitado manualmente — **não** é uma foreign key para `Ambiente` (Rooster Rooms), e continua sem checagem de conflito. O que existe (setembro/2026) é um vínculo **diferente e opcional**: ao criar uma `Reserva` de ambiente para uma aula, o professor (ou a gestão) pode ligá-la a uma `Turma` (`Reserva.turmaId`, ver RN044) — não substitui `sala`, é informação adicional sobre uma reserva específica, não sobre a turma em geral. **Recomendação futura**: ver `docs/engineering/10-melhorias-futuras.md`.
+> **Nota sobre `sala`**: campo `VarChar` de texto livre, preenchido manualmente; **não** constitui chave estrangeira para `Ambiente` (Rooster Rooms) e não possui verificação de conflito. Existe, desde setembro de 2026, um vínculo **distinto e opcional**: ao criar uma `Reserva` de ambiente para uma aula, o professor ou a gestão pode associá-la a uma `Turma` (`Reserva.turmaId`, ver RN044). Esse vínculo não substitui `sala`; constitui informação adicional sobre uma reserva específica, e não sobre a turma em geral. **Evolução prevista**: ver `docs/engineering/10-melhorias-futuras.md`.
 
 Relações: `disciplina` (N:1), `periodoLetivo` (N:1), `professor` (N:1, opcional), `matriculas` → `Matricula[]`, `frequencias` → `RegistroFrequencia[]`, `itensAvaliativos` → `ItemAvaliativo[]`, `atividades` → `Atividade[]`, `reservasVinculadas` → `Reserva[]` (Rooster Rooms).
 
@@ -683,7 +683,7 @@ PK: `id`. FKs: `alunoId` → `Aluno.id` (`ON DELETE CASCADE`), `turmaId` → `Tu
 | id | id | Uuid | obrigatório | |
 | alunoId | aluno_id | Uuid | obrigatório | |
 | turmaId | turma_id | Uuid | obrigatório | |
-| status | status | VarChar(20) | obrigatório | default `"ativa"` (`ativa`\|`trancada`\|`concluida`\|`cancelada`) |
+| status | status | VarChar(20) | obrigatório | padrão `"ativa"` (`ativa`\|`trancada`\|`concluida`\|`cancelada`) |
 | criadoEm | criado_em | Timestamp | opcional | |
 | atualizadoEm | atualizado_em | Timestamp | opcional | |
 
@@ -698,10 +698,10 @@ PK: `id`. FKs: `turmaId` → `Turma.id` (`ON DELETE CASCADE`), `alunoId` → `Al
 | alunoId | aluno_id | Uuid | obrigatório | |
 | data | data | Date | obrigatório | |
 | presenca | presenca | VarChar(20) | obrigatório | `presente`\|`falta`\|`atraso`\|`justificado` |
-| registradoPorId | registrado_por_id | Uuid | opcional | id solto (quem registrou a chamada), sem relação Prisma para `Usuario` |
+| registradoPorId | registrado_por_id | Uuid | opcional | identificador do autor do registro da chamada, sem relação Prisma para `Usuario` |
 | criadoEm | criado_em | Timestamp | opcional | |
 
-O `@@unique([turmaId, alunoId, data])` é a base do `upsert` em lote de `POST /turmas/:id/frequencia` — registrar a chamada da mesma data/aluno duas vezes **atualiza** em vez de duplicar.
+O `@@unique([turmaId, alunoId, data])` fundamenta o `upsert` em lote de `POST /turmas/:id/frequencia`: o novo registro da chamada para a mesma data e o mesmo aluno **atualiza** a presença, sem gerar duplicidade.
 
 ### ItemAvaliativo — tabela `itens_avaliativos`
 
@@ -713,12 +713,12 @@ PK: `id`. FKs: `turmaId` → `Turma.id` (`ON DELETE CASCADE`), `atividadeId` →
 | turmaId | turma_id | Uuid | obrigatório | |
 | nome | nome | VarChar(120) | obrigatório | |
 | peso | peso | Decimal(4,3) | obrigatório | intervalo `0`–`1` (validado no DTO, não no banco) |
-| notaMaxima | nota_maxima | Decimal(4,2) | obrigatório | default `10` |
-| **origem** | origem | VarChar(10) | obrigatório | default `"manual"` — `"manual"` (lançado à mão pelo professor) ou `"learn"` (gerado ao publicar uma `Atividade` do Rooster Learn) |
-| atividadeId | atividade_id | Uuid | opcional | `@unique` — 1:1 com `Atividade`, só preenchido quando `origem = "learn"` |
+| notaMaxima | nota_maxima | Decimal(4,2) | obrigatório | padrão `10` |
+| **origem** | origem | VarChar(10) | obrigatório | padrão `"manual"` — `"manual"` (lançado à mão pelo professor) ou `"learn"` (gerado ao publicar uma `Atividade` do Rooster Learn) |
+| atividadeId | atividade_id | Uuid | opcional | `@unique`; relação 1:1 com `Atividade`, preenchida somente quando `origem = "learn"` |
 | criadoEm | criado_em | Timestamp | opcional | |
 
-> **Nota sobre `origem`/`atividadeId`**: é o elo da integração Learn → Academy. `DELETE /itens-avaliativos/:id` recusa (`400 BadRequestException`) remover um item com `origem = "learn"` — a exclusão precisa acontecer do lado do Learn (excluir/despublicar a atividade), para não deixar a `Atividade` apontando para um `ItemAvaliativo` inexistente.
+> **Nota sobre `origem` e `atividadeId`**: constituem o elo da integração Learn → Academy. `DELETE /itens-avaliativos/:id` recusa (`400 BadRequestException`) a remoção de item com `origem = "learn"`; a exclusão deve ser realizada no Learn (exclusão ou despublicação da atividade), para que a `Atividade` não referencie `ItemAvaliativo` inexistente.
 
 Relações: `turma` (N:1), `atividade` (N:1, opcional), `notas` → `Nota[]`.
 
@@ -732,7 +732,7 @@ PK: `id`. FKs: `itemAvaliativoId` → `ItemAvaliativo.id` (`ON DELETE CASCADE`),
 | itemAvaliativoId | item_avaliativo_id | Uuid | obrigatório | |
 | alunoId | aluno_id | Uuid | obrigatório | |
 | valor | valor | Decimal(4,2) | opcional | `null` = item ainda não corrigido para este aluno — excluído do cálculo de média (não tratado como zero) |
-| lancadoPorId | lancado_por_id | Uuid | opcional | id solto, sem relação Prisma para `Usuario` |
+| lancadoPorId | lancado_por_id | Uuid | opcional | identificador sem relação Prisma para `Usuario` |
 | atualizadoEm | atualizado_em | Timestamp | opcional | |
 
 ### EventoCalendarioAcademico — tabela `eventos_calendario_academico`
@@ -761,7 +761,7 @@ PK: `id`. FK: `disciplinaId` → `Disciplina.id` (opcional, `ON DELETE SET NULL`
 | nome | nome | VarChar(200) | obrigatório | nome original do arquivo enviado |
 | tipo | tipo | VarChar(30) | obrigatório | `plano-de-ensino`\|`ementa`\|`regulamento`\|`institucional` |
 | disciplinaId | disciplina_id | Uuid | opcional | `null` = documento institucional (não ligado a uma disciplina) |
-| autorId | autor_id | Uuid | opcional | id solto (quem enviou), sem relação Prisma para `Usuario` |
+| autorId | autor_id | Uuid | opcional | identificador do autor do envio, sem relação Prisma para `Usuario` |
 | caminho | caminho | VarChar(255) | opcional | nome do arquivo em disco (`uploads/documentos-academicos/`) |
 | **tamanho** | tamanho | **BigInt** | opcional | mesma razão do `AnexoTicket.tamanho` (ver `03-relacionamentos.md`/`04-erros.md`) — convertido para `Number` antes da resposta JSON |
 | criadoEm | criado_em | Timestamp | opcional | |
@@ -773,7 +773,7 @@ Relações: `disciplina` (N:1, opcional).
 
 ## Módulo Learn (3 entidades)
 
-> Introduzido pela mesma migration `20260917173343_academy_learn_base`. Comentário de cabeçalho no schema, acima de `model Atividade`: *"Atividade referencia a Turma real do Academy (não duplica turma/aluno próprios, ao contrário do mock do frontend). Quando a atividade tem peso/nota, pode gerar um ItemAvaliativo (origem 'learn') no Academy."*
+> Introduzido pela mesma migration `20260917173343_academy_learn_base`. Comentário de cabeçalho no schema, antes de `model Atividade`: *"Atividade referencia a Turma real do Academy (não duplica turma/aluno próprios, ao contrário do mock do frontend). Quando a atividade tem peso/nota, pode gerar um ItemAvaliativo (origem 'learn') no Academy."*
 
 ### Atividade — tabela `atividades`
 
@@ -788,38 +788,38 @@ PK: `id`. FKs: `turmaId` → `Turma.id` (`ON DELETE RESTRICT`), `professorId` �
 | descricao | descricao | Text | opcional | |
 | turmaId | turma_id | Uuid | obrigatório | |
 | professorId | professor_id | Uuid | opcional | |
-| status | status | VarChar(20) | obrigatório | default `"rascunho"` (`rascunho`\|`agendada`\|`publicada`\|`encerrada`\|`arquivada`) |
-| peso | peso | Decimal(4,3) | obrigatório | default `1` |
-| notaMaxima | nota_maxima | Decimal(4,2) | obrigatório | default `10` |
+| status | status | VarChar(20) | obrigatório | padrão `"rascunho"` (`rascunho`\|`agendada`\|`publicada`\|`encerrada`\|`arquivada`) |
+| peso | peso | Decimal(4,3) | obrigatório | padrão `1` |
+| notaMaxima | nota_maxima | Decimal(4,2) | obrigatório | padrão `10` |
 | abreEm | abre_em | Timestamp | opcional | |
 | prazoEm | prazo_em | Timestamp | opcional | |
 | tempoLimiteMin | tempo_limite_min | Int | opcional | **não identificado no código analisado** nenhuma lógica de bloqueio por tempo decorrido — o campo existe no schema/DTO mas não é aplicado em `learn.service.ts` |
-| permiteAtraso | permite_atraso | Boolean | obrigatório | default `true` — se `false`, `enviarEntrega` rejeita envio após `prazoEm` (`400 BadRequestException`) |
+| permiteAtraso | permite_atraso | Boolean | obrigatório | padrão `true` — se `false`, `enviarEntrega` rejeita envio após `prazoEm` (`400 BadRequestException`) |
 | criadoEm | criado_em | Timestamp | opcional | |
 | publicadoEm | publicado_em | Timestamp | opcional | |
 
 Relações: `turma` (N:1, obrigatória), `professor` (N:1, opcional), `itemAvaliativo` (1:1, opcional — lado inverso de `ItemAvaliativo.atividadeId`), `entregas` → `Entrega[]`.
 
-**Não implementado / decisão de escopo**: o mock anterior do frontend (`learn/mock-data.ts`) modelava um banco de questões de múltipla escolha (`Question`/`QuestionType`, alternativas embaralhadas, correção automática). O backend real não modela questão/alternativa/resposta — `tipo = 'questionario'` é apenas um rótulo entre os cinco tipos de atividade; a resposta do aluno é sempre o campo de texto livre `Entrega.texto` (mais anexos), corrigida manualmente pelo professor. Ver `docs/engineering/10-melhorias-futuras.md`.
+**Fora do escopo implementado**: o protótipo anterior do frontend (`learn/mock-data.ts`) modelava um banco de questões de múltipla escolha (`Question` e `QuestionType`, alternativas embaralhadas e correção automática). O backend não modela questão, alternativa nem resposta: `tipo = 'questionario'` é apenas um rótulo entre os cinco tipos de atividade, e a resposta do aluno é sempre o campo de texto livre `Entrega.texto` (com anexos), corrigida manualmente pelo professor. Ver `docs/engineering/10-melhorias-futuras.md`.
 
 ### Entrega — tabela `entregas`
 
-PK: `id`. FKs: `atividadeId` → `Atividade.id` (`ON DELETE CASCADE`), `alunoId` → `Aluno.id` (`ON DELETE CASCADE`). `@@unique([atividadeId, alunoId])` — um aluno tem no máximo uma entrega por atividade (reenvio faz `update`, não uma nova linha).
+PK: `id`. FKs: `atividadeId` → `Atividade.id` (`ON DELETE CASCADE`) e `alunoId` → `Aluno.id` (`ON DELETE CASCADE`). `@@unique([atividadeId, alunoId])`: cada aluno possui no máximo uma entrega por atividade (o reenvio executa `update`, e não cria novo registro).
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
 |---|---|---|---|---|
 | id | id | Uuid | obrigatório | |
 | atividadeId | atividade_id | Uuid | obrigatório | |
 | alunoId | aluno_id | Uuid | obrigatório | |
-| status | status | VarChar(20) | obrigatório | default `"pendente"` (`pendente`\|`enviada`\|`corrigida`\|`reenvio`\|`atrasada`) |
+| status | status | VarChar(20) | obrigatório | padrão `"pendente"` (`pendente`\|`enviada`\|`corrigida`\|`reenvio`\|`atrasada`) |
 | texto | texto | Text | opcional | resposta em texto livre do aluno — não há modelagem de questão/alternativa |
 | enviadoEm | enviado_em | Timestamp | opcional | |
 | nota | nota | Decimal(4,2) | opcional | espelhada (na correção) para a `Nota` do item avaliativo vinculado, se houver |
 | feedback | feedback | Text | opcional | |
-| corrigidoPorId | corrigido_por_id | Uuid | opcional | id solto, sem relação Prisma para `Usuario` |
+| corrigidoPorId | corrigido_por_id | Uuid | opcional | identificador sem relação Prisma para `Usuario` |
 | corrigidoEm | corrigido_em | Timestamp | opcional | |
 
-> **Nota sobre reenvio**: ao reenviar (`POST /atividades/:id/entregas` sobre uma entrega já existente), o `update` do `upsert` zera `nota`, `feedback`, `corrigidoPorId` e `corrigidoEm` — uma correção anterior é invalidada e o professor precisa corrigir de novo. Não há histórico de versões de entrega nem de notas anteriores (**não identificado no código analisado**).
+> **Nota sobre o reenvio**: no reenvio (`POST /atividades/:id/entregas` sobre entrega existente), o `update` do `upsert` limpa `nota`, `feedback`, `corrigidoPorId` e `corrigidoEm`; a correção anterior é invalidada, e o professor deve corrigir novamente. Não há histórico de versões de entrega nem de notas anteriores.
 
 Relações: `atividade` (N:1, obrigatória), `aluno` (N:1, obrigatória), `anexos` → `AnexoEntrega[]`.
 
@@ -841,7 +841,7 @@ PK: `id`. FK: `entregaId` → `Entrega.id` (`ON DELETE CASCADE`).
 
 ## Módulo Boost (11 entidades)
 
-`BoostUsuario` é uma tabela de login **paralela** a `Usuario` (Hub) — cadastro público e independente, nunca ligada a `usuarios`. O `CursoBoost` **não tem dono**: quem gerencia é quem tem a permissão. Professores do Academy entram como **orientadores** (`CursoOrientadorBoost`) só para conversar com os alunos; o aluno é sempre um `BoostUsuario`. Ver `docs/security/03-rbac.md` para o racional dos dois logins.
+`BoostUsuario` é uma tabela de autenticação **paralela** a `Usuario` (Hub), com cadastro público e independente, sem vínculo com `usuarios`. O `CursoBoost` **não possui responsável exclusivo**: a gestão cabe a quem possui a permissão. Os professores do Academy participam como **orientadores** (`CursoOrientadorBoost`), apenas para a comunicação com os alunos; o aluno é sempre um `BoostUsuario`. Ver `docs/security/03-rbac.md` para a fundamentação dos dois mecanismos de autenticação.
 
 ### BoostUsuario — tabela `boost_usuarios`
 
@@ -853,14 +853,14 @@ PK: `id`.
 | nome | nome | VarChar(150) | obrigatório | |
 | email | email | VarChar(180) | obrigatório | `@unique` |
 | senhaHash | senha_hash | VarChar(255) | obrigatório | bcrypt, mesmo custo (10) do Hub |
-| ativo | ativo | Boolean | obrigatório | default `true` |
+| ativo | ativo | Boolean | obrigatório | padrão `true` |
 | criadoEm | criado_em | Timestamp | opcional | |
 
 Relações: `matriculas` → `MatriculaBoost[]`, `mensagens` → `MensagemBoost[]`, `conversas` → `ConversaBoost[]`.
 
 ### CursoBoost — tabela `cursos_boost`
 
-PK: `id`. Sem FK de professor (não há dono; ver `CursoOrientadorBoost`).
+PK: `id`. Não há chave estrangeira de professor (o curso não possui responsável exclusivo; ver `CursoOrientadorBoost`).
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
 |---|---|---|---|---|
@@ -869,11 +869,11 @@ PK: `id`. Sem FK de professor (não há dono; ver `CursoOrientadorBoost`).
 | slug | slug | VarChar(220) | obrigatório | `@unique`, gerado automaticamente do título com desambiguação |
 | descricao | descricao | Text | opcional | |
 | categoria | categoria | VarChar(80) | opcional | |
-| nivel | nivel | VarChar(20) | obrigatório | default `iniciante`; valores do DTO: `iniciante`, `intermediario`, `avancado` |
+| nivel | nivel | VarChar(20) | obrigatório | padrão `iniciante`; valores do DTO: `iniciante`, `intermediario`, `avancado` |
 | cargaHoraria | carga_horaria | Int | obrigatório | horas — impressa no certificado |
 | capa | capa | VarChar(255) | opcional | |
-| status | status | VarChar(20) | obrigatório | default `rascunho`; `rascunho` \| `publicado` \| `arquivado` — só `publicado` aparece no catálogo público |
-| emiteCertificado | emite_certificado | Boolean | obrigatório | default `true`. Desligado, o curso é só material de apoio: conclui sem emitir certificado. Só se altera pela ação `certificado` |
+| status | status | VarChar(20) | obrigatório | padrão `rascunho`; `rascunho` \| `publicado` \| `arquivado`; somente os cursos `publicado` constam do catálogo público |
+| emiteCertificado | emite_certificado | Boolean | obrigatório | padrão `true`. Quando desativado, o curso constitui material de apoio: é concluído sem emissão de certificado. Alterado exclusivamente pela ação `certificado` |
 | certificadoTexto | certificado_texto | Text | opcional | modelo do texto impresso no certificado (`{aluno}`, `{curso}`, `{cargaHoraria}`, `{data}`); vazio = texto padrão. Adicionado em setembro/2026 |
 | criadoEm / atualizadoEm | criado_em / atualizado_em | Timestamp | opcional | |
 
@@ -881,7 +881,7 @@ Relações: `modulos` → `ModuloBoost[]`, `matriculas` → `MatriculaBoost[]`, 
 
 ### CursoOrientadorBoost — tabela `cursos_orientadores_boost`
 
-Professor vinculado a um curso para conversar com os alunos dele — **não dá poder de gestão**. PK: `id`. FK: `cursoId` → `CursoBoost.id` (`ON DELETE CASCADE`), `professorId` → `Professor.id` (`RESTRICT`). `@@unique([cursoId, professorId])`.
+Professor vinculado a um curso para a comunicação com os alunos desse curso, **sem atribuição de gestão**. PK: `id`. FKs: `cursoId` → `CursoBoost.id` (`ON DELETE CASCADE`) e `professorId` → `Professor.id` (`RESTRICT`). `@@unique([cursoId, professorId])`.
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
 |---|---|---|---|---|
@@ -899,7 +899,7 @@ PK: `id`. FK: `cursoId` → `CursoBoost.id` (`ON DELETE CASCADE`).
 | id | id | Uuid | obrigatório | |
 | cursoId | curso_id | Uuid | obrigatório | |
 | titulo | titulo | VarChar(200) | obrigatório | |
-| ordem | ordem | Int | obrigatório | default `0` |
+| ordem | ordem | Int | obrigatório | padrão `0` |
 
 Relações: `curso` → `CursoBoost`, `aulas` → `AulaBoost[]`.
 
@@ -912,12 +912,12 @@ PK: `id`. FK: `moduloId` → `ModuloBoost.id` (`ON DELETE CASCADE`).
 | id | id | Uuid | obrigatório | |
 | moduloId | modulo_id | Uuid | obrigatório | |
 | titulo | titulo | VarChar(200) | obrigatório | |
-| ordem | ordem | Int | obrigatório | default `0` |
-| tipo | tipo | VarChar(20) | obrigatório | default `texto`; `video` \| `texto` \| `pdf` \| `link` |
+| ordem | ordem | Int | obrigatório | padrão `0` |
+| tipo | tipo | VarChar(20) | obrigatório | padrão `texto`; `video` \| `texto` \| `pdf` \| `link` |
 | conteudoUrl | conteudo_url | VarChar(500) | opcional | link externo (ex.: vídeo) |
 | conteudoTexto | conteudo_texto | Text | opcional | |
 | duracaoMin | duracao_min | Int | opcional | |
-| videoArquivo | video_arquivo | VarChar(255) | opcional | **vídeo hospedado** (setembro/2026): nome do arquivo em disco, na pasta configurada por `BOOST_VIDEOS_DIR` (padrão `uploads/videos-boost/`). Presença deste campo é o que distingue vídeo hospedado de link externo (`conteudoUrl`) — não há enum/flag separado, de propósito, para os dois nunca poderem divergir sobre qual é a fonte real |
+| videoArquivo | video_arquivo | VarChar(255) | opcional | **vídeo hospedado** (setembro de 2026): nome do arquivo em disco, na pasta definida por `BOOST_VIDEOS_DIR` (padrão `uploads/videos-boost/`). A presença deste campo distingue o vídeo hospedado do link externo (`conteudoUrl`); não há enumeração ou indicador separado, por decisão de projeto, para que as duas informações não possam divergir quanto à fonte efetiva |
 | **videoTamanho** | video_tamanho | **BigInt** | opcional | até 2GB, então excede o `Int` de 32 bits. Mesmo padrão de `MaterialApoio.tamanho` — convertido para `Number` antes da resposta JSON (`BoostService.serializeAula`/`serializeCursoAninhado`). Toda resposta que devolve a aula crua precisa passar por esse serializador, senão `JSON.stringify` lança `TypeError` |
 | videoMimeType | video_mime_type | VarChar(80) | opcional | `video/mp4`, `video/webm` ou `video/quicktime` — usado como `Content-Type` no streaming |
 
@@ -939,18 +939,18 @@ PK: `id`. FK: `aulaId` → `AulaBoost.id` (`ON DELETE CASCADE`).
 
 ### MatriculaBoost — tabela `matriculas_boost`
 
-PK: `id`. FK: `boostUsuarioId` → `BoostUsuario.id` (`ON DELETE CASCADE`), `cursoId` → `CursoBoost.id` (`ON DELETE CASCADE`). `@@unique([boostUsuarioId, cursoId])` — matricular de novo é idempotente, nunca duplica.
+PK: `id`. FKs: `boostUsuarioId` → `BoostUsuario.id` (`ON DELETE CASCADE`) e `cursoId` → `CursoBoost.id` (`ON DELETE CASCADE`). `@@unique([boostUsuarioId, cursoId])`: a nova matrícula no mesmo curso é idempotente e não gera duplicidade.
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
 |---|---|---|---|---|
 | id | id | Uuid | obrigatório | |
 | boostUsuarioId | boost_usuario_id | Uuid | obrigatório | |
 | cursoId | curso_id | Uuid | obrigatório | |
-| status | status | VarChar(20) | obrigatório | default `ativa`; `ativa` \| `concluida` \| `cancelada` |
-| progressoPct | progresso_pct | Int | obrigatório | default `0` — recalculado a cada `ProgressoAula` (aulas concluídas / total de aulas do curso) |
+| status | status | VarChar(20) | obrigatório | padrão `ativa`; `ativa` \| `concluida` \| `cancelada` |
+| progressoPct | progresso_pct | Int | obrigatório | padrão `0` — recalculado a cada `ProgressoAula` (aulas concluídas / total de aulas do curso) |
 | matriculadoEm / concluidoEm | matriculado_em / concluido_em | Timestamp | opcional | |
 
-Relações: `boostUsuario` → `BoostUsuario`, `curso` → `CursoBoost`, `progresso` → `ProgressoAula[]`, `certificado` → `CertificadoBoost?` (1:1, só existe depois de 100%).
+Relações: `boostUsuario` → `BoostUsuario`, `curso` → `CursoBoost`, `progresso` → `ProgressoAula[]` e `certificado` → `CertificadoBoost?` (1:1, existente somente após a conclusão de 100% em curso que emite certificado).
 
 ### ProgressoAula — tabela `progresso_aulas_boost`
 
@@ -961,15 +961,15 @@ PK: `id`. FK: `matriculaId` → `MatriculaBoost.id` (`ON DELETE CASCADE`), `aula
 | id | id | Uuid | obrigatório | |
 | matriculaId | matricula_id | Uuid | obrigatório | |
 | aulaId | aula_id | Uuid | obrigatório | |
-| concluidoEm | concluido_em | Timestamp | opcional | upsert — marcar a mesma aula de novo atualiza a data, não duplica a linha. **Só este campo indica "aula concluída"** — ver a advertência abaixo |
-| posicaoSeg | posicao_seg | Int | opcional | default `0` — posição do vídeo em segundos, para retomar de onde parou (setembro/2026) |
-| percentualAssistido | percentual_assistido | Int | opcional | default `0` — o **maior** percentual já assistido; nunca regride mesmo que o aluno volte o vídeo. Ao cruzar 90%, a aula se completa sozinha |
+| concluidoEm | concluido_em | Timestamp | opcional | `upsert`: a nova marcação da mesma aula atualiza a data, sem duplicar o registro. **Apenas este campo indica a conclusão da aula**; ver a advertência abaixo |
+| posicaoSeg | posicao_seg | Int | opcional | padrão `0` — posição do vídeo em segundos, para retomar de onde parou (setembro/2026) |
+| percentualAssistido | percentual_assistido | Int | opcional | padrão `0` — o **maior** percentual já assistido; nunca regride mesmo que o aluno volte o vídeo. Ao cruzar 90%, a aula se completa sozinha |
 
-**Advertência — a existência da linha deixou de significar "concluída".** Antes do progresso real de vídeo, só `concluirAula` criava linhas em `ProgressoAula`, sempre já com `concluidoEm` preenchido; contar linhas era equivalente a contar aulas concluídas. Agora `PATCH /boost/aulas/:id/progresso` também cria linhas para registrar posição sem necessariamente concluir a aula. Por isso o cálculo de `progressoPct` da matrícula filtra `concluidoEm: { not: null }` explicitamente (`BoostPortalService.recalcularProgressoEEmitirCertificado`). Qualquer consulta futura que queira saber "quais aulas foram concluídas" precisa fazer o mesmo.
+**Advertência: a existência do registro não significa conclusão da aula.** Antes do registro de progresso de vídeo, apenas `concluirAula` criava registros em `ProgressoAula`, sempre com `concluidoEm` preenchido, de modo que a contagem de registros equivalia à contagem de aulas concluídas. Como `PATCH /boost/aulas/:id/progresso` também cria registros para armazenar a posição sem concluir a aula, o cálculo de `progressoPct` da matrícula filtra explicitamente `concluidoEm: { not: null }` (`BoostPortalService.recalcularProgressoEEmitirCertificado`). Toda consulta que necessite identificar as aulas concluídas deve aplicar o mesmo filtro.
 
 ### ConversaBoost — tabela `conversas_boost`
 
-Uma conversa contínua por (curso, aluno), atendida por qualquer orientador do curso. Criada na primeira consulta do aluno. PK: `id`. FK: `cursoId` → `CursoBoost.id` e `boostUsuarioId` → `BoostUsuario.id` (ambas `ON DELETE CASCADE`). `@@unique([cursoId, boostUsuarioId])`.
+Conversa contínua por par (curso, aluno), atendida por qualquer orientador do curso e criada na primeira consulta do aluno. PK: `id`. FKs: `cursoId` → `CursoBoost.id` e `boostUsuarioId` → `BoostUsuario.id` (ambas `ON DELETE CASCADE`). `@@unique([cursoId, boostUsuarioId])`.
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
 |---|---|---|---|---|
@@ -981,7 +981,7 @@ Uma conversa contínua por (curso, aluno), atendida por qualquer orientador do c
 
 ### MensagemBoost — tabela `mensagens_boost`
 
-Mensagem de uma `ConversaBoost`. PK: `id`. FK: `conversaId` → `ConversaBoost.id` (`ON DELETE CASCADE`), `boostUsuarioId` → `BoostUsuario.id` (opcional), `professorId` → `Professor.id` (opcional).
+Mensagem de uma `ConversaBoost`. PK: `id`. FKs: `conversaId` → `ConversaBoost.id` (`ON DELETE CASCADE`), `boostUsuarioId` → `BoostUsuario.id` (opcional) e `professorId` → `Professor.id` (opcional).
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
 |---|---|---|---|---|
@@ -997,7 +997,7 @@ Mensagem de uma `ConversaBoost`. PK: `id`. FK: `conversaId` → `ConversaBoost.i
 
 ### CertificadoBoost — tabela `certificados_boost`
 
-PK: `id`. FK: `matriculaId` → `MatriculaBoost.id` (`ON DELETE CASCADE`), `@unique` (1:1 — no máximo um certificado por matrícula).
+PK: `id`. FK: `matriculaId` → `MatriculaBoost.id` (`ON DELETE CASCADE`), `@unique` (relação 1:1: no máximo um certificado por matrícula).
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
 |---|---|---|---|---|
@@ -1007,11 +1007,11 @@ PK: `id`. FK: `matriculaId` → `MatriculaBoost.id` (`ON DELETE CASCADE`), `@uni
 | caminhoPdf | caminho_pdf | VarChar(255) | obrigatório | nome do arquivo em disco (`uploads/certificados-boost/`) |
 | emitidoEm | emitido_em | Timestamp | opcional | |
 
-Criado automaticamente por `CertificadoBoostService.emitir()`, chamado uma única vez quando `MatriculaBoost.progressoPct` chega a 100 — nunca manualmente.
+Criado automaticamente por `CertificadoBoostService.emitir()`, invocado uma única vez quando `MatriculaBoost.progressoPct` atinge 100 em curso que emite certificado; não há emissão manual.
 
 ## Módulo Finance (7 entidades)
 
-Cobrança sempre ligada a um `Aluno` real do Academy — nunca uma identidade de aluno própria/fictícia (substitui o modelo do mock antigo do frontend, que tinha `Tuition`/`Charge`/`Boleto`/`Payment` como quatro nomes pra mesma informação).
+A cobrança é sempre vinculada a um `Aluno` do Academy, sem identidade de aluno própria ou fictícia. Esse modelo substitui o do protótipo anterior do frontend, que utilizava `Tuition`, `Charge`, `Boleto` e `Payment` como quatro denominações para a mesma informação.
 
 ### PoliticaMultaJuros — tabela `politicas_multa_juros`
 
@@ -1022,14 +1022,14 @@ PK: `id`. FK: `criadoPorId` → `Usuario.id` (opcional, `onDelete: SetNull`).
 | id | id | Uuid | obrigatório | |
 | nome | nome | VarChar(150) | obrigatório | |
 | descricao | descricao | Text | opcional | |
-| percentualMulta | percentual_multa | Decimal(5,2) | obrigatório | default `0`; % sobre o valor devido |
-| percentualJurosDia | percentual_juros_dia | Decimal(5,3) | obrigatório | default `0`; % ao dia de atraso, sobre o valor devido |
-| diasCarencia | dias_carencia | Int | obrigatório | default `0`; dias de atraso tolerados antes de multa/juros valerem |
-| ativo | ativo | Boolean | obrigatório | default `true` |
+| percentualMulta | percentual_multa | Decimal(5,2) | obrigatório | padrão `0`; % sobre o valor devido |
+| percentualJurosDia | percentual_juros_dia | Decimal(5,3) | obrigatório | padrão `0`; % ao dia de atraso, sobre o valor devido |
+| diasCarencia | dias_carencia | Int | obrigatório | padrão `0`; dias de atraso tolerados antes de multa/juros valerem |
+| ativo | ativo | Boolean | obrigatório | padrão `true` |
 | criadoPorId | criado_por_id | Uuid | opcional | quem criou a regra (o financeiro cria as próprias) |
 | criadoEm / atualizadoEm | criado_em / atualizado_em | Timestamp | opcional | |
 
-Criada e mantida pelo próprio financeiro (CRUD em `/politicas-multa-juros`), não um valor fixo no código — ver RN043 em `docs/system/04-regras-de-negocio.md`. Excluir uma política em uso (vinculada a algum `Servico` ou `Cobranca`) é bloqueado. Relações: `criadoPor` → `Usuario?`, `servicos` → `Servico[]`, `cobrancas` → `Cobranca[]`.
+Criada e mantida pela própria equipe financeira (CRUD em `/politicas-multa-juros`), e não definida como valor fixo no código; ver RN043 em `docs/system/04-regras-de-negocio.md`. A exclusão de política em uso (vinculada a algum `Servico` ou `Cobranca`) é recusada. Relações: `criadoPor` → `Usuario?`, `servicos` → `Servico[]` e `cobrancas` → `Cobranca[]`.
 
 ### Produto — tabela `produtos_financeiros`
 
@@ -1043,9 +1043,9 @@ PK: `id`.
 | categoria | categoria | VarChar(80) | opcional | |
 | descricao | descricao | Text | opcional | |
 | preco | preco | Decimal(10,2) | obrigatório | |
-| estoque / estoqueMinimo | estoque / estoque_minimo | Int | obrigatório | default `0`; usado pro alerta de estoque baixo no dashboard (`estoque <= estoqueMinimo`) |
-| unidade | unidade | VarChar(20) | obrigatório | default `un` |
-| ativo | ativo | Boolean | obrigatório | default `true` |
+| estoque / estoqueMinimo | estoque / estoque_minimo | Int | obrigatório | padrão `0`; utilizado no alerta de estoque baixo do painel (`estoque <= estoqueMinimo`) |
+| unidade | unidade | VarChar(20) | obrigatório | padrão `un` |
+| ativo | ativo | Boolean | obrigatório | padrão `true` |
 | criadoEm / atualizadoEm | criado_em / atualizado_em | Timestamp | opcional | |
 
 Relações: `cobrancas` → `Cobranca[]`.
@@ -1061,9 +1061,9 @@ PK: `id`. FK: `politicaMultaJurosId` → `PoliticaMultaJuros.id` (opcional, `onD
 | descricao | descricao | Text | opcional | |
 | preco | preco | Decimal(10,2) | obrigatório | valor-base usado na geração de mensalidade em lote |
 | categoria | categoria | VarChar(80) | opcional | |
-| frequencia | frequencia | VarChar(20) | obrigatório | default `unico`; `unico` \| `mensal` \| `anual` \| `semestral` |
+| frequencia | frequencia | VarChar(20) | obrigatório | padrão `unico`; `unico` \| `mensal` \| `anual` \| `semestral` |
 | politicaMultaJurosId | politica_multa_juros_id | Uuid | opcional | herdada por toda `Cobranca` gerada a partir deste serviço, salvo se a cobrança definir a própria |
-| ativo | ativo | Boolean | obrigatório | default `true` |
+| ativo | ativo | Boolean | obrigatório | padrão `true` |
 | criadoEm / atualizadoEm | criado_em / atualizado_em | Timestamp | opcional | |
 
 Relações: `cobrancas` → `Cobranca[]`, `politicaMultaJuros` → `PoliticaMultaJuros?`.
@@ -1081,10 +1081,10 @@ PK: `id`.
 | unidade | unidade | VarChar(10) | obrigatório | `percent` \| `fixo` |
 | motivo / responsavel | motivo / responsavel | Text / VarChar(120) | opcional | |
 | vigenciaInicio / vigenciaFim | vigencia_inicio / vigencia_fim | Date | opcional | |
-| ativo | ativo | Boolean | obrigatório | default `true` |
+| ativo | ativo | Boolean | obrigatório | padrão `true` |
 | criadoEm / atualizadoEm | criado_em / atualizado_em | Timestamp | opcional | |
 
-Relações: `cobrancas` → `Cobranca[]`, `alunos` → `DescontoAluno[]`. `beneficiarios` (contagem de alunos com o desconto atribuído) é sempre calculado em `FinanceService.findAllDescontos` a partir de `DescontoAluno`, nunca um contador gravado — o mock antigo tinha um campo `beneficiaries` solto que dessincronizava do dado real.
+Relações: `cobrancas` → `Cobranca[]` e `alunos` → `DescontoAluno[]`. `beneficiarios` (quantidade de alunos com o desconto atribuído) é sempre calculado em `FinanceService.findAllDescontos` a partir de `DescontoAluno`, e não armazenado como contador; o protótipo anterior possuía um campo `beneficiaries` independente, que divergia do dado real.
 
 ### DescontoAluno — tabela `descontos_alunos`
 
@@ -1097,7 +1097,7 @@ PK: `id`. FK: `alunoId` → `Aluno.id` (`ON DELETE CASCADE`), `descontoId` → `
 | descontoId | desconto_id | Uuid | obrigatório | |
 | atribuidoEm | atribuido_em | Timestamp | opcional | |
 
-`FinanceService.descontoAtivoDoAluno` resolve o desconto vigente de um aluno (mais recente, com `Desconto.ativo=true` e dentro da vigência) — consultado automaticamente ao gerar mensalidade em lote e no portal do aluno.
+`FinanceService.descontoAtivoDoAluno` determina o desconto vigente de um aluno (o mais recente, com `Desconto.ativo = true` e dentro da vigência), consultado automaticamente na geração de mensalidades em lote e no portal do aluno.
 
 ### Cobranca — tabela `cobrancas`
 
@@ -1109,13 +1109,13 @@ PK: `id`. FK: `alunoId` → `Aluno.id`, `produtoId` → `Produto.id` (opcional),
 | alunoId | aluno_id | Uuid | obrigatório | sempre um `Aluno` real do Academy |
 | tipo | tipo | VarChar(20) | obrigatório | `mensalidade` \| `produto` \| `servico` \| `taxa` |
 | descricao | descricao | VarChar(200) | obrigatório | |
-| competencia | competencia | VarChar(20) | opcional | só mensalidade, formato `"2026-03"` |
+| competencia | competencia | VarChar(20) | opcional | aplicável apenas a mensalidade; formato `"2026-03"` |
 | produtoId / servicoId / descontoId | produto_id / servico_id / desconto_id | Uuid | opcional | |
 | politicaMultaJurosId | politica_multa_juros_id | Uuid | opcional | herdada do `Servico` quando não informada; ignorada se `multa`/`juros` abaixo forem preenchidos manualmente (RN043) |
-| valorOriginal / valorDesconto / multa / juros | valor_original / valor_desconto / multa / juros | Decimal(10,2) | obrigatório | `valorDesconto`/`multa`/`juros` default `0`; multa/juros manuais (> 0) sempre vencem o cálculo dinâmico da política vinculada |
+| valorOriginal / valorDesconto / multa / juros | valor_original / valor_desconto / multa / juros | Decimal(10,2) | obrigatório | `valorDesconto`, `multa` e `juros` com padrão `0`; multa e juros informados manualmente (> 0) prevalecem sobre o cálculo dinâmico da política vinculada |
 | valorPago | valor_pago | Decimal(10,2) | opcional | preenchido em `marcar-pago` |
 | vencimento | vencimento | Date | obrigatório | |
-| status | status | VarChar(20) | obrigatório | default `aberto`; `aberto` \| `pago` \| `vencido` \| `negociado` \| `cancelado` \| `processando` — **`vencido` nunca é persistido nesse campo por uma transição automática**, é sempre derivado de `vencimento < hoje` no momento da leitura (`FinanceService.statusEfetivo`), pra não repetir o tipo de inconsistência que o mock antigo tinha (rótulo `"m/12"` com loop até 8) |
+| status | status | VarChar(20) | obrigatório | padrão `aberto`; `aberto` \| `pago` \| `vencido` \| `negociado` \| `cancelado` \| `processando`. **`vencido` não é persistido neste campo por transição automática**: é sempre derivado de `vencimento` anterior à data corrente no momento da leitura (`FinanceService.statusEfetivo`), o que evita a inconsistência existente no protótipo anterior (rótulo `"m/12"` com repetição limitada a 8) |
 | formaPagamento | forma_pagamento | VarChar(30) | opcional | |
 | nossoNumero | nosso_numero | VarChar(40) | opcional | `@unique`; gerado em `emitir-boleto`, controle 100% interno (sem banco/PSP real) |
 | linhaDigitavel / pixCopiaECola | linha_digitavel / pix_copia_e_cola | VarChar(60) / VarChar(255) | opcional | idem — formato válido (47 posições a linha digitável), gerados internamente |
@@ -1127,7 +1127,7 @@ Relações: `aluno` → `Aluno`, `produto` → `Produto?`, `servico` → `Servic
 
 ### NotaFiscal — tabela `notas_fiscais`
 
-PK: `id`. FK: `cobrancaId` → `Cobranca.id` (`ON DELETE CASCADE`), `@unique` (1:1 — toda NF documenta exatamente uma cobrança).
+PK: `id`. FK: `cobrancaId` → `Cobranca.id` (`ON DELETE CASCADE`), `@unique` (relação 1:1: cada nota fiscal documenta exatamente uma cobrança).
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
 |---|---|---|---|---|
@@ -1136,10 +1136,10 @@ PK: `id`. FK: `cobrancaId` → `Cobranca.id` (`ON DELETE CASCADE`), `@unique` (1
 | tipo | tipo | VarChar(20) | obrigatório | `produto` \| `servico` |
 | cobrancaId | cobranca_id | Uuid | obrigatório | `@unique` |
 | caminhoPdf | caminho_pdf | VarChar(255) | obrigatório | nome do arquivo em disco (`uploads/notas-fiscais/`); o XML correspondente é o mesmo nome com extensão `.xml`, não tem coluna própria |
-| status | status | VarChar(20) | obrigatório | default `emitida`; `emitida` \| `cancelada` |
+| status | status | VarChar(20) | obrigatório | padrão `emitida`; `emitida` \| `cancelada` |
 | emitidoEm | emitido_em | Timestamp | opcional | |
 
-Documento **interno**, gerado por `NotaFiscalService.emitir()` (PDF via `pdfkit` + XML simples) — sem transmissão à SEFAZ, sem certificado digital A1/A3, sem validade fiscal legal. Ver `docs/engineering/06-integracoes.md`.
+Documento **interno**, gerado por `NotaFiscalService.emitir()` (PDF por `pdfkit` e XML simples), sem transmissão à SEFAZ, sem certificado digital A1 ou A3 e sem validade fiscal. Ver `docs/engineering/06-integracoes.md`.
 
 ---
 
@@ -1157,4 +1157,4 @@ Documento **interno**, gerado por `NotaFiscalService.emitir()` (PDF via `pdfkit`
 | Finance | 7 |
 | **Total** | **64** |
 
-O total de 60 corresponde exatamente ao número de `model` declarados em `prisma/schema.prisma` (confirmado por contagem direta: `grep -c "^model " prisma/schema.prisma`).
+O total de 64 corresponde exatamente ao número de `model` declarados em `prisma/schema.prisma` (verificado por contagem direta: `grep -c "^model " prisma/schema.prisma`).
