@@ -32,7 +32,12 @@ export class LearnService {
     return this.prisma.atividade.findMany({
       where: { turmaId },
       orderBy: { criadoEm: 'desc' },
-      include: { itemAvaliativo: true, _count: { select: { entregas: true } } },
+      include: {
+        itemAvaliativo: true,
+        _count: { select: { entregas: true } },
+        // Código da turma e nome da disciplina, exibidos nas listagens do Learn.
+        turma: { select: { codigo: true, disciplina: { select: { nome: true, codigo: true } } } },
+      },
     });
   }
 

@@ -9,10 +9,10 @@ quantitativos) e, ao final, a matriz que associa cada teste ao requisito ou regr
 |---|---|---|---|
 | e2e de API (backend) | `test/*.e2e-spec.ts` | `npm run test:e2e` | 78 testes, 2 arquivos |
 | Unitário (backend) | `src/**/*.spec.ts` | `npm test` | 137 testes, 12 arquivos |
-| Unitário e de componente (frontend) | `src/**/*.test.{ts,tsx}` | `npm test` (repositório do frontend) | 70 testes, 6 arquivos |
-| Acessibilidade (frontend) | `src/components/shared/acessibilidade.test.tsx` | incluída em `npm test` | 12 dos 70 acima |
+| Unitário e de componente (frontend) | `src/**/*.test.{ts,tsx}` | `npm test` (repositório do frontend) | 81 testes, 7 arquivos |
+| Acessibilidade (frontend) | `src/components/shared/acessibilidade.test.tsx` | incluída em `npm test` | 12 dos 81 acima |
 
-Total: **285 testes**. No backend, `npm run test:all` executa os testes unitários e e2e em sequência. Todas as
+Total: **296 testes**. No backend, `npm run test:all` executa os testes unitários e e2e em sequência. Todas as
 camadas são executadas pelo CI a cada envio para `main` e a cada pull request (ver
 `docs/operations/05-cicd.md`).
 

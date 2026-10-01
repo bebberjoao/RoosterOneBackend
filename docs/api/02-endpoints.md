@@ -529,7 +529,7 @@ Notas de verificação manual:
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
 | POST | `/atividades` | Bearer | manual — ver nota (7), ação `criar-atividade` | Cria uma atividade, em rascunho, em uma turma do Academy |
-| GET | `/turmas/:turmaId/atividades` | Bearer | manual — ver nota (8) | Lista atividades da turma |
+| GET | `/turmas/:turmaId/atividades` | Bearer | manual — ver nota (8) | Lista atividades da turma, com o código da turma e o nome da disciplina |
 | GET | `/atividades/:id` | Bearer | manual — ver nota (8) | Busca atividade por id |
 | PATCH | `/atividades/:id` | Bearer | manual — ver nota (7), ação `criar-atividade` | Atualiza atividade |
 | PATCH | `/atividades/:id/publicar` | Bearer | manual — ver nota (7), ação `criar-atividade` | **Publica a atividade** (gera item avaliativo no Academy quando `peso > 0`; detalhado abaixo) e notifica os alunos matriculados |

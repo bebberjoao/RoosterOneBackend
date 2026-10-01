@@ -203,6 +203,24 @@ estão indicadas; as demais não alteram o banco de dados.
 
 ### Corrigido
 
+- **Calendário de reservas com "Invalid Date" e dias "NaN"** (01/10/2026; frontend). As colunas de data pura
+  (`@db.Date`) são serializadas pela API como meia-noite UTC (`2026-10-03T00:00:00.000Z`), e o serviço do Rooms
+  repassava o valor sem normalização ao calendário, que esperava `aaaa-mm-dd`. O defeito se manifestava ao abrir a
+  tela de reserva após a criação de uma reserva própria e também exibia a data em ISO nas telas de gestão e de
+  reservas do usuário. A data passou a ser normalizada no serviço, e os horários, exibidos sem segundos.
+- **Valor patrimonial concatenado no painel do Assets** (01/10/2026; frontend). O valor `Decimal` chegava como texto
+  e era somado com `+`, o que produzia sequências como "048005200…" em vez do total por categoria. O valor passou a
+  ser convertido para número no serviço e exibido em moeda com centavos.
+- **Formatação de datas, horários e números padronizada no frontend** (01/10/2026). Criado
+  `src/lib/formatacao.ts` (frontend), utilizado por todas as telas: datas em dd/mm/aaaa (antes, parte das telas
+  exibia o ano com dois dígitos e parte, o mês abreviado), data e hora em dd/mm/aaaa · hh:mm, decimais e
+  percentuais com vírgula (por exemplo, "peso 0,4", coeficiente "8,93", inadimplência "33,27%" e juros "0,033%"),
+  tamanhos de arquivo com vírgula e título de calendário "Outubro de 2026". As datas puras deixaram de ser
+  convertidas pelo fuso local, o que deslocaria a data em um dia no horário de Brasília, e a data de hoje passou a
+  ser calculada no fuso local, e não em UTC. Coberto por 11 testes em `src/lib/formatacao.test.ts`.
+- **Identificador interno exibido no lugar da turma no Learn** (01/10/2026). `GET /turmas/:turmaId/atividades`
+  passou a incluir o código da turma e o nome da disciplina, e o frontend deixou de exibir o UUID como alternativa
+  quando o nome não está disponível.
 - **Violação de unicidade respondia HTTP 500** (01/10/2026). Doze services convertiam o erro `P2002` do Prisma em
   `500` e o registravam em `logs_erro`, e a maioria convertia também em `500` as exceções HTTP lançadas pela regra
   de negócio no bloco protegido; o cadastro de usuário com e-mail já existente, por exemplo, era apresentado como
