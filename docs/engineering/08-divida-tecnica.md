@@ -136,7 +136,7 @@ Defeitos identificados durante a revisão do roadmap, com a correção aplicada:
   duplicados; `POST /prioridades-tickets` passou a `POST /chamados-prioridades`. Na mesma correção, o handler
   de prioridade deixou de usar os DTOs de categoria (mascarados por `as any`), que validavam e documentavam
   campos incorretos. Os testes e2e foram migrados para os caminhos canônicos.
-- **Remoção do Passport com quebra da tipagem de `request.user` (89 erros de compilação).** As
+- **Remoção do Passport com perda da tipagem de `request.user` (89 erros de compilação).** As
   dependências do Passport foram removidas por não terem uso (a verificação do JWT é feita em
   `src/auth/jwt-auth.guard.ts`), mas `@types/passport-jwt` fornecia, indiretamente, a declaração global de
   `Express.Request.user` da qual os controllers dependiam. O cache incremental do TypeScript

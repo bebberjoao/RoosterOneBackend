@@ -1,102 +1,160 @@
-# Troubleshooting
+# Solução de Problemas
 
-Problemas reais e conhecidos deste projeto, levantados diretamente do código-fonte.
+Problemas conhecidos do projeto, com causa, diagnóstico e solução, levantados a partir do código-fonte.
 
 ---
 
-## Backend não sobe: falta `JWT_SECRET`
+## Backend não inicia: `JWT_SECRET` ou `FILE_ENCRYPTION_KEY` ausente
 
-**Problema**: `npm run start:dev` (ou `start`/`start:prod`) falha imediatamente na inicialização.
+**Problema**: `npm run start:dev` (ou `start` e `start:prod`) é encerrado na inicialização.
 
-**Causa**: `JWT_SECRET` não está definido no `.env` (ou não foi carregado). O módulo `src/auth/jwt-config.ts` exige essa variável sem nenhum valor padrão hardcoded — decisão deliberada para que a aplicação nunca suba assinando tokens com um segredo público/previsível.
+**Causa**: variável obrigatória ausente no `.env` ou não carregada. `src/auth/jwt-config.ts` exige `JWT_SECRET`
+e `src/common/file-encryption.util.ts` exige `FILE_ENCRYPTION_KEY`, ambas sem valor padrão, para que a
+aplicação nunca assine tokens com segredo previsível nem grave arquivos sem poder cifrá-los.
 
-**Diagnóstico**: o processo encerra e o terminal mostra o erro lançado por `jwtModuleOptions()`:
+**Diagnóstico**: o terminal exibe uma das mensagens:
 
 ```
 Error: JWT_SECRET não definido. Configure a variável de ambiente antes de iniciar a aplicação.
+Error: FILE_ENCRYPTION_KEY não definida. Configure a variável de ambiente antes de iniciar a aplicação.
+Error: FILE_ENCRYPTION_KEY inválida: precisa decodificar (base64) para exatamente 32 bytes (AES-256).
 ```
 
 **Solução**:
-1. Confirme que existe um arquivo `.env` na raiz de `RoosterOneBackend-main` (não `.env.local`, não em outra pasta).
-2. Adicione a linha `JWT_SECRET=<algum-valor-secreto>` a esse arquivo.
-3. Confirme que `src/main.ts` importa `'dotenv/config'` no topo (é o que carrega o `.env` no processo) — se esse import tiver sido removido, nenhuma variável do `.env` é lida, mesmo que o arquivo exista e esteja correto.
-4. Reinicie o backend.
+1. Confirmar a existência do arquivo `.env` na raiz de `RoosterOneBackend-main`.
+2. Definir as variáveis, com os comandos de geração indicados no `.env.example`.
+3. Confirmar que `src/main.ts` importa `'dotenv/config'` em sua primeira linha; sem essa importação, nenhuma
+   variável do `.env` é carregada.
+4. Reiniciar o backend.
 
 ---
 
-## E-mail de redefinição de senha "não chega"
+## Arquivos existentes não abrem após troca de chave ou restauração
 
-**Problema**: usuário solicita redefinição de senha, mas nenhum e-mail chega na caixa de entrada.
+**Problema**: listagens exibem anexos, documentos ou certificados, mas o download falha.
 
-**Causa**: sem `SMTP_HOST` definido no `.env`, o `MailService` (`src/mail/mail.service.ts`) entra em **modo de log** por design — ele não tenta enviar e-mail de verdade, apenas registra o conteúdo (incluindo o link de redefinição) no log da aplicação. Isso não é uma falha: é o comportamento padrão em ambiente sem SMTP configurado, pensado para permitir testar o fluxo (token, link, expiração) sem depender de uma conta de e-mail real.
+**Causa**: a `FILE_ENCRYPTION_KEY` configurada difere da chave com que os arquivos foram cifrados — por exemplo,
+após restauração de backup em servidor com outra chave, ou após troca da chave.
 
-**Diagnóstico**: verifique o log do processo do backend (o terminal onde `npm run start:dev` está rodando) logo após a solicitação de redefinição. Devem aparecer linhas como:
+**Diagnóstico**: executar `node scripts/verificar-arquivo-cifrado.js <caminho-do-arquivo>` (requer `npm run
+build`); a mensagem "A chave configurada não decifra este arquivo" confirma a divergência.
+
+**Solução**: restaurar a chave original. Não há recuperação de arquivos sem a chave com que foram cifrados (ver
+`06-backup-e-recuperacao.md`).
+
+---
+
+## E-mail de redefinição de senha não é recebido
+
+**Problema**: o usuário solicita a redefinição de senha e nenhum e-mail é recebido.
+
+**Causa**: sem `SMTP_HOST` definido, o `MailService` (`src/mail/mail.service.ts`) não envia e-mails. Fora de
+produção, registra no log o destinatário, o assunto e o conteúdo, com o token de redefinição **mascarado**
+(`token=***`) por segurança; em produção, registra apenas a falha de configuração.
+
+**Diagnóstico**: no log do backend, logo após a solicitação, aparecem linhas como:
 
 ```
-[SMTP não configurado — modo dev] Para: usuario@exemplo.com | Assunto: <assunto do e-mail>
-<conteúdo do e-mail sem HTML>
-Link(s): http://localhost:8080/redefinir-senha?token=<token>
+[SMTP não configurado — modo dev] Para: usuario@exemplo.com | Assunto: <assunto>
+Link(s): http://localhost:8080/redefinir-senha?token=***
 ```
 
-O link útil para testar o fluxo manualmente é o que aparece após `Link(s):`.
+Como o token é mascarado, o link registrado **não pode** ser utilizado para concluir a redefinição.
 
 **Solução**:
-- Se o objetivo é apenas testar o fluxo localmente: use o link impresso no log diretamente no navegador — não é um bug, é o comportamento esperado sem SMTP configurado.
-- Se o objetivo é enviar e-mails de verdade: defina `SMTP_HOST` (e, conforme o provedor, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`) no `.env` e reinicie o backend. Ver `01-configuracao.md` para a tabela completa dessas variáveis.
-- Confirme também que `FRONTEND_URL` está correto no `.env` — é essa variável que define o domínio/porta usados para montar o link (default `http://localhost:8080` se ausente).
+- Para envio real, definir `SMTP_HOST` (e, conforme o provedor, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`,
+  `SMTP_PASS` e `MAIL_FROM`) e reiniciar o backend. O administrador pode confirmar a configuração e enviar um
+  e-mail de teste na seção "E-mail" de `/settings`.
+- Para testar o fluxo localmente sem provedor externo, utilizar um servidor SMTP de captura, como o Mailpit
+  (`SMTP_HOST=localhost`, `SMTP_PORT=1025`), e abrir o e-mail capturado na interface web da ferramenta.
+- Confirmar o valor de `FRONTEND_URL`, que define o endereço usado no link (padrão `http://localhost:8080`).
 
 ---
 
-## `EADDRINUSE` ao reiniciar o backend em modo watch
+## `EADDRINUSE` ao reiniciar o backend em modo de observação
 
-**Problema**: ao editar código com `npm run start:dev` rodando, o Nest tenta reiniciar e falha com um erro do tipo:
+**Problema**: com `npm run start:dev` em execução, a reinicialização após uma alteração falha com:
 
 ```
 Error: listen EADDRINUSE: address already in use :::3000
 ```
 
-**Causa**: em modo watch (`nest start --watch`), às vezes o processo Node anterior não é finalizado completamente antes do novo subir — comum no Windows quando o processo é encerrado de forma abrupta (fechar o terminal, `Ctrl+C` que não propaga corretamente, crash) e o processo continua com um handle aberto na porta 3000 (ou na porta definida em `PORT`).
+**Causa**: no modo de observação (`nest start --watch`), o processo anterior pode não ser finalizado antes do
+início do novo — situação comum no Windows após encerramento abrupto (fechamento do terminal, interrupção não
+propagada ou falha), com o processo mantendo a porta 3000 (ou a definida em `PORT`) ocupada.
 
 **Diagnóstico e solução (Windows)**:
 
-1. Descubra qual processo está segurando a porta (troque `3000` pela porta configurada, se diferente):
+1. Identificar o processo que ocupa a porta (substituir `3000` pela porta configurada, se diferente):
 
 ```bash
 netstat -ano | findstr :3000
 ```
 
-A última coluna da linha com `LISTENING` é o PID do processo.
+A última coluna da linha `LISTENING` é o identificador (PID) do processo.
 
-2. Finalize esse processo pelo PID:
+2. Encerrar o processo:
 
 ```bash
 taskkill /PID <PID> /F
 ```
 
-Ou, em PowerShell:
+Ou, no PowerShell:
 
 ```powershell
 Get-Process -Id <PID> | Stop-Process -Force
 ```
 
-3. Rode `npm run start:dev` novamente.
+3. Executar `npm run start:dev` novamente.
 
-Alternativa mais rápida se não precisar saber qual processo é: defina `PORT` para outro valor no `.env` temporariamente, ou finalize todos os processos `node.exe` órfãos do projeto (`taskkill /IM node.exe /F` — cuidado, isso encerra **qualquer** processo Node em execução na máquina, não só o do projeto).
+Alternativamente, definir temporariamente outra porta em `PORT`. O comando `taskkill /IM node.exe /F` encerra
+**todos** os processos Node.js da máquina, e não apenas o do projeto, devendo ser usado com cautela.
 
 ---
 
-## Frontend não autentica: 401 em toda chamada
+## Frontend recebe `401` em todas as requisições
 
-**Problema**: toda requisição à API retorna 401, mesmo após login aparentemente bem-sucedido, ou a aplicação fica "voltando" para a tela de login sozinha.
+**Problema**: toda requisição à API retorna `401`, ou a aplicação retorna à tela de login repetidamente.
 
-**Causas possíveis** (verifique nesta ordem):
+**Causas possíveis**, na ordem de verificação:
 
-1. **Token expirado.** O JWT é assinado com expiração fixa de **8 horas** (`src/auth/jwt-config.ts`, `signOptions: { expiresIn: '8h' }`) e não há mecanismo de refresh token no backend. Passado esse tempo, qualquer chamada autenticada retorna 401 e é esperado que o usuário faça login novamente. O próprio cliente HTTP do frontend (`src/services/hub/client.ts`) já trata isso: ao receber um 401 com um token presente, ele limpa a sessão automaticamente (`session.clear()`), o que deve levar a tela de volta ao login.
-2. **`VITE_API_URL` apontando para o backend errado.** Se o frontend estiver configurado para um host/porta onde não há um backend rodando (ou onde está rodando uma instância diferente, com usuários/base diferentes), toda chamada autenticada falhará. Confira o valor efetivo de `VITE_API_URL` (ou confirme que está usando o default `http://localhost:3000`) e compare com a porta real onde o backend subiu (ver log do `npm run start:dev`, `03-execucao.md`).
-3. **Backend reiniciado com `JWT_SECRET` diferente.** Como o segredo não tem fallback fixo, se o `.env` do backend for alterado (valor de `JWT_SECRET` trocado) e o backend reiniciado, todos os tokens emitidos antes da troca passam a ser inválidos — qualquer sessão de frontend aberta antes disso passa a receber 401 até um novo login.
+1. **Sessão expirada.** O access token expira em 8 horas; o cliente HTTP do frontend (`src/services/hub/client.ts`)
+   renova a sessão automaticamente com o refresh token (válido por 30 dias) ao receber `401` e repete a requisição.
+   Se a renovação falhar (refresh token expirado, revogado ou usuário desativado), a sessão é encerrada e a tela
+   de login é exibida, comportamento esperado.
+2. **`VITE_API_URL` apontando para outro backend.** Se o frontend estiver configurado para um endereço sem backend
+   em execução, ou com outra instância (outra base de usuários), as chamadas autenticadas falham. Comparar o valor
+   efetivo de `VITE_API_URL` (padrão `http://localhost:3000`) com a porta do backend (`03-execucao.md`).
+3. **Backend reiniciado com outro `JWT_SECRET`.** Todos os tokens emitidos antes da troca tornam-se inválidos; as
+   sessões abertas passam a receber `401` até novo login.
 
-**Diagnóstico**:
-- Abra o DevTools do navegador, aba Network, e confira o corpo/URL da requisição que retornou 401: a URL mostra exatamente para qual host a chamada foi feita (confirma ou descarta a causa 2).
-- Se o login funciona mas as chamadas seguintes falham, é mais provável ser expiração de token ou mudança de `JWT_SECRET` no servidor (causas 1 e 3) do que erro de configuração de URL.
+**Diagnóstico**: na aba de rede das ferramentas do desenvolvedor do navegador, a URL da requisição com `401`
+indica o endereço efetivamente chamado (confirma ou descarta a causa 2). Se o login funciona e apenas as chamadas
+seguintes falham, as causas 1 e 3 são mais prováveis.
 
-**Solução**: fazer login novamente (resolve 1 e 3); corrigir `VITE_API_URL` no `.env` do frontend e reiniciar `npm run dev` (resolve 2).
+**Solução**: novo login (causas 1 e 3); correção de `VITE_API_URL` e reinício de `npm run dev` (causa 2).
+
+---
+
+## Frontend em produção bloqueado por CORS
+
+**Problema**: com o backend em produção (`NODE_ENV=production`), o navegador registra erro de CORS e nenhuma
+requisição do frontend é concluída.
+
+**Causa**: em produção, o CORS aceita apenas a origem de `FRONTEND_URL` e as de `CORS_ORIGINS`
+(`src/common/cors.ts`). O registro de inicialização emite aviso quando nenhuma origem está configurada.
+
+**Solução**: definir `FRONTEND_URL` com o endereço público do frontend (ou incluí-lo em `CORS_ORIGINS`) e
+reiniciar o backend.
+
+---
+
+## Servidor do frontend não inicia no Windows
+
+**Problema**: `node .output/server/index.mjs` é encerrado imediatamente, sem abrir porta.
+
+**Causa**: o build padrão (`npm run build`) gera um Worker para a Cloudflare (preset `cloudflare-module` do Nitro),
+que não constitui servidor Node.js.
+
+**Solução**: compilar com o preset de servidor Node.js — no PowerShell, `$env:NITRO_PRESET="node-server"; npm run
+build` — e executar `node .output/server/index.mjs` com `PORT` definido (ver `04-deploy.md`).

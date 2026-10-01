@@ -1,124 +1,146 @@
-# Instalação — Do Zero
+# Instalação em ambiente de desenvolvimento
 
-Passo a passo para colocar os dois repositórios (`RoosterOneBackend-main` e `RoosterOneFrontEnd-main`) rodando localmente pela primeira vez.
+Procedimento para a primeira execução local dos dois repositórios (`RoosterOneBackend-main` e
+`RoosterOneFrontEnd-main`). A instalação em servidor está em `04-deploy.md`.
 
 ## Pré-requisitos
 
-- **Node.js**: versão não fixada no código de nenhum dos dois repositórios (não há `.nvmrc` nem campo `engines` no `package.json`). O backend usa `@types/node@^24.0.0` e o frontend `@types/node@^22.16.5` como pistas de compatibilidade — na prática, use uma versão LTS atual do Node (18+ recomendado como mínimo prático; idealmente 20 ou 22).
-- **npm**: usado como gerenciador de pacotes em ambos os repositórios (não há `yarn.lock` nem `pnpm-lock.yaml` — só `package-lock.json`, se presente).
-- **PostgreSQL**: exigido pelo backend (`prisma/schema.prisma` declara `provider = "postgresql"`). A versão mínima não está fixada no código; o Prisma 6 (`"@prisma/client": "^6.0.0"`, `"prisma": "^6.0.0"`) suporta PostgreSQL 9.6 em diante — use uma versão atual e suportada (ex.: 14+) por segurança e compatibilidade, ainda que isso não seja uma exigência documentada no repositório.
-- Um servidor PostgreSQL acessível (local ou remoto), com um banco de dados vazio criado para o projeto.
-- (Opcional, só para redefinição de senha por e-mail real) Credenciais de um servidor SMTP. Sem isso, o backend funciona normalmente em modo de log (ver `01-configuracao.md`).
+- **Node.js**: a versão não é fixada em nenhum dos repositórios (não há `.nvmrc` nem campo `engines`). O CI
+  utiliza a versão 22, recomendada; o mínimo prático é a versão 18.
+- **npm**: gerenciador de pacotes dos dois repositórios (há apenas `package-lock.json`).
+- **PostgreSQL**: exigido pelo backend (`provider = "postgresql"` em `prisma/schema.prisma`). A versão mínima
+  não é fixada; recomenda-se versão atual e suportada (14 ou superior). O desenvolvimento e o CI utilizam as
+  versões 16 a 18.
+- Servidor PostgreSQL acessível, local ou remoto, com um banco de dados vazio criado para o projeto.
+- Opcionalmente, credenciais de um servidor SMTP, necessárias apenas para o envio real do e-mail de redefinição
+  de senha. Sem elas, o backend opera normalmente em modo de registro (ver `01-configuracao.md`).
 
-## 1. Clonar os repositórios
+## 1. Obtenção dos repositórios
 
 ```bash
-git clone <url-do-backend> RoosterOneBackend-main
-git clone <url-do-frontend> RoosterOneFrontEnd-main
+git clone https://github.com/bebberjoao/RoosterOneBackend.git RoosterOneBackend-main
+git clone https://github.com/bebberjoao/RoosterOneFrontEnd.git RoosterOneFrontEnd-main
 ```
 
-(Os dois projetos são repositórios independentes, sem monorepo — não há dependência de build entre eles.)
+Os dois projetos são repositórios independentes, sem dependência de compilação entre si.
 
 ## 2. Backend
 
-### 2.1. Instalar dependências
+### 2.1. Instalação das dependências
 
 ```bash
 cd RoosterOneBackend-main
 npm install
 ```
 
-### 2.2. Configurar o `.env`
+### 2.2. Configuração do `.env`
 
-Não existe `.env.example` no repositório (ver gap documentado em `01-configuracao.md`). Crie manualmente um arquivo `.env` na raiz do backend com, no mínimo, as duas variáveis obrigatórias:
+Copie o arquivo de exemplo e preencha as três variáveis obrigatórias:
 
 ```bash
-DATABASE_URL=postgresql://usuario:senha@localhost:5432/rooster_one
-JWT_SECRET=<gere-um-segredo-forte-aleatorio>
+cp .env.example .env
 ```
 
-Adicione as demais variáveis opcionais (`PORT`, `FRONTEND_URL`, `SMTP_*`, `MAIL_FROM`) conforme necessário — ver tabela completa em `01-configuracao.md`.
+```bash
+DATABASE_URL=postgresql://usuario:senha@localhost:5432/rooster_one?schema=public
+JWT_SECRET=<segredo-aleatorio-longo>
+FILE_ENCRYPTION_KEY=<32-bytes-aleatorios-em-base64>
+```
 
-### 2.3. Gerar o Prisma Client
+Os comandos de geração dos segredos constam do próprio `.env.example`. As variáveis opcionais estão descritas
+em `01-configuracao.md`.
+
+### 2.3. Geração do cliente do Prisma
 
 ```bash
 npm run prisma:generate
 ```
 
-### 2.4. Aplicar as migrations
+### 2.4. Aplicação das migrations
 
-Em ambiente de desenvolvimento (cria/atualiza o banco e mantém o histórico de migrations sincronizado):
+Em desenvolvimento, o comando abaixo cria ou atualiza o banco e mantém o histórico de migrations sincronizado:
 
 ```bash
 npm run prisma:migrate
 ```
 
-Esse comando executa `prisma migrate dev`, que pede confirmação interativa caso detecte drift de schema — rode em um terminal interativo na primeira vez.
+O comando executa `prisma migrate dev`, que solicita confirmação caso detecte divergência entre o esquema e o
+banco; na primeira execução, deve ser utilizado em terminal interativo.
 
-### 2.5. Popular dados de exemplo (seed)
+### 2.5. Dados de demonstração (seed)
 
 ```bash
 npm run db:seed:dev
 ```
 
-Executa `prisma/seed-dev.ts` via `ts-node`. Esse script cria os dados de exemplo (setores, usuários, permissões) usados para testar o sistema localmente — consulte o próprio arquivo para saber quais credenciais de login ele cria.
+Executa `prisma/seed-dev.ts`, que **apaga o conteúdo do banco** e cria dados de demonstração de todos os módulos:
+setores, usuários com permissões, chamados, reservas, patrimônio, cursos, turmas, notas, cobranças, cursos do
+Boost e arquivos de demonstração cifrados. As credenciais das contas criadas são exibidas ao final da execução.
 
-### 2.6. Subir o backend
+### 2.6. Inicialização do backend
 
 ```bash
 npm run start:dev
 ```
 
-Ver detalhes de execução (porta, logs) em `03-execucao.md`.
+Detalhes de execução (porta e registros) em `03-execucao.md`.
 
 ## 3. Frontend
 
-### 3.1. Instalar dependências
+### 3.1. Instalação das dependências
 
 ```bash
 cd RoosterOneFrontEnd-main
 npm install
 ```
 
-### 3.2. Configurar a URL da API (opcional)
+### 3.2. Endereço da API (opcional)
 
-O frontend já assume `http://localhost:3000` como padrão para `VITE_API_URL` (ver `src/services/hub/client.ts`). Se o backend estiver rodando em outra porta/host, crie um `.env` (ou `.env.local`) na raiz do frontend:
+O frontend adota `http://localhost:3000` como valor padrão de `VITE_API_URL` (`src/services/hub/client.ts`).
+Se o backend estiver em outro endereço, crie um `.env` (ou `.env.local`) na raiz do frontend:
 
 ```bash
 VITE_API_URL=http://localhost:3000
 ```
 
-### 3.3. Subir o frontend
+### 3.3. Inicialização do frontend
 
 ```bash
 npm run dev
 ```
 
-Ver detalhes de porta em `03-execucao.md`.
+Detalhes de porta em `03-execucao.md`.
 
 ## Resumo dos comandos (backend)
 
-Todos confirmados em `package.json` — não use nomes de script diferentes destes:
+Todos os comandos abaixo constam do `package.json`:
 
-| Objetivo | Comando |
+| Finalidade | Comando |
 |---|---|
 | Instalar dependências | `npm install` |
-| Gerar Prisma Client | `npm run prisma:generate` |
-| Aplicar migrations (dev) | `npm run prisma:migrate` |
+| Gerar o cliente do Prisma | `npm run prisma:generate` |
+| Aplicar migrations (desenvolvimento) | `npm run prisma:migrate` |
 | Aplicar migrations (produção) | `npm run prisma:deploy` |
-| Popular dados de exemplo | `npm run db:seed:dev` |
-| Rodar em desenvolvimento | `npm run start:dev` |
-| Build de produção | `npm run build` |
-| Rodar build de produção | `npm run start:prod` |
+| Popular dados de demonstração | `npm run db:seed:dev` |
+| Executar em desenvolvimento | `npm run start:dev` |
+| Compilar para produção | `npm run build` |
+| Executar a compilação de produção | `npm run start:prod` |
+| Testes unitários | `npm test` |
 | Testes end-to-end | `npm run test:e2e` |
+| Todos os testes | `npm run test:all` |
+| Auditoria de dependências de produção | `npm run audit` |
+| Teste de carga (detecção de regressão) | `npm run load-test` |
 
 ## Resumo dos comandos (frontend)
 
-| Objetivo | Comando |
+| Finalidade | Comando |
 |---|---|
 | Instalar dependências | `npm install` |
-| Rodar em desenvolvimento | `npm run dev` |
-| Build de produção | `npm run build` |
-| Servir o build localmente | `npm run preview` |
-| Lint | `npm run lint` |
-| Formatar código | `npm run format` |
+| Executar em desenvolvimento | `npm run dev` |
+| Compilar (alvo padrão: Cloudflare Workers) | `npm run build` |
+| Compilar para servidor Node.js | `NITRO_PRESET=node-server npm run build` (no PowerShell: `$env:NITRO_PRESET="node-server"; npm run build`) |
+| Servir a compilação localmente | `npm run preview` |
+| Testes | `npm test` |
+| Verificação de estilo | `npm run lint` |
+| Formatação do código | `npm run format` |
+| Auditoria de dependências de produção | `npm run audit` |

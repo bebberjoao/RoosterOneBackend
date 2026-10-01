@@ -1,139 +1,179 @@
 # Estratégia de Testes e Matriz de Cobertura
 
-Status: setembro/2026. Descreve o que existe de fato — comandos, camadas, o que cada uma cobre e, no fim, a matriz que liga teste a requisito/regra de negócio.
+Situação em 30/09/2026. Este documento descreve as camadas de teste existentes (comandos, abrangência e
+quantitativos) e, ao final, a matriz que associa cada teste ao requisito ou regra de negócio que verifica.
 
 ## Camadas
 
-| Camada | Onde | Comando | Quantidade |
+| Camada | Localização | Comando | Quantidade |
 |---|---|---|---|
-| e2e de API (backend) | `test/*.e2e-spec.ts` | `npm run test:e2e` | 73 testes, 2 arquivos |
-| Unitário (backend) | `src/**/*.spec.ts` | `npm test` | 90 testes, 9 arquivos |
-| Unitário + componente (frontend) | `src/**/*.test.{ts,tsx}` | `npm test` (no repo do frontend) | 70 testes, 6 arquivos |
-| Acessibilidade (frontend) | `src/components/shared/acessibilidade.test.tsx` | incluída no `npm test` | 12 dos 70 acima |
+| e2e de API (backend) | `test/*.e2e-spec.ts` | `npm run test:e2e` | 78 testes, 2 arquivos |
+| Unitário (backend) | `src/**/*.spec.ts` | `npm test` | 131 testes, 11 arquivos |
+| Unitário e de componente (frontend) | `src/**/*.test.{ts,tsx}` | `npm test` (repositório do frontend) | 70 testes, 6 arquivos |
+| Acessibilidade (frontend) | `src/components/shared/acessibilidade.test.tsx` | incluída em `npm test` | 12 dos 70 acima |
 
-Total: **233 testes**. No backend, `npm run test:all` roda unitários e e2e em sequência.
+Total: **279 testes**. No backend, `npm run test:all` executa os testes unitários e e2e em sequência. Todas as
+camadas são executadas pelo CI a cada envio para `main` e a cada pull request (ver
+`docs/operations/05-cicd.md`).
 
-### e2e de API — a camada principal
+### e2e de API — camada principal
 
-Sobe a aplicação NestJS inteira (`AppModule`) contra um **SQLite isolado** (`prisma/dev-test.db`, schema `prisma/schema.test.prisma`), sem depender do PostgreSQL de desenvolvimento. Usa `configurarApp()` — a mesma função do `main.ts` —, então `ValidationPipe`, versionamento e filtro de exceção do Prisma valem igual em teste e em produção. Antes dessa extração os testes rodavam sem o `ValidationPipe`, e nenhuma regra de DTO era de fato exercitada.
+Inicia a aplicação NestJS completa (`AppModule`) contra um **SQLite isolado** (`prisma/dev-test.db`, esquema
+`prisma/schema.test.prisma`), sem depender do PostgreSQL de desenvolvimento. Utiliza `configurarApp()`, a mesma
+função empregada por `main.ts`, de modo que `ValidationPipe`, versionamento e filtro de exceções se comportam
+igualmente em teste e em execução real.
 
-É a camada onde a **autorização** é verificada, e é por isso que ela é a principal: quase toda regra crítica do sistema é uma regra de acesso, e regra de acesso só se prova de ponta a ponta (guard + controller + service + banco). Vários testes existem exatamente para provar o caminho negativo — 401 sem token, 403 fora do escopo, 404 que não revela existência.
+É a camada em que a **autorização** é verificada, razão de sua posição central: a maior parte das regras críticas do
+sistema é de controle de acesso, cuja comprovação exige o fluxo completo (guard, controller, service e banco).
+Diversos testes existem especificamente para comprovar o caminho negativo — `401` sem token, `403` fora do
+escopo e `404` que não revela a existência do recurso.
 
 ### Unitário (backend)
 
-`jest-unit.json`, isolado da suíte e2e (`roots: ["<rootDir>/src"]`, `testRegex: \.spec\.ts$`). Cobre lógica pura e decisões que não precisam de banco: os helpers de paginação, o mascaramento de segredo em log, a regra do último administrador (com Prisma substituído por dublê, verificando a decisão e o formato da consulta) e a **suíte dedicada de validação de entrada**.
+`jest-unit.json`, isolado da suíte e2e (`roots: ["<rootDir>/src"]`, `testRegex: \.spec\.ts$`). Cobre lógica pura e
+decisões que dispensam banco de dados: auxiliares de paginação, mascaramento de segredos em log, regra do último
+administrador (com o Prisma substituído por dublê), criptografia de arquivos (incluindo o motor de armazenamento
+de vídeo), verificação de assinatura binária de arquivos, critério de origem do CORS, filtro de exceções e a
+**suíte dedicada de validação de entrada**.
 
 #### Validação de entrada (`src/common/validacao-dtos.spec.ts`)
 
-Antes, cada restrição de DTO era exercitada só de forma indireta, por algum caso e2e que mandava dado inválido — a maioria das regras não tinha cobertura explícita. Agora as regras são verificadas uma a uma com `plainToInstance` + `validateSync`, que reproduzem exatamente o que o `ValidationPipe` global faz, sem precisar subir a aplicação.
+As restrições de cada DTO são verificadas individualmente com `plainToInstance` e `validateSync`, que reproduzem
+o comportamento do `ValidationPipe` global sem iniciar a aplicação. A suíte cobre, entre outros: obrigatoriedade e
+formato de e-mail, CPF com 11 dígitos, conversão de `"true"` em booleano, obrigatoriedade de `participantes` na
+reserva, identificador de prioridade não restrito aos valores do seed, conversão de número recebido como texto na
+paginação e o limite de 200 registros por página.
 
-Cobre, entre outros: obrigatoriedade e formato de e-mail, CPF só com 11 dígitos, conversão de `"true"` de formulário em booleano, `participantes` obrigatório na reserva, id de prioridade de chamado não restrito aos quatro do seed, conversão de número vindo como texto na query de paginação e o teto de 200 registros por página.
+A suíte revelou uma inconsistência real: a criação de usuário e o cadastro do Boost exigiam senha de 8 caracteres,
+mas `RedefinirSenhaDto` aceitava 6, o que permitia contornar o mínimo pelo fluxo de redefinição. O mínimo foi
+unificado em 8, com teste de regressão.
 
-Um achado real saiu daí: **a senha mínima era inconsistente** — criação de usuário e cadastro do Boost exigiam 8 caracteres, mas `RedefinirSenhaDto` aceitava 6. Não era só divergência de documentação: dava para contornar o mínimo de 8 usando o fluxo de "esqueci minha senha". Unificado em 8, com teste que trava a regressão.
-
-`whitelist`/`forbidNonWhitelisted` (a rejeição de campo desconhecido) são comportamento do pipe, não do DTO, e continuam cobertos pelo e2e.
+A recusa de campo não declarado (`whitelist` e `forbidNonWhitelisted`) é comportamento do pipe, e não do DTO,
+permanecendo coberta pela suíte e2e.
 
 ### Frontend
 
-Vitest + Testing Library + jsdom (`vitest.config.ts`, separado do `vite.config.ts` do app, que é montado pelo preset do Lovable e não deve receber plugins manualmente). Cobre a lógica pura da agenda de reservas, o contrato do cliente HTTP (incluindo o prefixo `/v1` e a renovação de sessão) e o componente de tabela usado por praticamente toda tela de gestão.
+Vitest, Testing Library e jsdom (`vitest.config.ts`, separado do `vite.config.ts` da aplicação, que é montado pelo
+preset do Lovable e não deve receber plugins manualmente). Cobre a lógica da agenda de reservas, o contrato do
+cliente HTTP (incluindo o prefixo `/v1` e a renovação de sessão) e o componente de tabela utilizado pelas telas de
+gestão.
 
 #### Acessibilidade (`acessibilidade.test.tsx`)
 
-Auditoria automatizada com **axe-core** (`vitest-axe`) sobre os componentes compartilhados — são eles que se repetem em praticamente toda tela, então um problema ali se multiplica pelo sistema inteiro. Verifica campo sem rótulo associado, botão sem nome acessível, papel ARIA inválido e tabela mal estruturada, tanto em componentes isolados quanto num formulário montado como aparece numa tela real.
+Auditoria automatizada com **axe-core** (`vitest-axe`) sobre os componentes compartilhados, que se repetem em
+praticamente todas as telas. Verifica campos sem rótulo associado, botões sem nome acessível, papéis ARIA inválidos
+e tabelas mal estruturadas, em componentes isolados e em um formulário montado como em uma tela real.
 
-A regra `color-contrast` fica **desligada de propósito**: ela precisa de canvas e da folha de estilo aplicada para medir cor, e o jsdom não tem nem uma coisa nem outra — mantê-la ligada só produziria ruído e um resultado sem significado. Contraste, ordem de foco, navegação por teclado e comportamento de leitor de tela continuam sendo verificação manual.
+A regra `color-contrast` está deliberadamente desativada: ela requer canvas e a folha de estilos aplicada, ausentes
+no jsdom, e produziria resultados sem significado. Contraste, ordem de foco, navegação por teclado e comportamento
+com leitor de tela permanecem sob verificação manual.
 
-## Varredura de dependência
+## Varredura de dependências
 
-`npm run audit` (`npm audit --omit=dev`) nos dois repositórios. Não é um portão de pipeline — não há CI —, é um comando a rodar antes de mudança estrutural e antes de qualquer deploy.
+`npm run audit` (`npm audit --omit=dev`) nos dois repositórios, executado também pelo CI (job `auditoria`, não
+bloqueante). Situação em 30/09/2026: **frontend sem avisos**; **backend** sem vulnerabilidades exploráveis por
+requisição HTTP, com dois avisos classificados como risco aceito (`deepmerge-ts`, via CLI do Prisma, e `js-yaml`,
+fixado pelo `@nestjs/swagger`). Justificativa em `docs/security/05-analise-de-seguranca.md`.
 
-Estado atual: o **frontend está limpo**; o **backend tem 8 avisos** vindos de `multer` (via `@nestjs/platform-express`) e `qs`. Confirmado por `npm audit fix --dry-run` que **não há correção não-quebrante**: resolver exige subir `@nestjs/platform-express` para a major seguinte, decisão que precisa de avaliação de impacto própria e está registrada como recomendação em `docs/security/05-analise-de-seguranca.md`.
+## Verificações não automatizadas
 
-## O que NÃO é testado automaticamente
+Registradas para que não sejam interpretadas como omissão:
 
-Registrado aqui para não ser lido como esquecimento:
+- **Carga e desempenho**: fora das suítes automatizadas. `scripts/load-test.mjs` detecta regressão de desempenho
+  e pode ser executado manualmente ou como etapa separada; a medição de setembro/2026 está em
+  `docs/operations/08-requisitos-de-hardware.md`.
+- **Recuperação de desastre**: não agendada (depende de ambiente em execução contínua), mas repetível:
+  `scripts/recovery-drill.ps1` restaura um backup real em banco descartável, confere a integridade e, desde
+  30/09/2026, a decifragem dos arquivos com a chave configurada (ver `docs/operations/06-backup-e-recuperacao.md`).
+- **Interface de ponta a ponta em navegador**: não há Playwright nem Cypress. Os fluxos de tela são verificados
+  manualmente; os testes de frontend cobrem lógica, componentes isolados e acessibilidade da árvore renderizada.
+- **Responsividade**: não automatizada, pois o jsdom não calcula layout; a verificação é manual, em diferentes
+  larguras de tela.
+- **Teste de intrusão**: realizado de forma manual em setembro/2026 (revisão estática e testes ativos), sem
+  ferramentas dedicadas nem fuzzing. Resultados em `docs/security/06-pentest-2026-09.md`; os achados corrigidos
+  possuem testes de regressão automatizados.
 
-- **Teste de carga/desempenho**: não faz parte de nenhuma suíte automatizada (não roda em `npm test`/`test:e2e`, não há CI). Existe `scripts/load-test.mjs` (ver `docs/engineering/09-performance.md`) — um detector de regressão de desempenho que pode ser rodado manualmente ou como *gate* separado, não um número de capacidade de produção: sem volume real, isso ainda não significaria nada.
-- **Teste de recuperação de desastre**: não agendado (depende de um ambiente que rode continuamente — ver Índice de Pendências), mas deixou de depender só de execução manual: `scripts/recovery-drill.ps1` restaura um backup de verdade num banco descartável e confere a integridade de forma repetível (ver `docs/operations/06-backup-e-recuperacao.md`).
-- **Teste de interface ponta a ponta (navegador)**: não há Playwright/Cypress. O fluxo de tela é verificado manualmente; o que os testes de frontend cobrem é lógica, componente isolado e acessibilidade da árvore renderizada — não a jornada completa nem a navegação real por teclado.
-- **Teste de responsividade**: não automatizado. O jsdom não faz layout, então não há o que medir; a verificação é manual, em diferentes larguras de viewport.
-- **Teste de penetração e fuzzing**: não realizados. O que existe é a análise de segurança em `docs/security/05-analise-de-seguranca.md`, verificada contra o código, mais a varredura de dependência acima.
+## Matriz de cobertura — testes e regras de negócio
 
-## Matriz de cobertura — teste ↔ requisito
+Associa cada regra de negócio numerada (`docs/system/04-regras-de-negocio.md`) ao teste que a verifica. Regras sem
+teste automatizado estão indicadas, com o motivo.
 
-Liga cada regra de negócio numerada (`docs/system/04-regras-de-negocio.md`) ao teste que a exercita. Regras sem teste automatizado aparecem explicitamente, com o motivo.
-
-| Regra | O que garante | Onde é testada |
+| Regra | Garantia | Teste |
 |---|---|---|
-| RN001, RN002 | Administrador é permissão, concedida direto ao usuário | e2e: "Rejects a protected route with a valid token but without the required permission"; "Usuarios-setores and usuarios-permissoes flows" |
+| RN001, RN002 | Administrador é permissão concedida diretamente ao usuário | e2e: "Rejects a protected route with a valid token but without the required permission"; "Usuarios-setores and usuarios-permissoes flows" |
 | RN003 | E-mail de usuário é único | e2e: "Users endpoints should create, read, update and delete a user" |
-| RN004 | Redefinição de senha não revela se o e-mail existe; token de uso único | e2e: "Password reset via email: request, consume token, old password stops working, token cannot be reused" |
-| RN005, RN006, RN009 | Transição de status de chamado, `encerradoEm` derivado, histórico só em troca real | e2e: "Rooster Desk should create, read, update and delete a ticket flow" |
+| RN004 | Redefinição de senha não revela a existência do e-mail; token de uso único | e2e: "Password reset via email: request, consume token, old password stops working, token cannot be reused" |
+| RN005, RN006, RN009 | Transição de status do chamado, `encerradoEm` derivado, histórico apenas em alteração efetiva | e2e: "Rooster Desk should create, read, update and delete a ticket flow" |
 | RN007, RN008 | Visibilidade de chamado por setor; nota interna invisível ao solicitante | e2e: "Rooster Desk should create, read, update and delete a ticket flow" |
-| RN010 | Reserva valida capacidade, dia, janela e conflito | e2e (rooms): "recusa horário de término menor…", "recusa quantidade de participantes acima da capacidade", "recusa horário fora da janela", "recusa sobreposição", "aceita horários encostados", "não considera conflito entre ambientes diferentes", "libera o horário de uma reserva cancelada", "revalida o conflito ao confirmar". Frontend: `labels.test.ts` (`findConflicts`) |
+| RN010 | Reserva valida capacidade, dia, janela de funcionamento e conflito | e2e (rooms): "recusa horário de término menor…", "recusa quantidade de participantes acima da capacidade", "recusa horário fora da janela", "recusa sobreposição", "aceita horários encostados", "não considera conflito entre ambientes diferentes", "libera o horário de uma reserva cancelada", "revalida o conflito ao confirmar". Frontend: `labels.test.ts` (`findConflicts`) |
 | RN011 | Série recorrente é atômica | e2e: "Rooster Rooms recurring series: generates occurrences, rejects on conflict atomically, cancels in bulk" |
-| RN012 | Cancelamento grava o motivo | e2e (rooms): "recusa (cancela) a reserva" |
-| RN013, RN014 | Patrimônio baixado não movimenta; movimentação exige destino | e2e: "Rooster Assets should register an asset and a movement" |
+| RN012 | Cancelamento registra o motivo | e2e (rooms): "recusa (cancela) a reserva" |
+| RN013, RN014 | Patrimônio baixado não é movimentado; movimentação exige destino | e2e: "Rooster Assets should register an asset and a movement" |
 | RN015 | Empréstimo: prazo, atraso e devolução | e2e: "Asset loans: overdue tracking and return flow" |
 | RN016 | Eventos de segurança geram auditoria automaticamente | e2e: "Security-relevant events are written automatically to LogAuditoria" |
 | RN017, RN018 | Horizonte de antecedência e permissão própria de recorrência | e2e: "Rooster Rooms recurring series…" |
-| RN019 | Professor/Aluno são vínculos de usuário existente | e2e: "Coordenação constrói a hierarquia completa…" |
+| RN019 | Professor e aluno são vínculos de usuário existente | e2e: "Coordenação constrói a hierarquia completa…" |
 | RN020 | Matrícula respeita a capacidade da turma | e2e: "Coordenação constrói a hierarquia completa…" |
-| RN021 | Posse de turma é obrigatória além da permissão | e2e: "Professor só acessa/gerencia a própria turma — 403 na turma de outro professor"; "Aluno só vê os próprios dados via /me" |
+| RN021 | Posse da turma é obrigatória além da permissão | e2e: "Professor só acessa/gerencia a própria turma — 403 na turma de outro professor"; "Aluno só vê os próprios dados via /me" |
 | RN022, RN023 | Validação de nota e frequência sem reprovação automática | e2e: "Coordenação constrói a hierarquia completa…" |
-| RN024 | Não existe fechamento de período | **Sem teste** — é a ausência de uma funcionalidade; não há comportamento a exercitar |
-| RN025, RN026 | Publicação idempotente e atomicidade correção↔nota | e2e: "Rooster Learn: publicar atividade gera item avaliativo; correção propaga nota para o Academy" |
-| RN027 | Prazo pelo servidor; aluno de outra turma não entrega | e2e: "Rooster Learn: … aluno de outra turma não pode entregar" |
-| RN028 | Cobrança sempre ligada a Aluno real | e2e: "Portal do aluno: só vê/baixa as próprias cobranças" |
-| RN029 | Lote de mensalidade idempotente, com desconto vigente | e2e: "Gerar mensalidades em lote é idempotente por competência e aplica desconto ativo automaticamente" |
-| RN030 | "Vencido" derivado, nunca persistido | e2e: "Cobrança: criar, marcar como paga, negociar e cancelar mudam o status corretamente" |
+| RN024 | Inexistência de fechamento de período | **Sem teste**: trata-se da ausência de uma funcionalidade, sem comportamento a verificar |
+| RN025, RN026 | Publicação idempotente e atomicidade entre correção e nota | e2e: "Rooster Learn: publicar atividade gera item avaliativo; correção propaga nota para o Academy" |
+| RN027 | Prazo decidido pelo servidor; aluno de outra turma não entrega | e2e: "Rooster Learn: … aluno de outra turma não pode entregar" |
+| RN028 | Cobrança sempre vinculada a aluno real | e2e: "Portal do aluno: só vê/baixa as próprias cobranças" |
+| RN029 | Lote de mensalidades idempotente, com desconto vigente | e2e: "Gerar mensalidades em lote é idempotente por competência e aplica desconto ativo automaticamente" |
+| RN030 | Status "vencido" derivado, nunca persistido | e2e: "Cobrança: criar, marcar como paga, negociar e cancelar mudam o status corretamente" |
 | RN031 | Pagamento parcial aceito | e2e: "Cobrança: criar, marcar como paga…" |
 | RN032 | Conclusão e certificado automáticos e atômicos | e2e: "Fluxo completo: professor publica curso, aluno externo matricula, conclui todas as aulas e recebe certificado automaticamente" |
-| RN033 | Acesso ao Boost por matrícula, não por RBAC | e2e: "Professor só gerencia o próprio curso Boost"; "Material de apoio: aluno matriculado baixa; não matriculado recebe 403"; "Chat do curso…" |
-| RN034 | Token do Hub e do Boost não se aceitam | e2e: "Cadastro/login público do Boost são independentes do login do Hub" |
-| RN036 | Vídeo hospedado servido por token de 5 min, escopado a uma aula | e2e: "Vídeo hospedado: instrutor envia, recusa mimetype errado, e o player consegue arrastar a barra (Range)" (token sem/inválido → 403, Range → 206). Unitário: `video-stream.util.spec.ts` (200/206/416) |
-| RN037 | Progresso de vídeo real: nunca regride, completa a partir de 90% | e2e: "Progresso real de vídeo: retoma posição, completa automaticamente perto do fim e emite certificado na última aula" |
-| RN038 | Contas externas: admin lista, desativa e redefine senha; professor recebe 403 | e2e: "Contas externas (painel admin): lista, desativa e redefine senha; professor sem a permissão recebe 403" |
-| RN040 | Boost sem dono: gestão por permissão; professor é orientador; tirar do ar preserva matriculados | e2e: "Gestão por permissão: quem tem a permissão gere QUALQUER curso; professor orientador (sem permissão de gestão) recebe 403" e "Tirar do ar: some do catálogo e bloqueia nova matrícula, mas o aluno já matriculado continua com acesso e com a conversa" |
-| RN041 | Conversa por aluno; orientador só vê os cursos a que está vinculado | e2e: "Orientadores: o gestor vincula professores; só orientador vinculado enxerga e responde as conversas do curso" (caixa vazia e 404 para não vinculado, não lidas, aluno só na própria conversa, 400 sem orientador) |
-| RN042 | Certificado por curso: pode não existir; texto do gestor | e2e: "Certificado: desligado, o curso conclui sem emitir (material de apoio); ligado, usa o texto configurado". Unitário: `certificado-boost.service.spec.ts` (`aplicarModelo`) |
-| RN039 | Notificação: cada usuário só lê/marca as próprias; emissão não derruba a operação | e2e: "Caixa de entrada: cada usuário lê e marca só as próprias notificações (sem exigir permissão)" (401 sem token, 404 em notificação alheia) e "Cobrança criada e paga gera notificação para o aluno na caixa de entrada dele — e só dele". Front: `role-context.test.ts` cobre `deriveRole` (perfil deduzido, nunca admin por omissão) e `tempoRelativo` |
-| RN035 | Instituição nunca fica sem administrador | e2e: "Proteção do último administrador: não dá para revogar, excluir nem desativar o único admin ativo". Unitário: `administradores.service.spec.ts` |
-| RN043 | Multa/juros manuais vencem a política; cálculo por política nunca é persistido | e2e: "Política de multa/juros: o financeiro cria a própria regra; ela calcula dinamicamente, mas valor manual sempre vence" (também cobre exclusão bloqueada de política em uso) |
-| RN044 | Vínculo Reserva↔Turma é por posse do professor, ou gestão ampla do Academy | e2e: "Rooms ↔ Academy: ao criar a reserva de uma aula, só o professor dono da turma pode vinculá-la" (dono vincula, outro professor recebe 403, coordenação vincula qualquer turma) |
+| RN033 | Acesso ao Boost por matrícula, e não por RBAC | e2e: "Material de apoio: aluno matriculado baixa; não matriculado recebe 403"; "Chat do curso…" |
+| RN034 | Tokens do Hub e do Boost não são aceitos reciprocamente | e2e: "Cadastro/login público do Boost são independentes do login do Hub" |
+| RN035 | A instituição nunca fica sem administrador | e2e: "Proteção do último administrador: não dá para revogar, excluir nem desativar o único admin ativo". Unitário: `administradores.service.spec.ts` |
+| RN036 | Vídeo hospedado servido por token de 5 minutos restrito a uma aula | e2e: "Vídeo hospedado: instrutor envia, recusa mimetype errado, e o player consegue arrastar a barra (Range)" (token ausente ou inválido → 403; Range → 206; conteúdo sem assinatura de vídeo → 400). Unitário: `video-stream.util.spec.ts` (200, 206 e 416) |
+| RN037 | Progresso de vídeo real: não regride e conclui a partir de 90% | e2e: "Progresso real de vídeo: retoma posição, completa automaticamente perto do fim e emite certificado na última aula" |
+| RN038 | Contas externas: o administrador lista, desativa e redefine senha; professor recebe 403 | e2e: "Contas externas (painel admin): lista, desativa e redefine senha; professor sem a permissão recebe 403" |
+| RN039 | Notificação: cada usuário lê e marca apenas as próprias; a emissão não interrompe a operação | e2e: "Caixa de entrada: cada usuário lê e marca só as próprias notificações (sem exigir permissão)"; "Cobrança criada e paga gera notificação para o aluno na caixa de entrada dele — e só dele"; aviso ao técnico na atribuição de chamado ("Rooster Desk should create, read, update and delete a ticket flow"). Frontend: `role-context.test.ts` (`deriveRole` e `tempoRelativo`) |
+| RN040 | Boost sem dono: gestão por permissão; professor como orientador; retirada do ar preserva matriculados | e2e: "Gestão por permissão: quem tem a permissão gere QUALQUER curso; professor orientador (sem permissão de gestão) recebe 403"; "Tirar do ar: some do catálogo e bloqueia nova matrícula, mas o aluno já matriculado continua com acesso e com a conversa" |
+| RN041 | Conversa por aluno; orientador acessa apenas os cursos vinculados | e2e: "Orientadores: o gestor vincula professores; só orientador vinculado enxerga e responde as conversas do curso" |
+| RN042 | Certificado por curso: pode não existir; texto definido pelo gestor | e2e: "Certificado: desligado, o curso conclui sem emitir (material de apoio); ligado, usa o texto configurado". Unitário: `certificado-boost.service.spec.ts` (`aplicarModelo`) |
+| RN043 | Multa e juros manuais prevalecem sobre a política; o cálculo da política nunca é persistido | e2e: "Política de multa/juros: o financeiro cria a própria regra; ela calcula dinamicamente, mas valor manual sempre vence" |
+| RN044 | Vínculo entre reserva e turma por posse do professor ou gestão ampla do Academy | e2e: "Rooms ↔ Academy: ao criar a reserva de uma aula, só o professor dono da turma pode vinculá-la" |
 
 ### Requisitos não funcionais e de contrato
 
-| Requisito | Onde é testado |
+| Requisito | Teste |
 |---|---|
 | Versionamento da API (`/v1` obrigatório) | e2e: "Rota de negócio sem o prefixo /v1 não existe"; "Health check responde em / (fora do versionamento)". Frontend: `client.test.ts` ("prefixo de versão") |
-| Health check verifica o banco | e2e: "GET /health verifica o banco de verdade" |
+| Verificação de saúde com consulta ao banco | e2e: "GET /health verifica o banco de verdade" |
 | Paginação opcional e retrocompatível | e2e: "Paginação opcional: sem `pagina`/`limite` devolve array…". Unitário: `pagination.spec.ts` |
 | Refresh token com rotação e revogação | e2e: os três testes "Refresh token: …". Frontend: `client.test.ts` ("renovação automática de sessão") |
-| Mascaramento de segredo em log | Unitário: `mail.service.spec.ts` |
+| Mascaramento de segredos em log | Unitário: `mail.service.spec.ts` |
 | Autenticação obrigatória por padrão | e2e: "Rejects a protected route without a token"; e2e (rooms): "recusa a listagem de reservas sem token" |
-| Serialização de `BigInt` em anexo/documento | e2e: "Documento acadêmico: upload, listagem, download e remoção respondem com o tamanho (BigInt) serializado corretamente" |
-| Contrato de erro do cliente HTTP (`ApiError` × `ApiUnavailableError`, 401 limpa sessão) | Frontend: `client.test.ts` |
-| Ordenação/paginação da tabela de listagem | Frontend: `data-table.test.tsx` |
-| Validação de entrada, regra a regra (DTOs) | Unitário: `validacao-dtos.spec.ts` |
-| Senha mínima igual em todo fluxo que define senha (8 caracteres) | Unitário: `validacao-dtos.spec.ts` ("Senha mínima é a mesma em todo fluxo que define senha") |
+| Serialização de `BigInt` em anexo e documento | e2e: "Documento acadêmico: upload, listagem, download e remoção respondem com o tamanho (BigInt) serializado corretamente" |
+| Contrato de erro do cliente HTTP (`ApiError` e `ApiUnavailableError`; `401` encerra a sessão) | Frontend: `client.test.ts` |
+| Ordenação e paginação da tabela de listagem | Frontend: `data-table.test.tsx` |
+| Validação de entrada por regra (DTOs) | Unitário: `validacao-dtos.spec.ts` |
+| Senha mínima uniforme (8 caracteres) em todo fluxo que define senha | Unitário: `validacao-dtos.spec.ts` ("Senha mínima é a mesma em todo fluxo que define senha") |
 | Acessibilidade dos componentes compartilhados | Frontend: `acessibilidade.test.tsx` (axe-core) |
-| Rastreamento de erros: só status >= 500 é persistido, nunca 400/403/404/409 | Unitário: `all-exceptions.filter.spec.ts` (Prisma P2002/P2025, `HttpException` conhecida e erro genuíno, com/sem persistência). e2e: "Rastreamento de erros: relatório e exportação exigem permissão própria…" (permissão + formato do relatório/CSV) |
-| Criptografia de arquivo em repouso (GCM/documento e CTR/vídeo, transparente na API) | Unitário: `file-encryption.util.spec.ts` (round-trip GCM, detecção de adulteração, round-trip CTR início/fronteira de bloco/fim/arquivo inteiro/byte único) e `video-stream.util.spec.ts` (Range sobre fixture cifrado). e2e: asserção no fluxo de anexo de chamado que lê o arquivo cru direto do disco e confirma que o texto original não aparece nos bytes gravados |
+| Rastreamento de erros: somente status 500 ou superior é persistido | Unitário: `all-exceptions.filter.spec.ts`. e2e: "Rastreamento de erros: relatório e exportação exigem permissão própria…" |
+| Criptografia de arquivos em repouso (GCM para documentos, CTR para vídeo) | Unitário: `file-encryption.util.spec.ts` (ida e volta, detecção de adulteração, trechos em fronteiras de bloco) e `video-stream.util.spec.ts` (Range sobre arquivo cifrado). e2e: leitura do arquivo diretamente do disco no fluxo de anexo de chamado, confirmando a ausência do texto original |
+| Conteúdo do arquivo compatível com o tipo declarado (assinatura binária) | Unitário: `assinatura-arquivo.spec.ts` (amostra válida de cada tipo aceito, executável declarado como PNG, binário declarado como texto, UTF-16 com BOM) e `file-encryption.util.spec.ts` (motor de armazenamento de vídeo: aceitação com cabeçalho fragmentado, recusa com remoção do arquivo parcial). e2e: executável declarado como `image/png` e texto declarado como vídeo recebem `400` |
+| Download com nome de arquivo não-ASCII (RFC 6266) e nome multipart em UTF-8 | e2e: "Rooster Desk should create, read, update and delete a ticket flow" (envio e download de "Relatório — final.txt") |
+| Critério de origem do CORS (produção e desenvolvimento) | Unitário: `cors.spec.ts` |
+| IDOR por caminho de arquivo em anexo de chamado | e2e: "Segurança: POST /anexos-tickets não aceita caminho/tipo/tamanho do cliente (achado de pentest, setembro/2026)" |
 
-## Como rodar
+## Execução
 
 ```bash
 # backend
-npm test           # unitários (rápido, sem banco)
-npm run test:e2e   # e2e completo (sobe a app contra SQLite isolado)
-npm run test:all   # os dois, em sequência
-npm run audit      # varredura de dependência de produção
+npm test           # unitários (rápidos, sem banco)
+npm run test:e2e   # e2e completo (aplicação contra SQLite isolado)
+npm run test:all   # ambos, em sequência
+npm run audit      # varredura de dependências de produção
 
 # frontend
-npm test           # Vitest, uma execução (inclui os testes de acessibilidade)
+npm test           # Vitest, execução única (inclui acessibilidade)
 npm run test:watch
 npm run audit
 ```
 
-Instabilidades conhecidas do e2e no Windows e o modo de falha por ordem de execução dos arquivos estão em `docs/operations/03-execucao.md`.
+As instabilidades conhecidas da suíte e2e no Windows e a falha associada à ordem de execução dos arquivos estão
+descritas em `docs/operations/03-execucao.md`.

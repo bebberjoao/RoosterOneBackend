@@ -604,7 +604,7 @@ Diferente de todos os módulos anteriores, o Rooster Boost tem **dois logins ind
 | PATCH/DELETE | `/modulos-boost/:id` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Atualiza/remove módulo |
 | POST | `/modulos-boost/:id/aulas` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Cria aula |
 | PATCH/DELETE | `/aulas-boost/:id` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Atualiza/remove aula |
-| POST | `/aulas-boost/:id/materiais` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | **Material de apoio** — multipart, até 25MB |
+| POST | `/aulas-boost/:id/materiais` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` (avaliada pelo guard, antes do recebimento do arquivo) | **Material de apoio** — multipart, até 25 MB; mimetype na lista de documentos e conteúdo verificado pela assinatura binária (`400` se incompatível); gravação cifrada |
 | DELETE | `/materiais-boost/:id` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Remove material |
 | GET | `/materiais-boost/:id/arquivo` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Baixa o material (visão do instrutor) |
 | GET | `/cursos-boost/:id/alunos` | Bearer (Hub) | `/boost/manage` / `ver-progresso` | **Progresso dos alunos matriculados** — `progressoPct`, status, certificado emitido ou não |
@@ -625,7 +625,7 @@ Além do link externo (`conteudoUrl`, YouTube/Vimeo — comportamento original, 
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
-| POST | `/aulas-boost/:id/video` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Envia o vídeo — multipart, até **2GB**, só `video/mp4`/`video/webm`/`video/quicktime`. Substituir um vídeo existente apaga o arquivo antigo do disco antes de gravar o novo (evita órfão de até 2GB a cada reenvio) |
+| POST | `/aulas-boost/:id/video` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` (avaliada pelo guard, antes do recebimento do arquivo) | Envia o vídeo — multipart, até **2 GB**, somente `video/mp4`, `video/webm` e `video/quicktime`, gravado em fluxo com cifragem AES-256-CTR. A assinatura binária é conferida nos primeiros bytes recebidos; conteúdo incompatível resulta em `400` e remoção do arquivo parcial. A substituição de um vídeo existente remove o arquivo anterior do disco |
 | DELETE | `/aulas-boost/:id/video` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Remove o vídeo — limpa os três campos e apaga o arquivo do disco |
 | GET | `/aulas-boost/:id/stream-token` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Token de **5 minutos**, escopado a esta aula, para a prévia do instrutor tocar o vídeo — ver nota (12) |
 | GET | `/aulas-boost/:id/video?token=...` | **Público** (token na query) | — | Serve o vídeo com suporte a `Range` (`206 Partial Content` — é o que permite ao player arrastar a barra sem baixar o arquivo inteiro). `403` sem token válido para esta aula específica |
@@ -854,17 +854,27 @@ Ver `03-autenticacao.md` (corpo, resposta, erros).
 
 **Content-Type:** `multipart/form-data`. Campo do arquivo: **`arquivo`** (nome fixo, usado por `FileInterceptor('arquivo', ...)`).
 
-**Limites:** tamanho máximo **10MB** (`MAX_ANEXO_BYTES = 10 * 1024 * 1024`). Armazenamento em disco local, pasta `uploads/anexos-tickets/`, com nome gerado (`randomUUID() + extensão original`).
+**Limites e validação:** tamanho máximo de **10 MB** (`MAX_ANEXO_BYTES`); mimetype na lista `MIMETYPES_DOCUMENTO`
+(PDF, formatos Office, imagens, texto e ZIP); e, desde 30/09/2026, conteúdo compatível com o mimetype declarado,
+verificado pela assinatura binária (`src/common/assinatura-arquivo.ts`). O nome original é decodificado em UTF-8
+(`OPCOES_UPLOAD`). O arquivo é recebido em memória e gravado cifrado (AES-256-GCM) na pasta de anexos de chamado
+(`DESK_ANEXOS_DIR`, padrão `uploads/anexos-tickets/`), com nome gerado no servidor (`randomUUID()` e extensão
+original).
 
-**Resposta 201:** objeto do anexo criado (via `serializeAnexo`), incluindo `nomeArquivo`, `tipo` (mimetype), `tamanho` e o `usuario` que enviou.
+**Resposta 201:** anexo criado (via `serializeAnexo`), com `nomeArquivo`, `tipo` (mimetype), `tamanho` e o
+`usuario` que o enviou.
+
+**Download (`GET /chamados/:id/anexos/:anexoId/arquivo`):** conteúdo decifrado, com `Content-Disposition:
+attachment` gerado conforme a RFC 6266 (`filename*=UTF-8''...` para nomes não-ASCII).
 
 **Erros:**
 
 | Status | Exceção | Causa |
 |---|---|---|
-| 400 | `BadRequestException('Nenhum arquivo enviado (campo "arquivo").')` | Requisição sem arquivo no campo `arquivo` |
-| 404 | `NotFoundException('Chamado não encontrado.')` | Chamado não existe ou sem acesso |
-| 413 (Multer) | erro de tamanho de arquivo do Multer, não uma `HttpException` do Nest — o comportamento exato de resposta não foi confirmado lendo o código (Multer aborta o upload ao exceder `limits.fileSize`) | Arquivo maior que 10MB — **não identificado no código analisado** o tratamento fino desse erro (sem try/catch específico no controller) |
+| 400 | `BadRequestException('Nenhum arquivo enviado, ou formato não aceito (campo "arquivo").')` | Requisição sem arquivo no campo `arquivo`, ou mimetype fora da lista aceita (o filtro descarta o arquivo) |
+| 400 | `BadRequestException('O conteúdo do arquivo não corresponde ao tipo declarado (...).')` | Assinatura binária incompatível com o mimetype declarado (por exemplo, executável declarado como `image/png`) |
+| 404 | `NotFoundException('Chamado não encontrado.')` | Chamado inexistente ou sem acesso |
+| 413 | `PayloadTooLargeException` | Arquivo acima de 10 MB (o NestJS converte o erro de limite do multer em 413) |
 
 ### POST /reservas — criar reserva
 
@@ -1003,12 +1013,20 @@ Ver `03-autenticacao.md` (corpo, resposta, erros).
 
 ### POST /documentos-academicos, POST /entregas/:id/anexos — upload de arquivo (multipart)
 
-Mesmo padrão do Desk (`POST /chamados/:id/anexos`, ver acima): `FileInterceptor('arquivo', ...)` com `diskStorage`, nome gerado (`randomUUID() + extensão original`). Documentos acadêmicos vão para `uploads/documentos-academicos/` (limite 15MB); anexos de entrega vão para `uploads/anexos-entregas/` (limite 15MB) — ambos maiores que o limite de 10MB usado pelo Desk. O campo `tamanho` de `DocumentoAcademico` e `AnexoEntrega` é `BigInt` no schema (mesma razão do `AnexoTicket.tamanho` — bytes podem exceder um `Int` de 32 bits) e é explicitamente convertido para `Number` antes da resposta JSON (`serializeDocumento`/`serializeAnexo`), porque `JSON.stringify` não serializa `BigInt` nativamente.
+Mesmo padrão do Desk (`POST /chamados/:id/anexos`, acima): `FileInterceptor('arquivo', ...)` com recebimento em
+memória, validação de mimetype e de assinatura binária, gravação cifrada (AES-256-GCM) e nome gerado no servidor.
+Documentos acadêmicos são gravados em `ACADEMY_DOCUMENTOS_DIR` (padrão `uploads/documentos-academicos/`, limite de
+15 MB); anexos de entrega, em `LEARN_ANEXOS_DIR` (padrão `uploads/anexos-entregas/`, limite de 15 MB). O campo
+`tamanho` de `DocumentoAcademico` e `AnexoEntrega` é `BigInt` no schema (o tamanho em bytes pode exceder um inteiro
+de 32 bits) e é convertido para `Number` antes da resposta (`serializeDocumento` e `serializeAnexo`), pois
+`JSON.stringify` não serializa `BigInt`.
 
 | Status | Exceção | Causa |
 |---|---|---|
-| 400 | `BadRequestException('Nenhum arquivo enviado (campo "arquivo").')` | Requisição sem arquivo no campo `arquivo` |
-| 403 | `ForbiddenException` | `POST /documentos-academicos`: sem `/academy/manage gerenciar-disciplinas` nem `Rooster Student /student/documents enviar`. `POST /entregas/:id/anexos`: entrega não pertence ao aluno autenticado |
+| 400 | `BadRequestException('Nenhum arquivo enviado, ou formato não aceito (campo "arquivo").')` | Requisição sem arquivo, ou mimetype fora da lista aceita |
+| 400 | `BadRequestException('O conteúdo do arquivo não corresponde ao tipo declarado (...).')` | Assinatura binária incompatível com o mimetype declarado |
+| 403 | `ForbiddenException` | `POST /documentos-academicos`: sem `/academy/manage gerenciar-disciplinas` nem `Rooster Student /student/documents enviar`. `POST /entregas/:id/anexos`: entrega não pertencente ao aluno autenticado |
+| 413 | `PayloadTooLargeException` | Arquivo acima do limite de 15 MB |
 
 ### POST /auth/redefinir-senha
 
