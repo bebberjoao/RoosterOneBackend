@@ -1,8 +1,9 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { CreatePermissaoDto } from './dto/create-permissao.dto';
 import { UpdatePermissaoDto } from './dto/update-permissao.dto';
+import { traduzirErroPrisma } from '../../common/prisma-erro';
 
 @Injectable()
 export class PermissoesService {
@@ -81,14 +82,6 @@ export class PermissoesService {
   // =====================================================
 
   private handleError(error: unknown, action: string): never {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2002') {
-        throw new InternalServerErrorException(
-          `Não foi possível ${action}: conflito de dados único.`,
-        );
-      }
-    }
-
-    throw new InternalServerErrorException(`Erro inesperado ao ${action}.`);
+    return traduzirErroPrisma(error, action);
   }
 }

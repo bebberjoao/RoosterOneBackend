@@ -1,59 +1,115 @@
 # Estrutura de diretórios
 
-Status: árvore extraída de `src/` via listagem real de arquivos (2026-09-17).
+Situação: árvore extraída da listagem de arquivos de `src/` (revisada em 01/10/2026). Arquivos de teste
+(`*.spec.ts`) omitidos.
 
 ```
 src/
-├── app.controller.ts        # GET / (health check, público)
+├── main.ts                   # inicialização: chave de cifragem, logger, Helmet, Swagger, CORS
+├── app-config.ts             # versionamento, ValidationPipe e filtro de exceções (compartilhado com e2e)
 ├── app.module.ts             # módulo raiz
+├── app.controller.ts         # GET / e GET /health (públicos, fora do versionamento)
 ├── app.service.ts
-├── main.ts                   # bootstrap: ValidationPipe, Swagger, CORS
+├── types/express.d.ts        # tipagem de request.user
 │
-├── auth/                     # cross-cutting: autenticação e autorização
-│   ├── auth.module.ts        # registra JwtAuthGuard como APP_GUARD
+├── auth/                     # autenticação e autorização (transversal)
+│   ├── auth.module.ts        # registra JwtAuthGuard e ThrottlerGuard como APP_GUARD
 │   ├── jwt-auth.guard.ts
-│   ├── jwt-config.ts         # opções do JwtModule (secret, expiresIn)
+│   ├── jwt-config.ts         # opções do JwtModule (segredo obrigatório, expiresIn)
 │   ├── permission.guard.ts
 │   ├── public.decorator.ts
-│   └── require-permission.decorator.ts
+│   ├── require-permission.decorator.ts
+│   └── throttle.util.ts      # limites de requisição por minuto
 │
-├── roster-hub/                       # núcleo administrativo (nome de pasta: "roster-hub", sem "o")
-│   ├── roster-hub.module.ts          # agrega os 9 submódulos abaixo
+├── common/                   # componentes compartilhados
+│   ├── all-exceptions.filter.ts   # filtro global; registra status >= 500 em logs_erro
+│   ├── prisma-erro.ts             # traduzirErroPrisma: P2002 → 409, P2025 → 404
+│   ├── cors.ts                    # critério único de origem (REST e WebSocket)
+│   ├── storage.config.ts          # pastas de upload, limites e opções do multer
+│   ├── assinatura-arquivo.ts      # verificação de assinatura binária (magic bytes)
+│   ├── file-encryption.util.ts    # cifragem em repouso (GCM para documentos, CTR para vídeo)
+│   ├── stream-token.util.ts       # token de curta duração para reprodução de vídeo
+│   ├── video-stream.util.ts       # transmissão com Range sobre arquivo cifrado
+│   └── pagination.ts              # paginação opcional por deslocamento
+│
+├── mail/                     # MailService (nodemailer)
+│
+├── roster-hub/                       # núcleo administrativo (pasta grafada "roster-hub")
+│   ├── roster-hub.module.ts          # agrega os submódulos abaixo
 │   ├── shared/
 │   │   ├── prisma.module.ts
-│   │   ├── prisma.service.ts         # PrismaClient real (Postgres)
-│   │   └── prisma-test.service.ts    # PrismaClient alternativo p/ e2e (SQLite)
-│   ├── usuarios/            # usuários + login (AuthController também mora aqui)
+│   │   ├── prisma.service.ts         # PrismaClient (PostgreSQL)
+│   │   ├── prisma-test.service.ts    # PrismaClient alternativo para e2e (SQLite)
+│   │   ├── auditoria.service.ts      # registro de eventos em logs_auditoria
+│   │   └── administradores.service.ts # proteção do último administrador ativo
+│   ├── usuarios/             # usuários, login, renovação e logout (o AuthController reside aqui)
 │   ├── setores/
-│   ├── modulos/              # cadastro de módulos do sistema (tabela "modulos")
+│   ├── modulos/              # catálogo de módulos do sistema (tabela "modulos")
 │   ├── permissoes/
-│   ├── usuarios-permissoes/  # vínculo direto usuário↔permissão (RBAC)
+│   ├── usuarios-permissoes/  # vínculo direto usuário–permissão (RBAC)
 │   ├── usuarios-setores/
 │   ├── notificacoes/
-│   ├── sessoes/              # CRUD da tabela "sessoes" (não usado pelo login — ver 09)
-│   └── logs-auditoria/       # CRUD da tabela "logs_auditoria" (sem escrita automática — ver 12)
+│   ├── sessoes/              # sessões de refresh token
+│   ├── logs-auditoria/       # relatório e exportação de auditoria
+│   ├── logs-erro/            # rastreamento de erros (somente leitura)
+│   └── configuracoes/        # estado e teste do envio de e-mail
 │
-├── rooster-desk/                     # ("rooster-desk", com "o" — inconsistente com "roster-hub")
+├── rooster-desk/
 │   ├── rooster-desk.module.ts
-│   ├── rooster-desk.controller.ts    # controller único e grande (todas as sub-entidades do Desk)
+│   ├── rooster-desk.controller.ts    # controller único para todas as entidades do Desk
 │   ├── rooster-desk.service.ts
-│   ├── mensagens.gateway.ts          # WebSocket namespace /desk
-│   └── dto/rooster-desk.dto.ts       # todos os DTOs do módulo em um arquivo só
+│   ├── mensagens.gateway.ts          # WebSocket, namespace /desk
+│   └── dto/rooster-desk.dto.ts       # DTOs do módulo em arquivo único
 │
 ├── rooster-rooms/
 │   ├── rooster-rooms.module.ts
 │   ├── rooms.controller.ts
 │   ├── rooms.service.ts
-│   └── dto/*.dto.ts                  # um arquivo de DTO por entidade (campus, bloco, ambiente, reserva, mensagem)
+│   └── dto/*.dto.ts                  # um arquivo por entidade e DTO de consulta
 │
-└── rooster-assets/
-    ├── rooster-assets.module.ts
-    ├── assets.controller.ts
-    ├── assets.service.ts
-    └── dto/*.dto.ts                  # um arquivo por entidade (category, sector, asset, movement)
+├── rooster-assets/
+│   ├── rooster-assets.module.ts
+│   ├── assets.controller.ts
+│   ├── assets.service.ts
+│   └── dto/*.dto.ts                  # um arquivo por entidade e DTO de consulta
+│
+├── rooster-academy/
+│   ├── rooster-academy.module.ts
+│   ├── academy.controller.ts         # inclui o portal do aluno (/me/*)
+│   ├── academy.service.ts
+│   └── dto/                          # academy.dto.ts e find-academy-query.dto.ts
+│
+├── rooster-learn/
+│   ├── rooster-learn.module.ts
+│   ├── learn.controller.ts
+│   ├── learn.service.ts
+│   └── dto/learn.dto.ts
+│
+├── rooster-boost/                    # área do instrutor
+│   ├── rooster-boost.module.ts
+│   ├── boost.controller.ts
+│   ├── boost.service.ts
+│   ├── certificado-boost.service.ts  # geração do certificado em PDF
+│   ├── boost-chat.gateway.ts         # WebSocket, namespace /boost
+│   └── dto/boost.dto.ts
+│
+├── rooster-boost-portal/             # área do aluno externo
+│   ├── rooster-boost-portal.module.ts
+│   ├── boost-portal.controller.ts
+│   ├── boost-portal.service.ts
+│   ├── boost-jwt-auth.guard.ts       # guard do token do Boost
+│   └── dto/boost-portal.dto.ts
+│
+└── rooster-finance/
+    ├── rooster-finance.module.ts
+    ├── finance.controller.ts
+    ├── finance.service.ts
+    ├── boleto.service.ts             # PDF de boleto gerado em memória
+    ├── notafiscal.service.ts         # PDF e XML de nota fiscal interna
+    └── dto/                          # finance.dto.ts e find-cobrancas-query.dto.ts
 ```
 
-Cada submódulo do Hub (`usuarios/`, `setores/`, etc.) segue internamente o mesmo padrão:
+Cada submódulo do Hub (`usuarios/`, `setores/` etc.) segue internamente o mesmo padrão:
 
 ```
 <nome>/
@@ -62,31 +118,48 @@ Cada submódulo do Hub (`usuarios/`, `setores/`, etc.) segue internamente o mesm
 ├── <nome>.service.ts
 └── dto/
     ├── create-<nome-singular>.dto.ts
-    └── update-<nome-singular>.dto.ts   # normalmente PartialType(Create...)
+    └── update-<nome-singular>.dto.ts   # em geral, PartialType(Create...)
 ```
 
 ## Responsabilidade de cada pasta
 
-| Pasta | Responsabilidade confirmada |
+| Pasta | Responsabilidade |
 |---|---|
-| `auth/` | Guard global de JWT, guard de permissão por rota, decorators `@Public()`/`@RequirePermission()`, opções do `JwtModule`. Não contém services de negócio. |
-| `roster-hub/shared/` | Único ponto de acesso ao Prisma (`PrismaService`) e sua variante de teste (`PrismaTestService`), reexportado por `PrismaModule` para todos os domínios. |
-| `roster-hub/usuarios/` | CRUD de usuário, login, cálculo de acesso efetivo (`getAccess`, `hasPermission`, `isAdmin`) — é a peça central do RBAC, consumida por `PermissionGuard` e pelos controllers de Desk/Rooms/Assets. |
-| `roster-hub/usuarios-permissoes/` | Vínculo direto usuário↔permissão (conceder/revogar). Não existe entidade "Perfil"/"Role" no schema nem no código. |
-| `rooster-desk/` | Chamados (tickets), categorias/subcategorias, prioridades, status, mensagens/conversa, anexos, histórico, avaliações. |
-| `rooster-rooms/` | Estrutura física (campus/bloco/ambiente) e reservas, incluindo disponibilidade de horário. |
-| `rooster-assets/` | Categorias e setores de patrimônio, patrimônio em si, movimentações e baixa. |
+| `auth/` | Guard global de JWT, guard de permissão por rota, decorators `@Public()` e `@RequirePermission()`, opções do `JwtModule` e limites de requisição. Não contém services de negócio. |
+| `common/` | Componentes transversais sem regra de negócio: tratamento de exceções, CORS, armazenamento, validação e cifragem de arquivos, transmissão de vídeo e paginação. |
+| `roster-hub/shared/` | Acesso ao Prisma (`PrismaService`) e sua variante de teste (`PrismaTestService`), exportados por `PrismaModule`; serviços de auditoria e de proteção do último administrador. |
+| `roster-hub/usuarios/` | Cadastro de usuários, login, renovação de sessão e cálculo do acesso efetivo (`getAccess`, `hasPermission`, `isAdmin`); constitui o núcleo do RBAC, consumido pelo `PermissionGuard` e pelos controllers. |
+| `roster-hub/usuarios-permissoes/` | Vínculo direto usuário–permissão (concessão e revogação). Não há entidade de perfil ou papel no schema nem no código. |
+| `rooster-desk/` | Chamados, categorias, subcategorias, prioridades, status, mensagens, anexos, histórico e avaliações. |
+| `rooster-rooms/` | Estrutura física (campus, bloco e ambiente) e reservas, incluindo disponibilidade de horário e séries recorrentes. |
+| `rooster-assets/` | Categorias e setores de patrimônio, patrimônios, movimentações, empréstimos e baixa. |
+| `rooster-academy/` | Estrutura acadêmica, matrículas, frequência, avaliação, calendário, documentos e portal do aluno. |
+| `rooster-learn/` | Atividades, entregas, correções e anexos de entrega. |
+| `rooster-boost/` e `rooster-boost-portal/` | Cursos extracurriculares: gestão pelo instrutor e consumo pelo aluno externo. |
+| `rooster-finance/` | Cobranças, catálogo financeiro, descontos, políticas de multa e juros, boleto, nota fiscal e relatórios. |
 
-## Convenções de nomenclatura observadas
+## Convenções de nomenclatura
 
-- Arquivos em kebab-case (`usuarios-permissoes.service.ts`), classes em PascalCase (`UsuariosPermissoesService`).
-- Sufixos padronizados: `.module.ts`, `.controller.ts`, `.service.ts`, `.dto.ts`, `.guard.ts`, `.decorator.ts`.
-- Nome de pasta do módulo de Hub é **`roster-hub`** (sem "o" em "roster"), enquanto o módulo de tickets é **`rooster-desk`** (com "o") — inconsistência real de grafia entre os dois diretórios, confirmada pela listagem de `src/`. Rooms e Assets seguem a grafia "rooster-*".
-- DTOs de atualização quase sempre estendem o de criação via `PartialType` de `@nestjs/mapped-types` (ex.: `UpdateUsuarioDto extends PartialType(CreateUsuarioDto)`), em vez de declarar campos duplicados.
-- Toda regra de RBAC de controller usa duas constantes locais no topo do arquivo, `MODULO` e (quando a tela é única) `TELA`, para compor `@RequirePermission(MODULO, TELA, 'acao')` — ex. em `usuarios.controller.ts`: `const MODULO = 'Rooster Hub'; const TELA = '/hub/usuarios';`.
+- Arquivos em kebab-case (`usuarios-permissoes.service.ts`) e classes em PascalCase (`UsuariosPermissoesService`).
+- Sufixos padronizados: `.module.ts`, `.controller.ts`, `.service.ts`, `.dto.ts`, `.guard.ts`, `.decorator.ts` e
+  `.gateway.ts`.
+- A pasta do Hub é grafada **`roster-hub`** (sem a segunda letra "o"), ao passo que os demais módulos utilizam
+  **`rooster-*`**. A divergência de grafia é conhecida e mantida para evitar alteração de caminhos de importação
+  sem ganho funcional.
+- Os DTOs de atualização, em geral, estendem o de criação por `PartialType` de `@nestjs/mapped-types` (por exemplo,
+  `UpdateUsuarioDto extends PartialType(CreateUsuarioDto)`), sem duplicação de campos.
+- As regras de RBAC dos controllers utilizam constantes locais no início do arquivo, `MODULO` e, quando a tela é
+  única, `TELA`, para compor `@RequirePermission(MODULO, TELA, 'acao')`; por exemplo, em `usuarios.controller.ts`:
+  `const MODULO = 'Rooster Hub'; const TELA = '/hub/usuarios';`.
 
-### Rotas do Desk — só português, sem alias
+### Rotas exclusivamente em português
 
-Todo recurso de `src/rooster-desk/rooster-desk.controller.ts` (`chamados`, `chamados-categorias`, `chamados-subcategorias`, `chamados-status`, `chamados-prioridades`) usa só o nome de domínio em português. O controller chegou a expor, por um tempo, um segundo path em inglês por recurso (ex.: `categorias-tickets` ao lado de `chamados-categorias`), delegando para o mesmo handler — nunca usado pelo frontend e removido na limpeza de código morto de setembro/2026 (ver `docs/engineering/08-divida-tecnica.md`; alguns desses aliases tinham inclusive um bug real de permissão, por não herdar o `@RequirePermission` do método original).
+Todos os recursos de `src/rooster-desk/rooster-desk.controller.ts` (`chamados`, `chamados-categorias`,
+`chamados-subcategorias`, `chamados-status` e `chamados-prioridades`) utilizam apenas o nome de domínio em
+português. O controller expôs, durante certo período, um segundo caminho em inglês por recurso (por exemplo,
+`categorias-tickets` ao lado de `chamados-categorias`), que nunca foi utilizado pelo frontend e foi removido em
+setembro de 2026 (ver `docs/engineering/08-divida-tecnica.md`); parte desses aliases apresentava falha de
+permissão, por não herdar o `@RequirePermission` do método original.
 
-Isso é consistente com `rooms.controller.ts` (`campus`, `blocos`, `ambientes`, `reservas`) e `assets.controller.ts` (`patrimonio*`): nenhum módulo do backend usa alias bilíngue de rota.
+O mesmo critério é adotado em `rooms.controller.ts` (`campus`, `blocos`, `ambientes` e `reservas`) e em
+`assets.controller.ts` (`patrimonio*`): nenhum módulo do backend utiliza alias bilíngue de rota.

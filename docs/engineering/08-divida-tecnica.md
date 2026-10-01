@@ -30,6 +30,19 @@ disco do servidor e está coberta pelos scripts de backup.
 
 **Evidência**: `src/common/storage.config.ts`; `docs/operations/06-backup-e-recuperacao.md`.
 
+### ~~Tratamento heterogêneo de violação de unicidade entre services~~ — resolvido (01/10/2026)
+
+Cada service possuía implementação própria do método privado `handleError`. Doze deles (`RoomsService`,
+`RoosterDeskService` e todos os services do Hub) convertiam o erro `P2002` do Prisma em `500 Internal Server
+Error`, com a mensagem "conflito de dados único"; a maioria convertia também em `500` qualquer exceção HTTP lançada
+pela regra de negócio dentro do bloco protegido. Em consequência, o cadastro de usuário com e-mail já existente,
+por exemplo, era apresentado como falha interna e registrado em `logs_erro`, embora decorresse do dado de entrada.
+
+**Solução**: a conversão foi centralizada em `traduzirErroPrisma` (`src/common/prisma-erro.ts`), à qual todos os
+`handleError` delegam: exceção HTTP é propagada sem alteração, `P2002` resulta em `409`, `P2025` em `404` e os
+demais erros em `500`. Cobertura: `src/common/prisma-erro.spec.ts` e, em `test/app.e2e-spec.ts`, o cadastro de
+usuário com e-mail duplicado (`409`, sem registro em `logs_erro`).
+
 ### ~~Cabeçalho `x-user-id` liberado no CORS~~ — resolvido (30/09/2026)
 
 `src/main.ts` incluía `x-user-id` em `allowedHeaders`, cabeçalho de um esquema de autenticação anterior

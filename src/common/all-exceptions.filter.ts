@@ -1,18 +1,18 @@
 import { ArgumentsHost, Catch, ConflictException, ExceptionFilter, HttpException, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import type { Request, Response } from 'express';
 import { LogsErroService } from '../roster-hub/logs-erro/logs-erro.service';
+import { ehErroConhecidoPrisma } from './prisma-erro';
 
 /**
- * Rede de segurança global — todo service já mapeia os erros conhecidos do
- * Prisma (P2002/P2025) pra uma exceção HTTP própria, com uma mensagem
- * contextual ("ao criar usuário", "ao remover turma"...), via um `handleError`
- * privado replicado em cada um. Este filtro cobre o que escapar dessa camada
- * (um service novo que esqueça o `try/catch`, um erro do Prisma fora dos dois
- * códigos mapeados, ou qualquer exceção não prevista) — sem contexto de ação,
- * por isso a mensagem genérica — e, além de responder, persiste em `logs_erro`
- * toda vez que o status final for >= 500: são bugs de verdade, não recusas
- * esperadas (400/401/403/404/409), que não interessa rastrear aqui.
+ * Proteção global de tratamento de exceções. Os services convertem os erros
+ * conhecidos do Prisma (P2002 e P2025) em exceção HTTP com mensagem
+ * contextualizada ("ao criar usuário", "ao remover turma" etc.), por meio de
+ * `handleError`, que delega a `traduzirErroPrisma`. Este filtro trata o que não
+ * passa por essa camada (service sem `try/catch`, código do Prisma não mapeado
+ * ou exceção não prevista), com mensagem genérica por não dispor do contexto da
+ * ação. Além de responder, registra em `logs_erro` toda resposta com status
+ * igual ou superior a 500, que indica defeito; as recusas esperadas
+ * (400, 401, 403, 404 e 409) não são registradas.
  */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -40,7 +40,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
   }
 
   private resolver(exception: unknown): { status: number; body: unknown } {
-    if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+    if (ehErroConhecidoPrisma(exception)) {
       if (exception.code === 'P2002') {
         const conflict = new ConflictException('Já existe um registro com esses dados.');
         return { status: conflict.getStatus(), body: conflict.getResponse() };

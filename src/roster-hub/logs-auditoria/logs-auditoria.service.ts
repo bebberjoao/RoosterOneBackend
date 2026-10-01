@@ -1,9 +1,10 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../shared/prisma.service';
 import { CreateLogAuditoriaDto } from './dto/create-log-auditoria.dto';
 import { UpdateLogAuditoriaDto } from './dto/update-log-auditoria.dto';
 import { PaginacaoQueryDto, montarPagina, pediuPaginacao, prismaSkipTake } from '../../common/pagination';
+import { traduzirErroPrisma } from '../../common/prisma-erro';
 
 @Injectable()
 export class LogsAuditoriaService {
@@ -164,12 +165,6 @@ export class LogsAuditoriaService {
   // =====================================================
 
   private handleError(error: unknown, action: string): never {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2002') {
-        throw new InternalServerErrorException(`Não foi possível ${action}: conflito de dados único.`);
-      }
-    }
-
-    throw new InternalServerErrorException(`Erro inesperado ao ${action}.`);
+    return traduzirErroPrisma(error, action);
   }
 }

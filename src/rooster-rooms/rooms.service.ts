@@ -2,7 +2,6 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -19,6 +18,7 @@ import { UpdateAmbienteDto } from './dto/update-ambiente.dto';
 import { UpdateBlocoDto } from './dto/update-bloco.dto';
 import { UpdateCampusDto } from './dto/update-campus.dto';
 import { UpdateReservaDto } from './dto/update-reserva.dto';
+import { traduzirErroPrisma } from '../common/prisma-erro';
 
 @Injectable()
 export class RoomsService {
@@ -803,15 +803,6 @@ export class RoomsService {
   }
 
   private handleError(error: unknown, action: string): never {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2002') {
-        throw new InternalServerErrorException(`Não foi possível ${action}: conflito de dados único.`);
-      }
-      if (error.code === 'P2025') {
-        throw new NotFoundException(`Registro não encontrado ao ${action}.`);
-      }
-    }
-
-    throw new InternalServerErrorException(`Erro inesperado ao ${action}.`);
+    return traduzirErroPrisma(error, action);
   }
 }

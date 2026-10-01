@@ -70,9 +70,10 @@ Falha de autenticação resulta em `401 Unauthorized`; falha de autorização, e
 
 ## Formato de erro
 
-A maior parte dos erros de negócio é traduzida pelos próprios services (um método privado `handleError` em cada
-service converte os códigos `P2002` e `P2025` do Prisma em `ConflictException` e `NotFoundException`, com mensagem
-contextual). Como proteção para o que escapar dessa camada, `configurarApp()` registra o `AllExceptionsFilter`
+A maior parte dos erros de banco é traduzida pelos próprios services: o método privado `handleError` de cada
+service delega a `traduzirErroPrisma` (`src/common/prisma-erro.ts`), que converte os códigos `P2002` e `P2025` do
+Prisma em `ConflictException` e `NotFoundException`, com mensagem contextual, e propaga sem alteração as exceções
+HTTP da regra de negócio. Como proteção para o que escapar dessa camada, `configurarApp()` registra o `AllExceptionsFilter`
 (`src/common/all-exceptions.filter.ts`) como filtro global:
 
 - erro do Prisma `P2002` não tratado → `409` ("Já existe um registro com esses dados.");
@@ -129,7 +130,7 @@ Aplicada às listagens que crescem sem limite com o uso:
 **Critério de aplicação**: as listagens vinculadas a um recurso pai (`GET /turmas/:id/matriculas`,
 `GET /atividades/:id/entregas`, `GET /me/entregas`) são limitadas por natureza — uma turma tem no máximo
 `capacidade` alunos, e uma atividade, no máximo uma entrega por matriculado. Paginá-las não resolveria nenhum
-problema e acrescentaria um envelope que toda tela consumidora precisaria tratar. O mesmo vale para catálogos que
+problema e acrescentaria um envelope a ser tratado por toda tela consumidora. O mesmo se aplica aos catálogos que
 crescem por decisão administrativa, e não pelo uso (categorias, status, prioridades, campi, cursos, períodos
 letivos). O critério adotado foi o **crescimento sem limite com o uso**.
 
@@ -193,7 +194,7 @@ Documentação interativa OpenAPI gerada por `@nestjs/swagger`, em `/api/docs`:
 http://localhost:3000/api/docs
 ```
 
-Disponível fora de produção. Em produção (`NODE_ENV=production`), fica desabilitada, salvo definição de
+Disponível fora de produção. Em produção (`NODE_ENV=production`), permanece desabilitada, salvo definição de
 `SWAGGER_ENABLED=true`, pois expõe a estrutura completa de rotas e DTOs. Título: "Rooster One API"; versão do
 documento: `1.0`. O Swagger reflete os decorators `@ApiTags`, `@ApiOperation`, `@ApiBody` e `@ApiConsumes` dos
 controllers, presentes em parte dos endpoints; esta documentação (`docs/api/`) abrange a superfície completa da

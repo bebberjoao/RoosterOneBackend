@@ -2,7 +2,6 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
@@ -11,6 +10,7 @@ import { PrismaService } from '../roster-hub/shared/prisma.service';
 import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
 import { PaginacaoQueryDto, montarPagina, pediuPaginacao, prismaSkipTake } from '../common/pagination';
 import { CreateMensagemChamadoDto } from './dto/rooster-desk.dto';
+import { traduzirErroPrisma } from '../common/prisma-erro';
 
 type DeskModel =
   | 'categoriaTicket' | 'subcategoriaTicket' | 'prioridadeTicket' | 'statusTicket'
@@ -461,9 +461,6 @@ export class RoosterDeskService implements OnModuleInit {
   }
 
   private handleError(error: unknown, action: string): never {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      throw new InternalServerErrorException(`Não foi possível ${action}: conflito de dados único.`);
-    }
-    throw new InternalServerErrorException(`Erro inesperado ao ${action}.`);
+    return traduzirErroPrisma(error, action);
   }
 }

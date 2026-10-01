@@ -1,14 +1,12 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
 import { NotificacoesService } from '../roster-hub/notificacoes/notificacoes.service';
 import { CorrigirEntregaDto, CreateAtividadeDto, EnviarEntregaDto, UpdateAtividadeDto } from './dto/learn.dto';
+import { traduzirErroPrisma } from '../common/prisma-erro';
 
 @Injectable()
 export class LearnService {
@@ -266,10 +264,6 @@ export class LearnService {
   }
 
   private handleError(error: unknown, action: string): never {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2002') throw new ConflictException(`Não foi possível ${action}: já existe um registro com esses dados.`);
-      if (error.code === 'P2025') throw new NotFoundException(`Registro relacionado não encontrado ao ${action}.`);
-    }
-    throw new InternalServerErrorException(`Erro inesperado ao ${action}.`);
+    return traduzirErroPrisma(error, action);
   }
 }

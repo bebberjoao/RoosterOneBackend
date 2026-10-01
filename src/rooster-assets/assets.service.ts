@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -16,6 +15,7 @@ import { UpdateAssetCategoryDto } from './dto/update-asset-category.dto';
 import { UpdateAssetMovementDto } from './dto/update-asset-movement.dto';
 import { UpdateAssetSectorDto } from './dto/update-asset-sector.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
+import { traduzirErroPrisma } from '../common/prisma-erro';
 
 @Injectable()
 export class AssetsService {
@@ -448,21 +448,6 @@ export class AssetsService {
   }
 
   private handleError(error: unknown, action: string): never {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2002') {
-        const alvo = (error.meta?.target as string[] | undefined)?.join(', ');
-        throw new ConflictException(
-          `Não foi possível ${action}: já existe um registro com ${alvo ?? 'esse valor único'}.`,
-        );
-      }
-      if (error.code === 'P2025') {
-        throw new NotFoundException(`Registro não encontrado ao ${action}.`);
-      }
-    }
-    if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof ConflictException) {
-      throw error;
-    }
-
-    throw new InternalServerErrorException(`Erro inesperado ao ${action}.`);
+    return traduzirErroPrisma(error, action);
   }
 }

@@ -2,7 +2,7 @@
 
 ## Formato padrão
 
-Não há `ExceptionFilter` customizado no projeto — o formato de erro é o **padrão do NestJS** para qualquer subclasse de `HttpException` lançada em controller/service/guard:
+As exceções HTTP lançadas em controllers, services e guards seguem o **formato padrão do NestJS**:
 
 ```json
 {
@@ -12,11 +12,32 @@ Não há `ExceptionFilter` customizado no projeto — o formato de erro é o **p
 }
 ```
 
-`error` é o texto padrão do status HTTP (`Not Found`, `Bad Request`, `Unauthorized`, `Forbidden`, `Conflict`, `Internal Server Error` etc.), derivado automaticamente pelo NestJS a partir do código de status — não é definido manualmente no código da aplicação.
+`error` é o texto padrão do status HTTP (`Not Found`, `Bad Request`, `Unauthorized`, `Forbidden`, `Conflict`,
+`Internal Server Error` etc.), derivado automaticamente pelo NestJS a partir do código de status, e não definido
+manualmente no código da aplicação.
 
-## Erros de validação de body (`ValidationPipe`)
+## Filtro global de exceções (`AllExceptionsFilter`)
 
-Quando o `ValidationPipe` global (`whitelist`, `forbidNonWhitelisted`, `transform` — `src/main.ts:10-16`) rejeita o payload, `message` vira um **array** de strings, uma por violação:
+`src/common/all-exceptions.filter.ts`, registrado por `configurarApp()` (`src/app-config.ts`), atua como proteção
+para as exceções não tratadas pelos services:
+
+| Exceção recebida | Resposta |
+|---|---|
+| `HttpException` (e subclasses) | Status e corpo originais |
+| Prisma `P2002` não tratado | `409`, `"Já existe um registro com esses dados."` |
+| Prisma `P2025` não tratado | `404`, `"Registro não encontrado."` |
+| Outro erro conhecido do Prisma | `500`, `"Erro inesperado ao acessar o banco de dados."` |
+| Qualquer outra exceção | `500`, `"Erro interno inesperado."` |
+
+As respostas com status igual ou superior a 500 não expõem pilha de execução nem detalhes internos e são
+registradas em `logs_erro` (método, rota, status, mensagem, pilha de execução e usuário). Ver
+`docs/backend/11-tratamento-erros.md`.
+
+## Erros de validação do corpo (`ValidationPipe`)
+
+Quando o `ValidationPipe` global (`whitelist`, `forbidNonWhitelisted` e `transform`, configurados em
+`src/app-config.ts`) recusa o corpo da requisição, `message` passa a ser uma **lista** de mensagens, uma por regra
+violada:
 
 ```json
 {
@@ -29,26 +50,34 @@ Quando o `ValidationPipe` global (`whitelist`, `forbidNonWhitelisted`, `transfor
 }
 ```
 
-Casos que disparam esse formato:
-- Campo obrigatório ausente ou de tipo errado.
-- Campo fora dos limites de `@Length`, `@Min`, `@Max`.
-- Valor fora do conjunto permitido por `@IsIn` (ex.: `status` de reserva fora de `['confirmada', 'analise', 'cancelada', 'finalizada', 'andamento']`).
-- Propriedade não declarada no DTO enviada no body (`forbidNonWhitelisted: true` — mensagem no formato `"property <nome> should not exist"`).
+Situações que produzem esse formato:
 
-## Exceções por camada
+- campo obrigatório ausente ou de tipo incorreto;
+- campo fora dos limites de `@Length`, `@Min` ou `@Max`;
+- valor fora do conjunto permitido por `@IsIn` (por exemplo, `status` de reserva fora de
+  `['confirmada', 'analise', 'cancelada', 'finalizada', 'andamento']`);
+- propriedade não declarada no DTO (`forbidNonWhitelisted: true`), com mensagem no formato
+  `"property <nome> should not exist"`.
 
-| Exceção NestJS | Status HTTP | Onde é usada no código |
+## Exceções por tipo
+
+| Exceção NestJS | Status HTTP | Ocorrência no código |
 |---|---|---|
-| `UnauthorizedException` | 401 | `JwtAuthGuard` — token ausente/inválido/expirado, ou usuário inativo (`src/auth/jwt-auth.guard.ts`); `PermissionGuard` — `request.user` ausente (`src/auth/permission.guard.ts:27`); `UsuariosService.login` — credenciais inválidas |
-| `ForbiddenException` | 403 | `PermissionGuard` — usuário autenticado sem a permissão exigida pelo `@RequirePermission` (`src/auth/permission.guard.ts:33`); checagens manuais em `RoosterDeskController` (`requireManagement`, `requireTicketAction`, mudança de status/categoria/transferência de chamado pelo próprio solicitante) e em `RoomsController` (`requireReservaAccess`, cancelamento de série sem permissão) |
-| `NotFoundException` | 404 | Em praticamente todos os services (`usuarios`, `setores`, `modulos`, `permissoes`, `usuarios-permissoes`, `usuarios-setores`, `notificacoes`, `sessoes`, `logs-auditoria`, `rooster-desk`, `rooster-rooms`, `rooster-assets`) quando um registro buscado por `id` não existe; também usada para "esconder" recursos a que o usuário não tem acesso (ex.: `GET /chamados/:id` retorna 404 — não 403 — quando o solicitante tenta ver um chamado de outro usuário, para não revelar a existência do recurso) |
-| `BadRequestException` | 400 | `ValidationPipe` (validação de DTO); upload de anexo sem arquivo (`"Nenhum arquivo enviado (campo \"arquivo\")."`); regras de negócio de reservas (horário de término ≤ início, capacidade excedida, ambiente fechado no dia, fora da janela de funcionamento, série com `repetirAte` anterior à data ou acima de 26 ocorrências); regras de patrimônio (patrimônio baixado não pode ser movimentado, destino obrigatório para certos tipos de movimentação, empréstimo já devolvido, patrimônio já baixado); token de redefinição de senha inválido/expirado; cursor `antes` inválido em `GET /chamados/:id/mensagens` |
-| `ConflictException` | 409 | Conflito de horário de reserva (`RoomsService.assertReservaDisponivel`) — sobreposição com outra reserva ativa no mesmo ambiente; violação de unicidade do Prisma (`P2002`) mapeada nos `handleError` de `AssetsService`/`RoomsService`/`RoosterDeskService` |
-| `InternalServerErrorException` | 500 | Fallback genérico dos `handleError` de cada service para erros inesperados do Prisma/infra, e para `P2002` em alguns pontos de `RoomsService` |
+| `UnauthorizedException` | 401 | `JwtAuthGuard`: token ausente, inválido ou expirado, ou usuário inativo (`src/auth/jwt-auth.guard.ts`); `PermissionGuard`: `request.user` ausente (`src/auth/permission.guard.ts`); `UsuariosService.login`: credenciais inválidas; `POST /auth/refresh`: sessão inválida ou expirada |
+| `ForbiddenException` | 403 | `PermissionGuard`: usuário autenticado sem a permissão exigida por `@RequirePermission`; verificações manuais em `RoosterDeskController` (`requireManagement`, `requireTicketAction`, alteração de status ou categoria e encerramento pelo próprio solicitante), `RoomsController` (`requireReservaAccess`, cancelamento de série sem permissão, limite de antecedência), `AcademyController`, `LearnController` e `FinanceController` (escopo por turma ou por aluno) |
+| `NotFoundException` | 404 | Na maioria dos services, quando o registro procurado por `id` não existe. É também utilizada para ocultar recursos aos quais o usuário não tem acesso: `GET /chamados/:id` responde `404`, e não `403`, quando o solicitante tenta consultar chamado de outro usuário, de modo a não revelar a existência do recurso |
+| `BadRequestException` | 400 | `ValidationPipe`; upload sem arquivo ou com tipo não aceito (`"Nenhum arquivo enviado, ou formato não aceito (campo \"arquivo\")."`); conteúdo de arquivo incompatível com o tipo declarado; regras de negócio de reservas (término anterior ou igual ao início, capacidade excedida, ambiente sem funcionamento no dia, horário fora da janela de funcionamento, série com `repetirAte` anterior à data ou com mais de 26 ocorrências); regras de patrimônio (patrimônio baixado não pode ser movimentado, destino obrigatório para determinados tipos de movimentação, empréstimo já devolvido, patrimônio já baixado); token de redefinição de senha inválido ou expirado; cursor `antes` inválido em `GET /chamados/:id/mensagens` |
+| `ConflictException` | 409 | Conflito de horário de reserva (`RoomsService.assertReservaDisponivel`); violação de unicidade do Prisma (`P2002`), convertida por `traduzirErroPrisma` e, na ausência de tratamento no service, pelo `AllExceptionsFilter` |
+| `PayloadTooLargeException` | 413 | Arquivo acima do limite de tamanho do upload (o NestJS converte o erro de limite do multer em 413) |
+| `ThrottlerException` | 429 | Limite de requisições excedido (global: 120 por minuto; rotas de autenticação: 8 por minuto; cadastro do Boost: 5 por minuto; verificação pública de certificado: 20 por minuto) |
+| `InternalServerErrorException` | 500 | Erros inesperados do Prisma ou da infraestrutura, convertidos por `traduzirErroPrisma` ou pelo `AllExceptionsFilter` |
 
 ## Caso específico: conflito de horário de reserva (409)
 
-`RoomsService.assertReservaDisponivel` (`src/rooster-rooms/rooms.service.ts:670-733`) é chamado ao criar (`POST /reservas`, `POST /reservas/serie`) ou atualizar horário (`PATCH /reservas/:id`) uma reserva. Se houver sobreposição de horário com outra reserva do mesmo ambiente cujo status esteja em `RESERVA_STATUS_BLOQUEIA` (análise, confirmada ou em andamento — ver `RoomsService`), a API responde:
+`RoomsService.assertReservaDisponivel` (`src/rooster-rooms/rooms.service.ts`) é executado na criação
+(`POST /reservas` e `POST /reservas/serie`) e na alteração de horário (`PATCH /reservas/:id`) de reservas. Havendo
+sobreposição de horário com outra reserva do mesmo ambiente cujo status pertença a `RESERVA_STATUS_BLOQUEIA`
+(análise, confirmada ou em andamento), a API responde:
 
 ```json
 {
@@ -58,35 +87,42 @@ Casos que disparam esse formato:
 }
 ```
 
-A mensagem inclui dinamicamente o nome do evento conflitante e o intervalo de horário da reserva já existente.
+A mensagem informa o nome do evento conflitante e o intervalo de horário da reserva existente.
 
 ## Caso específico: violação de unicidade (Prisma `P2002`)
 
-`AssetsService.handleError` e `RoosterDeskService`/`RoomsService` equivalentes interceptam `Prisma.PrismaClientKnownRequestError` com `code === 'P2002'`:
+Os métodos privados `handleError` dos services delegam a `traduzirErroPrisma` (`src/common/prisma-erro.ts`), que
+aplica o mesmo critério em todos os módulos:
 
-- Em `AssetsService`: retorna `409 ConflictException` com `"Não foi possível <ação>: já existe um registro com <campo(s)>."` (campo extraído de `error.meta.target`).
-- Em `RoomsService`: retorna `500 InternalServerErrorException` com `"Não foi possível <ação>: conflito de dados único."` (não normalizado para 409 nesse service — confirme no código antes de assumir consistência entre módulos).
+- exceção HTTP lançada pela regra de negócio dentro do bloco protegido é propagada sem alteração;
+- `P2002` (violação de unicidade) resulta em `409 ConflictException`, com
+  `"Não foi possível <ação>: já existe um registro com <campo(s)>."` (campos obtidos de `error.meta.target`);
+- `P2025` (registro inexistente em atualização ou remoção) resulta em
+  `404 NotFoundException("Registro não encontrado ao <ação>.")`;
+- qualquer outro erro resulta em `500 InternalServerErrorException("Erro inesperado ao <ação>.")`.
 
-`code === 'P2025'` (registro não encontrado no update/delete) é mapeado para `404 NotFoundException('Registro não encontrado ao <ação>.')` nos services que implementam esse `handleError` (`AssetsService`, `RoomsService`).
+Por constituir conflito de dado de entrada, a violação de unicidade não é registrada em `logs_erro`. Até
+30/09/2026, a maioria dos services convertia `P2002` em `500`; ver `docs/engineering/08-divida-tecnica.md`.
 
-## Erros de permissão (403) — exemplos de mensagem real
+## Erros de permissão (403): mensagens efetivas
 
 | Situação | Mensagem |
 |---|---|
 | `PermissionGuard` bloqueia rota com `@RequirePermission` | `Sem permissão para <acao> em <recurso>.` |
 | Gestor do Desk sem permissão de gestão na tela | `Sem permissão para gerenciar a configuração do Desk.` |
-| Gestor do Desk tentando gerenciar recurso de outro setor | `O recurso pertence a outro setor.` |
-| Solicitante tentando alterar status/categoria/encerrar o próprio chamado | `O solicitante não pode alterar status, categoria ou encerrar o próprio chamado.` |
-| Atendente sem permissão de transferência tentando atribuir chamado a outro setor | `O atendente deve pertencer ao setor do chamado.` |
-| Usuário sem permissão de nota interna tentando marcar `interno: true` | `Sem permissão para registrar nota interna.` / `Apenas atendentes podem registrar notas internas.` |
-| Usuário sem permissão de gestão/dono tentando alterar reserva de terceiro | `Sem permissão para alterar esta reserva.` |
-| Usuário sem permissão de gestão/dono tentando cancelar série de reserva | `Sem permissão para cancelar esta série.` |
+| Gestor do Desk tenta gerenciar recurso de outro setor | `O recurso pertence a outro setor.` |
+| Solicitante tenta alterar status ou categoria, ou encerrar o próprio chamado | `O solicitante não pode alterar status, categoria ou encerrar o próprio chamado.` |
+| Atribuição de chamado a técnico de outro setor | `O atendente deve pertencer ao setor do chamado.` |
+| Usuário sem permissão de nota interna envia `interno: true` | `Sem permissão para registrar nota interna.` / `Apenas atendentes podem registrar notas internas.` |
+| Usuário sem permissão de gestão, e que não é o responsável, tenta alterar reserva de terceiro | `Sem permissão para alterar esta reserva.` |
+| Usuário sem permissão de gestão, e que não é o responsável, tenta cancelar série de reservas | `Sem permissão para cancelar esta série.` |
 
-## Erros de autenticação (401) — exemplos de mensagem real
+## Erros de autenticação (401): mensagens efetivas
 
 | Situação | Mensagem |
 |---|---|
-| Header `Authorization` ausente ou sem prefixo `Bearer ` | `Token JWT não informado.` |
-| Token expirado, assinatura inválida, ou usuário desativado após emissão do token | `Token JWT inválido ou expirado.` / `Usuário inválido ou inativo.` |
-| Login com e-mail/senha incorretos | `Login ou senha inválidos.` |
-| `request.user` ausente ao checar permissão (não deveria ocorrer em produção, pois o `JwtAuthGuard` roda antes) | `Usuário não autenticado.` |
+| Cabeçalho `Authorization` ausente ou sem o prefixo `Bearer ` | `Token JWT não informado.` |
+| Token expirado, assinatura inválida ou usuário desativado após a emissão do token | `Token JWT inválido ou expirado.` |
+| Login com e-mail ou senha incorretos | `Login ou senha inválidos.` |
+| Refresh token inexistente, revogado ou expirado | `Sessão inválida ou expirada.` |
+| `request.user` ausente na verificação de permissão (situação não esperada em produção, pois o `JwtAuthGuard` é executado antes) | `Usuário não autenticado.` |

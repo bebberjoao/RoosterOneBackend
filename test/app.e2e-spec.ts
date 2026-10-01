@@ -342,6 +342,16 @@ describe('Full API e2e tests', () => {
 
     const userId = createRes.body.id;
 
+    // E-mail duplicado é conflito de dado de entrada (409), e não falha interna: não gera registro em logs_erro.
+    const errosAntes = await prisma.logErro.count();
+    const duplicadoRes = await request(app.getHttpServer())
+      .post('/v1/usuarios')
+      .set('Authorization', authHeader)
+      .send({ ...createUser, cpf: '10987654321' })
+      .expect(409);
+    expect(duplicadoRes.body.message).toContain('já existe um registro');
+    expect(await prisma.logErro.count()).toBe(errosAntes);
+
     const listRes = await request(app.getHttpServer()).get('/v1/usuarios').set('Authorization', authHeader).expect(200);
     expect(Array.isArray(listRes.body)).toBe(true);
     expect(listRes.body.some((item: any) => item.id === userId)).toBe(true);

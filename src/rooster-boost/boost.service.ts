@@ -1,8 +1,6 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -18,6 +16,7 @@ import {
   ConfigurarCertificadoDto, CreateAulaBoostDto, CreateCursoBoostDto, CreateModuloBoostDto,
   UpdateAulaBoostDto, UpdateCursoBoostDto, UpdateModuloBoostDto,
 } from './dto/boost.dto';
+import { traduzirErroPrisma } from '../common/prisma-erro';
 
 const SALT_ROUNDS = 10;
 
@@ -483,11 +482,6 @@ export class BoostService {
   }
 
   private handleError(error: unknown, action: string): never {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2002') throw new ConflictException(`Não foi possível ${action}: já existe um registro com esses dados.`);
-      if (error.code === 'P2025') throw new NotFoundException(`Registro relacionado não encontrado ao ${action}.`);
-    }
-    if (error instanceof BadRequestException) throw error;
-    throw new InternalServerErrorException(`Erro inesperado ao ${action}.`);
+    return traduzirErroPrisma(error, action);
   }
 }

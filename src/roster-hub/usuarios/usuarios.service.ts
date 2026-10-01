@@ -1,8 +1,6 @@
 import {
   BadRequestException,
   Injectable,
-  InternalServerErrorException,
-  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -16,6 +14,7 @@ import { JwtService } from '@nestjs/jwt';
 import { MailService } from '../../mail/mail.service';
 import { PaginacaoQueryDto, montarPagina, pediuPaginacao, prismaSkipTake } from '../../common/pagination';
 import { AdministradoresService } from '../shared/administradores.service';
+import { traduzirErroPrisma } from '../../common/prisma-erro';
 
 const SALT_ROUNDS = 10;
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1h
@@ -454,17 +453,6 @@ export class UsuariosService {
   // =====================================================
 
   private handleError(error: unknown, action: string): never {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2002') {
-        throw new InternalServerErrorException(
-          `Não foi possível ${action}: conflito de dados único.`,
-        );
-      }
-      if (error.code === 'P2025') {
-        throw new NotFoundException(`Registro não encontrado ao ${action}.`);
-      }
-    }
-
-    throw new InternalServerErrorException(`Erro inesperado ao ${action}.`);
+    return traduzirErroPrisma(error, action);
   }
 }

@@ -1,27 +1,35 @@
 # Arquitetura
 
-Status: baseado em leitura direta do código em `src/` e `prisma/schema.prisma` (revisado em 2026-09-22).
+Situação: descrição elaborada a partir da leitura de `src/` e `prisma/schema.prisma` (revisada em 01/10/2026).
 
-## Stack
+## Tecnologias
 
-- **NestJS 11** (`@nestjs/common`, `@nestjs/core` `^11.0.1`) como framework de aplicação.
-- **Prisma 6** (`@prisma/client` `^6.0.0`) como ORM, contra **PostgreSQL** (`prisma/schema.prisma`, `datasource db { provider = "postgresql" }`) — **62 models**.
-- **@nestjs/jwt** para emissão/verificação de JWT. A verificação é feita manualmente em `src/auth/jwt-auth.guard.ts` (`jwt.verifyAsync`), **sem Passport** — `passport`, `passport-jwt` e `@nestjs/passport` foram removidos do `package.json` por não terem uso real. Ver `09-autenticacao.md`.
-- **@nestjs/websockets** + **socket.io** para os gateways de chat do Desk e do Boost.
-- **nodemailer** (via `src/mail/`) para envio de e-mail de redefinição de senha, opcional — sem SMTP configurado, cai em modo de log.
-- **pdfkit** para geração de PDF (certificado do Boost, boleto e nota fiscal do Finance).
-- **@nestjs/swagger** para documentação OpenAPI, servida em `/api/docs`.
-- **class-validator** / **class-transformer** para validação de DTOs.
-- **bcryptjs** para hash de senha.
+- **NestJS 11** (`@nestjs/common` e `@nestjs/core`; versão instalada 11.2.7) como framework de aplicação.
+- **Prisma 6** (`@prisma/client`; versão instalada 6.19.3) como ORM, sobre **PostgreSQL** (`prisma/schema.prisma`,
+  `datasource db { provider = "postgresql" }`), com **64 modelos**.
+- **@nestjs/jwt** para emissão e verificação de JWT. A verificação é realizada em `src/auth/jwt-auth.guard.ts`
+  (`jwt.verifyAsync`), **sem Passport**; os pacotes `passport`, `passport-jwt` e `@nestjs/passport` foram removidos
+  por não serem utilizados. Ver `09-autenticacao.md`.
+- **@nestjs/throttler** para limitação de requisições (global e por rota de autenticação).
+- **helmet** para cabeçalhos de segurança HTTP.
+- **@nestjs/websockets** e **socket.io** para os gateways de mensagens do Desk e do Boost.
+- **nodemailer** (por meio de `src/mail/`) para o envio de e-mail; na ausência de configuração SMTP, o serviço opera
+  em modo de registro em log.
+- **pdfkit** para a geração de PDF (certificado do Boost, boleto e nota fiscal do Finance).
+- **@nestjs/swagger** para a documentação OpenAPI, disponibilizada em `/api/docs`.
+- **class-validator** e **class-transformer** para validação de DTOs.
+- **bcryptjs** para o hash de senhas.
+- Módulo nativo **crypto** do Node.js para a cifragem de arquivos em repouso (AES-256-GCM e AES-256-CTR).
 
 ## Módulo raiz
 
-`src/app.module.ts` registra os módulos de negócio como imports irmãos:
+`src/app.module.ts` registra os módulos de negócio como importações independentes:
 
 ```ts
 @Module({
   imports: [
     AuthModule,
+    PrismaModule,
     RoosterHubModule,
     RoosterDeskModule,
     RoosterRoomsModule,
@@ -38,61 +46,93 @@ Status: baseado em leitura direta do código em `src/` e `prisma/schema.prisma` 
 export class AppModule {}
 ```
 
-`AppController` expõe só `GET /` (`@Public()`), usado como health check textual (`"Rooster One API is running"`, `src/app.service.ts`).
+O `AppController` expõe `GET /` (texto fixo `"Rooster One API is running"`) e `GET /health` (verificação com
+consulta ao banco), ambos públicos e fora do versionamento. Ver `docs/api/01-visao-geral.md`.
 
-## Módulos de negócio com backend real
+## Módulos de negócio
 
-Confirmado por leitura de `src/` — **todos os 9 módulos do produto têm backend**:
+Todos os nove módulos do produto possuem implementação no backend:
 
-- `src/roster-hub/` — núcleo administrativo (usuários, setores, módulos, permissões, RBAC, notificações, sessões, logs de auditoria).
-- `src/rooster-desk/` — chamados/tickets (service desk).
-- `src/rooster-rooms/` — reserva de ambientes/salas.
-- `src/rooster-assets/` — inventário de patrimônio.
-- `src/rooster-academy/` — gestão acadêmica (cursos, disciplinas, turmas, matrícula, frequência, notas, calendário, documentos) e as rotas `/me/*` do portal do aluno.
-- `src/rooster-learn/` — atividades e entregas, com propagação de nota para o Academy.
-- `src/rooster-boost/` — lado instrutor da plataforma de cursos extracurriculares (autenticado pelo Hub).
-- `src/rooster-boost-portal/` — lado aluno externo do Boost, com login próprio (`BoostUsuario`) e guard dedicado.
-- `src/rooster-finance/` — cobranças, produtos, serviços, descontos, boleto e nota fiscal internos.
+- `src/roster-hub/`: núcleo administrativo (usuários, setores, módulos, permissões, notificações, sessões, logs de
+  auditoria, logs de erro e configurações).
+- `src/rooster-desk/`: chamados (central de serviços).
+- `src/rooster-rooms/`: reserva de ambientes.
+- `src/rooster-assets/`: inventário de patrimônio.
+- `src/rooster-academy/`: gestão acadêmica (cursos, disciplinas, turmas, matrículas, frequência, notas, calendário e
+  documentos) e as rotas `/me/*` do portal do aluno.
+- `src/rooster-learn/`: atividades e entregas, com propagação de notas para o Academy.
+- `src/rooster-boost/`: área do instrutor da plataforma de cursos extracurriculares (autenticada pelo Hub).
+- `src/rooster-boost-portal/`: área do aluno externo do Boost, com autenticação própria (`BoostUsuario`) e guard
+  dedicado.
+- `src/rooster-finance/`: cobranças, produtos, serviços, descontos, políticas de multa e juros, boleto e nota fiscal
+  internos.
 
 Módulos transversais:
 
-- `src/auth/` — guards JWT e de permissão, decorators, configuração do JWT.
-- `src/mail/` — `MailService` (nodemailer), usado na redefinição de senha; sem SMTP configurado, registra o link em log em vez de enviar. Ver `12-logs.md` e `docs/engineering/06-integracoes.md`.
-- `src/common/` — `PrismaExceptionFilter`, filtro global de exceção do Prisma (rede de segurança para erro de banco não tratado em um service).
+- `src/auth/`: guards de JWT e de permissão, decorators, configuração do JWT e limites de requisição.
+- `src/mail/`: `MailService` (nodemailer), utilizado na redefinição de senha e no teste de envio; sem SMTP
+  configurado, registra o conteúdo em log em vez de enviá-lo. Ver `12-logs.md` e
+  `docs/engineering/06-integracoes.md`.
+- `src/common/`: componentes compartilhados: filtro global de exceções (`AllExceptionsFilter`), tradução de erros do
+  Prisma (`traduzirErroPrisma`), critério de origem do CORS, configuração de armazenamento e de upload, verificação
+  de assinatura binária de arquivos, cifragem de arquivos, token e transmissão de vídeo, e paginação.
 
-**Rooster Student** não tem módulo NestJS próprio: é um módulo apenas de permissão, cujas rotas (`/me/*`, `/financeiro/me/*`) são servidas por `AcademyController`, `LearnController` e `FinanceController`.
+O **Rooster Student** não possui módulo NestJS próprio: é um módulo exclusivamente de permissão, cujas rotas
+(`/me/*` e `/financeiro/me/*`) são atendidas por `AcademyController`, `LearnController` e `FinanceController`.
 
-## Padrão de camadas
+## Organização em camadas
 
-Todos os módulos de negócio seguem o mesmo padrão de três camadas:
+Todos os módulos de negócio seguem a mesma organização em três camadas:
 
 ```
 Controller (HTTP/WS, guards, DTO de entrada)
       ↓
 Service (regra de negócio, chamadas ao Prisma)
       ↓
-PrismaService (client Prisma, acesso direto ao PostgreSQL)
+PrismaService (cliente Prisma, acesso ao PostgreSQL)
 ```
 
-- **Controller**: recebe a requisição, aplica `@UseGuards(PermissionGuard)` (guard global `JwtAuthGuard` já roda antes, via `APP_GUARD`), valida o DTO (`ValidationPipe` global) e delega ao service. Em alguns controllers (Desk, Rooms) parte da regra de autorização contextual e até regra de negócio de auditoria de histórico vive no controller — ver `05-services.md` para os casos confirmados.
-- **Service**: contém a lógica de negócio (ex.: `RoomsService.assertReservaDisponivel`, `RoosterDeskService.createMensagemChamado`) e acessa o Prisma diretamente. Não há camada de repository (ver `06-repositories.md`).
-- **PrismaService** (`src/roster-hub/shared/prisma.service.ts`): estende `PrismaClient`, implementa `OnModuleInit`/`OnModuleDestroy` para `$connect`/`$disconnect`. Exportado por `PrismaModule` (`src/roster-hub/shared/prisma.module.ts`) e importado em todos os módulos de domínio — não existe uma instância por módulo, é a mesma classe reutilizada.
+- **Controller**: recebe a requisição, aplica `@UseGuards(PermissionGuard)` (o guard global `JwtAuthGuard` é
+  executado antes, por `APP_GUARD`), tem o DTO validado pelo `ValidationPipe` global e delega ao service. Em alguns
+  controllers (Desk e Rooms), parte da autorização contextual e o registro de histórico residem no próprio
+  controller; ver `05-services.md`.
+- **Service**: contém a lógica de negócio (por exemplo, `RoomsService.assertReservaDisponivel` e
+  `RoosterDeskService.createMensagemChamado`) e acessa o Prisma diretamente. Não há camada de repositório (ver
+  `06-repositories.md`).
+- **PrismaService** (`src/roster-hub/shared/prisma.service.ts`): estende `PrismaClient` e implementa `OnModuleInit`
+  e `OnModuleDestroy` para `$connect` e `$disconnect`. É exportado por `PrismaModule`
+  (`src/roster-hub/shared/prisma.module.ts`) e importado pelos módulos de domínio, que compartilham a mesma classe.
 
-## Autenticação e autorização como cross-cutting concerns
+## Autenticação e autorização como aspectos transversais
 
-- `JwtAuthGuard` é registrado como `APP_GUARD` em `AuthModule` (`src/auth/auth.module.ts`), portanto roda em **toda** rota da aplicação, exceto as marcadas com `@Public()`.
-- `PermissionGuard` não é global: cada controller de negócio o registra localmente com `@UseGuards(PermissionGuard)` e cada handler declara `@RequirePermission(modulo, recurso, acao)`. Rotas sem esse decorator passam livremente pelo `PermissionGuard` (ver `10-autorizacao-rbac.md`).
+- O `JwtAuthGuard` é registrado como `APP_GUARD` em `AuthModule` (`src/auth/auth.module.ts`) e é, portanto,
+  executado em **todas** as rotas da aplicação, exceto as marcadas com `@Public()`.
+- O `PermissionGuard` não é global: cada controller de negócio o registra com `@UseGuards(PermissionGuard)`, e cada
+  handler declara `@RequirePermission(modulo, recurso, acao)`. As rotas sem esse decorator não são restringidas pelo
+  `PermissionGuard` (ver `10-autorizacao-rbac.md`).
 
-## Bootstrap (`src/main.ts`)
+## Inicialização (`src/main.ts` e `src/app-config.ts`)
 
-- `ValidationPipe` global: `{ whitelist: true, forbidNonWhitelisted: true, transform: true }`.
-- Swagger montado em `/api/docs` via `DocumentBuilder`.
-- CORS restrito, em código, a qualquer porta de `localhost`/`127.0.0.1` (regex), `credentials: true`, métodos `GET, POST, PATCH, DELETE, OPTIONS`, headers `Content-Type, Authorization, x-user-id`. **Observação**: o header `x-user-id` está liberado no CORS mas não é lido em nenhum guard/controller do código atual (a autenticação é 100% via `Authorization: Bearer <jwt>`) — possível resquício de uma versão anterior do fluxo de auth.
+- Validação antecipada de `FILE_ENCRYPTION_KEY`: a aplicação não é iniciada sem chave de cifragem válida.
+- Log em formato JSON em produção (`ConsoleLogger({ json: true })`) e em formato legível nos demais ambientes.
+- Helmet; a Content-Security-Policy é desativada apenas quando o Swagger está habilitado.
+- `configurarApp()` (`src/app-config.ts`): versionamento por URI (`/v1`), `ValidationPipe` global
+  (`{ whitelist: true, forbidNonWhitelisted: true, transform: true }`) e `AllExceptionsFilter`. A mesma função é
+  utilizada pelos testes e2e.
+- Swagger em `/api/docs`, desabilitado em produção salvo `SWAGGER_ENABLED=true`.
+- CORS pelo critério de `src/common/cors.ts` (origens configuradas em `CORS_ORIGINS` e `FRONTEND_URL`; `localhost`
+  apenas fora de produção), com `credentials: true`, métodos `GET`, `POST`, `PATCH`, `DELETE` e `OPTIONS` e
+  cabeçalhos `Content-Type` e `Authorization`. Em produção sem origem configurada, é emitido aviso no log.
 - Porta: `process.env.PORT ?? 3000`.
 
-## Websocket
+## WebSocket
 
-Dois gateways Socket.IO existem no sistema:
+O sistema possui dois gateways Socket.IO, ambos com validação de origem pelo mesmo critério de CORS da API REST:
 
-- `MensagensGateway` (`src/rooster-desk/mensagens.gateway.ts`), namespace `/desk`. Autentica cada conexão/handler validando o JWT enviado em `handshake.auth.token` contra o mesmo `JwtService`/`PrismaService` usados no REST. O REST continua sendo a fonte da verdade para persistência; o gateway só emite `mensagem:nova` para quem está na sala `ticket:<id>` depois que o controller já persistiu a mensagem.
-- `BoostChatGateway` (`src/rooster-boost/boost-chat.gateway.ts`), namespace `/boost`, para o chat de um curso. É o **único ponto do sistema que autentica os dois tipos de token** (Hub e Boost): decodifica o JWT e escolhe a tabela (`usuarios` ou `boost_usuarios`) pelo claim `tipo`. Ver `docs/security/03-rbac.md`.
+- `MensagensGateway` (`src/rooster-desk/mensagens.gateway.ts`), namespace `/desk`. Autentica cada conexão e cada
+  evento pelo JWT enviado em `handshake.auth.token`, com o mesmo `JwtService` e `PrismaService` utilizados no REST. O
+  REST permanece a fonte de verdade da persistência; o gateway apenas emite `mensagem:nova` para os participantes da
+  sala `ticket:<id>` após o controller registrar a mensagem.
+- `BoostChatGateway` (`src/rooster-boost/boost-chat.gateway.ts`), namespace `/boost`, para as conversas entre aluno
+  e orientadores. É o **único ponto do sistema que autentica os dois tipos de token** (Hub e Boost): decodifica o JWT
+  e seleciona a tabela (`usuarios` ou `boost_usuarios`) pela declaração `tipo`. Ver `docs/security/03-rbac.md`.

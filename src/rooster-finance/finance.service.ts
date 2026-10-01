@@ -1,8 +1,6 @@
 import {
   BadRequestException,
-  ConflictException,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -15,6 +13,7 @@ import {
   CreatePoliticaMultaJurosDto, CreateProdutoDto, CreateServicoDto, GerarLoteMensalidadeDto, MarcarPagoDto,
   NegociarCobrancaDto, UpdateCobrancaDto, UpdateDescontoDto, UpdatePoliticaMultaJurosDto, UpdateProdutoDto, UpdateServicoDto,
 } from './dto/finance.dto';
+import { traduzirErroPrisma } from '../common/prisma-erro';
 
 type CobrancaComoStatus = { status: string; vencimento: Date };
 
@@ -651,10 +650,6 @@ export class FinanceService {
   }
 
   private handleError(error: unknown, action: string): never {
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2002') throw new ConflictException(`Não foi possível ${action}: já existe um registro com esses dados.`);
-      if (error.code === 'P2025') throw new NotFoundException(`Registro relacionado não encontrado ao ${action}.`);
-    }
-    throw new InternalServerErrorException(`Erro inesperado ao ${action}.`);
+    return traduzirErroPrisma(error, action);
   }
 }
