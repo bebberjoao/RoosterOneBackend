@@ -67,7 +67,7 @@ tokens ou decifrar arquivos.
 **Decisão**: o `JwtAuthGuard` é registrado uma única vez, globalmente (`APP_GUARD`), e não rota a rota. As rotas
 que dispensam token utilizam o decorator `@Public()`.
 
-**Contexto**: modelo seguro por padrão: uma nova rota somente fica sem autenticação se assim for declarado
+**Contexto**: modelo seguro por padrão: uma nova rota somente permanece sem autenticação se assim for declarado
 explicitamente, e a omissão não a expõe.
 
 **Implementação**: `src/auth/auth.module.ts` (`{ provide: APP_GUARD, useClass: JwtAuthGuard }`) e

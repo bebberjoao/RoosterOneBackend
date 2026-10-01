@@ -78,7 +78,7 @@ A única variável consumida pelo código é lida por `import.meta.env` (padrão
 > (`io(\`${API_URL}/desk\`)`), que não são versionados. A inclusão de `/v1` em `VITE_API_URL` interromperia as
 > conversas em tempo real e geraria caminhos `/v1/v1/...` nas requisições REST.
 
-> **Toda variável iniciada por `VITE_` é incorporada ao pacote distribuído** e fica visível a qualquer visitante.
+> **Toda variável iniciada por `VITE_` é incorporada ao pacote distribuído** e torna-se visível a qualquer visitante.
 > Apenas valores públicos devem ser definidos dessa forma; segredos pertencem ao backend.
 
 Para definir `VITE_API_URL`, crie um arquivo `.env` (ou `.env.local`) na raiz do frontend; pelo padrão do Vite,

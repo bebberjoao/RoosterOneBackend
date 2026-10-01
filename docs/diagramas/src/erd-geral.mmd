@@ -12,7 +12,7 @@ erDiagram
   ALUNO ||--o{ ENTREGA : envia
   ALUNO ||--o{ COBRANCA : "Finance: deve"
   COBRANCA ||--o| NOTA_FISCAL : documenta
-  PROFESSOR ||--o{ CURSO_BOOST : "Boost: instrui"
+  PROFESSOR }o--o{ CURSO_BOOST : "Boost: orienta"
   BOOST_USUARIO ||--o{ MATRICULA_BOOST : "login proprio"
   CURSO_BOOST ||--o{ MATRICULA_BOOST : recebe
   MATRICULA_BOOST ||--o| CERTIFICADO : emite

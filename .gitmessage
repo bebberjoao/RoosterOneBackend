@@ -1,7 +1,7 @@
-# <tipo>(<escopo>): <assunto no imperativo, minusculo, sem acento, ate 72 caracteres>
+# <tipo>(<escopo>): <assunto no imperativo, em minusculas, sem acento, ate 72 caracteres>
 #
-# <corpo: explique o PORQUE da mudanca. O diff ja mostra o que mudou.
-#  Se for correcao, diga qual era o sintoma. Acento pode, aqui no corpo.>
+# <corpo: motivacao da mudanca; o diff ja mostra o que foi alterado.
+#  Em correcao, descrever o sintoma. O corpo admite acentuacao.>
 #
 # <rodape: BREAKING CHANGE: ... / Refs: ...>
 #
@@ -9,10 +9,10 @@
 # TIPOS
 #   feat     funcionalidade nova visivel para algum usuario
 #   fix      correcao de defeito em comportamento existente
-#   docs     so documentacao (docs/, README, comentario explicativo)
-#   refactor mudanca de estrutura sem alterar comportamento observavel
-#   test     acrescimo ou correcao de teste
-#   perf     mudanca cujo objetivo e desempenho
+#   docs     exclusivamente documentacao (docs/, README, comentarios)
+#   refactor alteracao de estrutura sem mudanca de comportamento observavel
+#   test     inclusao ou correcao de teste
+#   perf     alteracao com objetivo de desempenho
 #   chore    manutencao (dependencia, script, configuracao)
 #   build    processo de build ou dependencia de build
 #   ci       pipeline
@@ -21,14 +21,14 @@
 #   hub  desk  rooms  assets  academy  learn  student  finance  boost
 #   rbac  auth  db  api  deps  docs
 #
-# LEMBRETES ANTES DE COMMITAR
-#   [ ] documentacao impactada foi atualizada NESTE commit
+# VERIFICACOES ANTES DO COMMIT
+#   [ ] documentacao impactada atualizada NESTE commit, em registro formal
 #   [ ] rota nova declara @RequirePermission
-#   [ ] resposta com relacao de Usuario usa select explicito (nunca include cru)
-#   [ ] escrita em mais de uma tabela esta em transacao
-#   [ ] mudou schema.prisma? replicou em schema.test.prisma?
-#   [ ] tsc --noEmit limpo (apague dist/tsconfig.tsbuildinfo antes)
-#   [ ] suite e2e passando
+#   [ ] resposta com relacao de Usuario utiliza select explicito
+#   [ ] gravacao em mais de uma tabela ocorre em transacao
+#   [ ] alteracao em schema.prisma reproduzida em schema.test.prisma
+#   [ ] tsc --noEmit sem erros (com dist/tsconfig.tsbuildinfo removido)
+#   [ ] npm test e npm run test:e2e aprovados
 #
 # Processo completo: docs/engineering/12-processo-de-desenvolvimento.md
 # ----------------------------------------------------------------------

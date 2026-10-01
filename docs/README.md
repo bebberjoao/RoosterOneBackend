@@ -2,10 +2,14 @@
 
 Índice central da documentação do sistema. O Rooster One é composto por dois repositórios independentes:
 
-- **Backend** (este repositório, `RoosterOneBackend-main`) — API NestJS + Prisma + PostgreSQL. Contém a documentação de sistema, backend, API, banco de dados, segurança, engenharia, operações e guias.
-- **Frontend** (`RoosterOneFrontEnd-main`) — TanStack Start + React. Contém sua própria documentação em [`docs/frontend/`](../../RoosterOneFrontEnd-main/docs/frontend/01-arquitetura.md) dentro do repositório do frontend.
+- **Backend** (este repositório, `RoosterOneBackend-main`): API NestJS, Prisma e PostgreSQL. Contém a documentação
+  de sistema, backend, API, banco de dados, segurança, engenharia, operações e guias.
+- **Frontend** (`RoosterOneFrontEnd-main`): TanStack Start e React. Possui documentação própria em
+  [`docs/frontend/`](../../RoosterOneFrontEnd-main/docs/frontend/01-arquitetura.md), no repositório do frontend.
 
-Toda a documentação foi reconstruída a partir do estado real do código (setembro/2026) — a documentação anterior foi removida por estar desatualizada frente ao sistema atual. Ver auditoria completa em [`engineering/11-auditoria-documentacao.md`](engineering/11-auditoria-documentacao.md).
+A documentação foi reconstruída a partir do código em setembro de 2026 e revisada integralmente, quanto à
+conformidade com o código e ao registro técnico-formal, em 01/10/2026. Ver
+[`engineering/11-auditoria-documentacao.md`](engineering/11-auditoria-documentacao.md).
 
 ## Sistema
 
@@ -18,7 +22,9 @@ Toda a documentação foi reconstruída a partir do estado real do código (sete
 
 ## Frontend
 
-Documentação completa no repositório do frontend: [`RoosterOneFrontEnd-main/docs/frontend/`](../../RoosterOneFrontEnd-main/docs/frontend/01-arquitetura.md) — arquitetura, estrutura, páginas e rotas, componentes, estado e hooks, integração com a API, autenticação, autorização, validações, tratamento de erros, guia do desenvolvedor.
+Documentação completa no repositório do frontend, em [`RoosterOneFrontEnd-main/docs/frontend/`](../../RoosterOneFrontEnd-main/docs/frontend/01-arquitetura.md):
+arquitetura, estrutura, páginas e rotas, componentes, estado e hooks, integração com a API, autenticação,
+autorização, validações, tratamento de erros e guia do desenvolvedor.
 
 ## Backend
 
@@ -60,6 +66,7 @@ Documentação completa no repositório do frontend: [`RoosterOneFrontEnd-main/d
 - [RBAC](security/03-rbac.md)
 - [Segurança da Aplicação](security/04-seguranca-aplicacao.md)
 - [Análise de Segurança](security/05-analise-de-seguranca.md)
+- [Teste de Intrusão Interno (setembro de 2026)](security/06-pentest-2026-09.md)
 
 ## Engenharia
 
@@ -74,9 +81,9 @@ Documentação completa no repositório do frontend: [`RoosterOneFrontEnd-main/d
 - [Performance](engineering/09-performance.md)
 - [Melhorias Futuras](engineering/10-melhorias-futuras.md)
 - [Auditoria da Documentação](engineering/11-auditoria-documentacao.md)
-- [Processo de Desenvolvimento](engineering/12-processo-de-desenvolvimento.md) — commits, branches, PR e revisão de código
-- [Governança](engineering/13-governanca.md) — incidentes, problemas, mudanças e registro de riscos
-- [Estratégia de Testes](engineering/14-estrategia-de-testes.md) — camadas, o que não é testado e a matriz teste ↔ requisito
+- [Processo de Desenvolvimento](engineering/12-processo-de-desenvolvimento.md): commits, branches, pull requests e revisão de código
+- [Governança](engineering/13-governanca.md): incidentes, problemas, mudanças e registro de riscos
+- [Estratégia de Testes](engineering/14-estrategia-de-testes.md): camadas de teste e matriz entre testes e requisitos
 
 ## Operações
 
@@ -91,7 +98,7 @@ Documentação completa no repositório do frontend: [`RoosterOneFrontEnd-main/d
 
 ## Diagramas
 
-- [Catálogo de diagramas](diagramas/README.md) — 52 diagramas (contexto, arquitetura, componentes, ERDs por módulo, RBAC, casos de uso, sequência, atividade e estados), com a fonte Mermaid em [`diagramas/src/`](diagramas/src/) e a renderização em [`diagramas/png/`](diagramas/png/).
+- [Catálogo de diagramas](diagramas/README.md): 52 diagramas (contexto, arquitetura, componentes, ERDs por módulo, RBAC, casos de uso, sequência, atividade e estados), com a fonte Mermaid em [`diagramas/src/`](diagramas/src/) e a renderização em [`diagramas/png/`](diagramas/png/).
 
 ## Guias
 
@@ -100,4 +107,7 @@ Documentação completa no repositório do frontend: [`RoosterOneFrontEnd-main/d
 
 ## Documento consolidado
 
-O documento `Rooster-One-Documentacao-Geral.docx`, na raiz da pasta do TCC, consolida toda esta árvore em 751 itens numerados, com as 52 figuras embutidas. Esta árvore `docs/` continua sendo a fonte de verdade técnica, mantida junto ao código; o documento é a visão consolidada para entrega acadêmica.
+O documento `Rooster-One-Documentacao-Geral.docx`, na raiz da pasta do TCC, consolida esta árvore, com as 52 figuras
+incorporadas, e o `Rooster-One-Manual-do-Usuario.docx` descreve a operação do sistema tela a tela. A árvore `docs/`
+permanece a fonte de verdade técnica, mantida junto ao código; os documentos Word constituem a visão consolidada para
+a entrega acadêmica.

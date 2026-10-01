@@ -1,20 +1,24 @@
 # Diagramas — Rooster One
 
-52 diagramas gerados a partir do estado real do sistema (schema Prisma, controllers, guards, catálogo de permissões e rotas do frontend), não de um desenho prévio.
+Conjunto de 52 diagramas gerados a partir do estado do sistema (schema Prisma, controllers, guards, catálogo de
+permissões e rotas do frontend), e não de desenho prévio.
 
-- **`src/`** — fonte Mermaid (`.mmd`) de cada diagrama. É a fonte de verdade: alterou o sistema, altere aqui.
-- **`png/`** — renderização de cada fonte, usada no documento `Rooster-One-Documentacao-Geral.docx`.
+- **`src/`**: fonte Mermaid (`.mmd`) de cada diagrama. Constitui a fonte de verdade: toda alteração do sistema que
+  afete um diagrama deve ser refletida aqui.
+- **`png/`**: renderização de cada fonte, utilizada no documento `Rooster-One-Documentacao-Geral.docx`.
 
-## Como regerar
+## Regeneração
 
-Requer Node e um Chrome/Chromium instalado (o renderizador usa Puppeteer apontando para o navegador local).
+Requer Node.js e Chrome ou Chromium instalado (o renderizador utiliza Puppeteer com o navegador local).
 
 ```bash
 npm install @mermaid-js/mermaid-cli
-# puppeteer-config.json apontando para o executável do Chrome local:
+# puppeteer-config.json com o caminho do executável do Chrome local:
 # { "executablePath": "C:/Program Files/Google/Chrome/Application/chrome.exe", "args": ["--no-sandbox"] }
-npx mmdc -i src/<nome>.mmd -o png/<nome>.png -p puppeteer-config.json -b white -s 2
+npx mmdc -i src/<nome>.mmd -o png/<nome>.png -p puppeteer-config.json -b white -s 3
 ```
+
+Após a regeneração, a figura correspondente deve ser substituída no documento Word.
 
 ## Catálogo
 
@@ -31,19 +35,35 @@ npx mmdc -i src/<nome>.mmd -o png/<nome>.png -p puppeteer-config.json -b white -
 
 ## Enquadramento em página
 
-Cada figura precisa caber em **uma** página A4 com o texto ainda legível. O gerador do documento limita largura e altura (620 × 860 px na área útil) e **avisa** quando uma figura fica abaixo de 440 px de largura — sinal de que o texto ficou pequeno demais.
+Cada figura deve caber em **uma** página A4, com o texto legível. O gerador do documento limita largura e altura
+(620 × 860 px na área útil) e **emite aviso** quando a figura resulta com menos de 440 px de largura, indicação de
+texto excessivamente reduzido.
 
-Quando isso acontecer, a correção é **na fonte do diagrama, nunca encolhendo a figura**. Em ordem de eficácia:
+Nesse caso, a correção deve ser feita **na fonte do diagrama, e nunca pela redução da figura**. Em ordem de eficácia:
 
-1. **Reduzir níveis verticais.** Um fluxo com 20 passos em coluna única não cabe em página nenhuma. Agrupe passos em nós de conceito mais alto (o passo a passo detalhado pertence à prosa, não à figura) ou divida em duas figuras de fases — foi o que se fez com o processo financeiro e o de atividade/entrega.
-2. **Alargar os nós** com `%%{init: {'flowchart': {'wrappingWidth': 420}}}%%`. O padrão do Mermaid quebra rótulos longos em muitas linhas, o que deixa os nós altos e o diagrama estreito; aumentar a largura de quebra faz o oposto.
-3. **Enxugar atributos nos ERDs.** Cada atributo listado aumenta a altura da caixa. Mostre a chave e os campos que importam para a relação; o dicionário completo está em `database/02-entidades.md`.
+1. **Redução de níveis verticais.** Um fluxo com 20 etapas em coluna única não cabe em página. As etapas devem ser
+   agrupadas em nós de nível conceitual mais alto (o passo a passo pertence ao texto, e não à figura) ou divididas em
+   duas figuras por fase, procedimento adotado nos processos financeiro e de atividade e entrega.
+2. **Alargamento dos nós** com `%%{init: {'flowchart': {'wrappingWidth': 420}}}%%`. O padrão do Mermaid quebra
+   rótulos longos em muitas linhas, o que torna os nós altos e o diagrama estreito; a ampliação da largura de quebra
+   produz o efeito inverso.
+3. **Redução de atributos nos diagramas ER.** Cada atributo aumenta a altura da caixa; devem constar a chave e os
+   campos relevantes para a relação, pois o dicionário completo está em `database/02-entidades.md`.
 
-**O que não funciona** (testado): trocar `flowchart TD` por `LR` num fluxo linear longo apenas troca "alto demais" por "largo demais" — o processo financeiro chegou a ficar 14× mais largo que alto, com o texto ilegível.
+**Procedimento ineficaz** (verificado): a substituição de `flowchart TD` por `LR` em fluxo linear longo apenas
+converte excesso de altura em excesso de largura; o processo financeiro chegou a resultar 14 vezes mais largo que
+alto, com texto ilegível.
 
 ## Convenções
 
-- Sem acento nos rótulos dentro dos diagramas (evita problema de renderização em alguns ambientes); o texto explicativo com acentuação fica no documento, não na figura.
-- Renderização em `-s 3` (3× a resolução base), para o texto continuar nítido quando o Word ajusta a figura à página.
-- Cada diagrama de estado e de sequência cita, quando aplicável, a regra de negócio (RN0XX) que o governa — ver `docs/system/04-regras-de-negocio.md`.
-- Onde o sistema não tem implementação (infraestrutura de produção, CI/CD), **nenhum diagrama foi produzido** — a ausência está registrada no documento em vez de ilustrada com um desenho hipotético.
+- Rótulos sem acentuação nos diagramas, para evitar problemas de renderização em alguns ambientes; o texto
+  explicativo, acentuado, consta do documento, e não da figura.
+- Renderização com `-s 3` (resolução três vezes maior que a base), para manter a nitidez do texto quando o Word
+  ajusta a figura à página.
+- Os diagramas de estado e de sequência citam, quando aplicável, a regra de negócio (RN0XX) correspondente; ver
+  `docs/system/04-regras-de-negocio.md`.
+- Não foram produzidos diagramas de infraestrutura de produção, por inexistir ambiente de produção; a ausência é
+  registrada no documento, em vez de ilustrada por desenho hipotético. O pipeline de integração contínua está
+  descrito em texto em `docs/operations/05-cicd.md`.
+- Revisão de 01/10/2026: `erd-geral` atualizado para representar o professor como orientador de curso do Boost
+  (relação N:N por `CursoOrientadorBoost`), e não como instrutor responsável.

@@ -53,7 +53,7 @@ scripts resolvem cada pasta pela mesma regra da aplicação (`scripts/pastas-upl
 
 - **Pastas redirecionadas para outro disco entram no backup.** Até 30/09/2026, apenas `<projeto>/uploads`
   era arquivado, e uma pasta de vídeos em disco separado — configuração recomendada para instituições que
-  hospedam vídeos — ficava fora do backup sem aviso.
+  hospedam vídeos — permanecia fora do backup sem aviso.
 - **A restauração independe da disposição do servidor de origem.** Cada `uploads/<subpasta>/` é restaurada
   na pasta configurada para aquele tipo de arquivo no servidor de destino, que pode diferir da origem.
 - **Backups anteriores permanecem restauráveis.** O formato canônico coincide com o dos backups antigos; a

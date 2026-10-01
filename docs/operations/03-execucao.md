@@ -14,7 +14,7 @@ npm run start:dev
   `07-troubleshooting.md`).
 - Requer o PostgreSQL indicado por `DATABASE_URL` acessível.
 - Disponibiliza a documentação interativa em `/api/docs` (por exemplo, `http://localhost:3000/api/docs`). Em
-  produção, a documentação fica desabilitada, salvo `SWAGGER_ENABLED=true`.
+  produção, a documentação permanece desabilitada, salvo `SWAGGER_ENABLED=true`.
 - Fora de produção, o CORS aceita qualquer origem `http://localhost:<porta>` ou `http://127.0.0.1:<porta>`, pois
   o servidor de desenvolvimento do frontend pode utilizar portas diferentes conforme a disponibilidade.
 

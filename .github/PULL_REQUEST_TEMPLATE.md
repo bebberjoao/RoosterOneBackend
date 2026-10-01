@@ -1,47 +1,49 @@
-# O que muda e por quê
+# Alteração e motivação
 
-<!-- Qual problema isso resolve? Descreva o problema, não só a solução. -->
+<!-- Descrever o problema tratado, e não apenas a solução adotada. -->
 
-## Como foi verificado
+## Verificação realizada
 
-<!-- Não basta "testei". Diga o quê. -->
+<!-- Indicar o que foi verificado; a menção genérica a "testado" não é suficiente. -->
 
-- [ ] `npx tsc --noEmit` limpo (com `dist/tsconfig.tsbuildinfo` apagado antes)
-- [ ] `npm run test:e2e` passando
-- [ ] Testado manualmente: <!-- descreva o cenário, incluindo o caso negativo -->
+- [ ] `npx tsc --noEmit` sem erros (com `dist/tsconfig.tsbuildinfo` removido previamente)
+- [ ] `npm test` aprovado
+- [ ] `npm run test:e2e` aprovado
+- [ ] Verificação manual: <!-- descrever o cenário, inclusive o caso negativo -->
 
 ## Impacto na documentação
 
-**Nenhuma mudança de comportamento entra sem a documentação correspondente.**
+**Nenhuma alteração de comportamento é integrada sem a documentação correspondente, em registro técnico-formal.**
 
-- [ ] Não há impacto na documentação (justifique: ____)
-- [ ] Documentação atualizada neste mesmo PR
+- [ ] Sem impacto na documentação (justificativa: ____)
+- [ ] Documentação atualizada neste pull request
 
-Marque o que foi revisado:
+Itens revisados:
 
-- [ ] `database/` + ERD — se mexeu em schema ou migration
-- [ ] `api/02-endpoints.md` + `backend/04-controllers.md` — se mexeu em endpoint
-- [ ] `security/03-rbac.md` + `database/06-seeds.md` — se mexeu em permissão
-- [ ] `system/04-regras-de-negocio.md` — se criou ou mudou regra de negócio
-- [ ] `backend/01-arquitetura.md` — se mexeu em dependência
-- [ ] **Alguma afirmação de ausência ("não existe", "não implementado") ficou desatualizada?**
-- [ ] **Alguma contagem citada na documentação mudou?** (módulos, tabelas, permissões, testes, endpoints)
+- [ ] `database/` e diagramas ER, em caso de alteração de schema ou migration
+- [ ] `api/02-endpoints.md` e `backend/04-controllers.md`, em caso de alteração de endpoint
+- [ ] `security/03-rbac.md` e `database/06-seeds.md`, em caso de alteração de permissão
+- [ ] `system/04-regras-de-negocio.md`, em caso de criação ou alteração de regra de negócio
+- [ ] `backend/01-arquitetura.md`, em caso de alteração de dependência
+- [ ] **Alguma afirmação de ausência ("não existe", "não implementado") tornou-se incorreta?**
+- [ ] **Alguma contagem citada na documentação foi alterada?** (módulos, tabelas, permissões, testes, endpoints)
 
-## Checklist de segurança
+## Lista de verificação de segurança
 
-- [ ] Rota nova declara `@RequirePermission` (handler sem o decorator passa livre pelo guard)
-- [ ] Resposta com relação de `Usuario` usa `select` explícito, nunca `include` cru
-- [ ] Identidade vem do token, nunca de parâmetro de rota ou do corpo
-- [ ] Regra que depende de posse é checada no servidor, não só escondendo o botão
-- [ ] Escrita em mais de uma tabela está em transação
-- [ ] Campo `BigInt` novo tem conversão explícita antes de serializar
+- [ ] Rota nova declara `@RequirePermission` (o handler sem o decorator não é restringido pelo guard)
+- [ ] Resposta com relação de `Usuario` utiliza `select` explícito, e nunca `include` sem seleção
+- [ ] A identidade é obtida do token, e nunca de parâmetro de rota ou do corpo
+- [ ] Regra dependente de vínculo com o recurso é verificada no servidor, e não apenas pela ocultação de elementos da interface
+- [ ] Gravação em mais de uma tabela ocorre em transação
+- [ ] Campo `BigInt` novo possui conversão explícita antes da serialização
+- [ ] Rota de upload declara a permissão no guard, verifica a assinatura binária e grava o arquivo cifrado
 
 ## Riscos e pontos de atenção
 
-<!-- O que o revisor deve olhar com mais cuidado? Que efeito colateral você aceitou conscientemente? -->
+<!-- Aspectos que exigem análise mais cuidadosa do revisor e efeitos colaterais aceitos deliberadamente. -->
 
-## Classe de risco da mudança
+## Classe de risco da alteração
 
 - [ ] Baixo (texto, documentação, ajuste visual)
-- [ ] Médio (endpoint novo, tela nova, dependência acrescentada)
-- [ ] **Alto** (migration, guard/autorização, remoção de dependência, transação) — exige revisão explícita do checklist de segurança
+- [ ] Médio (endpoint novo, tela nova, dependência incluída)
+- [ ] **Alto** (migration, guard ou autorização, remoção de dependência, transação, tratamento de erro compartilhado), com revisão explícita da lista de verificação de segurança

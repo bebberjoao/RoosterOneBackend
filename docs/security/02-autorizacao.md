@@ -22,7 +22,7 @@ recusado antes do recebimento do arquivo.
 - **`401 Unauthorized`**: token ausente ou inválido, situação em que não é possível identificar o usuário. Emitido
   pelo `JwtAuthGuard` (token ausente, malformado, com assinatura inválida ou expirado, ou usuário inativo ou
   excluído). O `PermissionGuard` também emite `401` quando a rota exige permissão e `request.user` está ausente,
-  situação que só ocorreria se o `PermissionGuard` fosse executado sem o `JwtAuthGuard`, o que não acontece, pois
+  situação que somente ocorreria se o `PermissionGuard` fosse executado sem o `JwtAuthGuard`, o que não acontece, pois
   este é global.
 - **`403 Forbidden`**: usuário autenticado e identificado, porém sem a permissão exigida. Emitido por
   `PermissionGuard.canActivate()`:
@@ -67,7 +67,7 @@ Etapas:
 2. **Na ausência de `@RequirePermission`, a requisição é autorizada** (`if (!required) return true;`). O
    `@UseGuards(PermissionGuard)` no controller, isoladamente, não bloqueia nenhuma rota: o bloqueio existe apenas
    onde o decorator foi declarado no método ou na classe. Uma rota sem o decorator é acessível a qualquer usuário
-   autenticado, o que constitui risco de manutenção: novo endpoint sem `@RequirePermission` fica exposto a todo
+   autenticado, o que constitui risco de manutenção: novo endpoint sem `@RequirePermission` permanece exposto a todo
    usuário autenticado (ver a lista de verificação em `docs/engineering/12-processo-de-desenvolvimento.md`).
 3. **Autorização irrestrita do administrador**: `isAdmin(usuarioId)` é avaliado antes da permissão específica. Ver
    `03-rbac.md` para a definição de administrador.

@@ -1,6 +1,6 @@
 ---
 name: Incidente
-about: Registro de incidente em operação (indisponibilidade, dado incorreto, acesso indevido)
+about: Registro de incidente em operação (indisponibilidade, dado incorreto ou acesso indevido)
 title: "[INCIDENTE] "
 labels: incidente
 ---
@@ -8,21 +8,21 @@ labels: incidente
 ## Severidade
 
 - [ ] **S1 — Crítica**: sistema indisponível, perda ou exposição de dado pessoal, acesso indevido confirmado → resposta imediata
-- [ ] **S2 — Alta**: módulo inoperante, dado incorreto sendo gravado, operação acadêmica/financeira bloqueada no prazo → mesmo dia
-- [ ] **S3 — Média**: funcionalidade degradada com contorno disponível → próximo ciclo
-- [ ] **S4 — Baixa**: defeito cosmético ou de conveniência → backlog
+- [ ] **S2 — Alta**: módulo inoperante, gravação de dado incorreto, operação acadêmica ou financeira bloqueada no prazo → no mesmo dia
+- [ ] **S3 — Média**: funcionalidade degradada, com alternativa disponível → no ciclo seguinte
+- [ ] **S4 — Baixa**: defeito estético ou de conveniência → lista de pendências
 
 ## Sintoma
 
-<!-- O que foi observado, exatamente. Mensagem de erro literal, se houver. -->
+<!-- Descrição exata do que foi observado, com a mensagem de erro literal, se houver. -->
 
-## Quando
+## Período
 
 <!-- Horário de início e de detecção. -->
 
-## Quem foi afetado
+## Usuários afetados
 
-<!-- Quais usuários/perfis/módulos. Algum dado pessoal envolvido? -->
+<!-- Usuários, perfis e módulos afetados; indicar se há dado pessoal envolvido. -->
 
 ## Módulo
 
@@ -31,33 +31,35 @@ labels: incidente
 
 ## Contenção aplicada
 
-<!-- Restaurar o serviço vem antes de entender a causa.
-     Em incidente de segurança: PRIMEIRO revogar o acesso
-     (desativar o usuário zera o acesso efetivo na requisição seguinte),
-     depois investigar. -->
+<!-- A restauração do serviço precede a identificação da causa.
+     Em incidente de segurança, a primeira medida é a revogação do acesso
+     (a desativação do usuário elimina o acesso efetivo na requisição seguinte
+     e revoga as sessões abertas); a investigação ocorre em seguida. -->
 
 ## Investigação
 
-<!-- O log de auditoria (LogAuditoria) registra login, CRUD de usuário,
-     concessão/revogação de permissão e redefinição de senha, com autor e data.
-     LIMITAÇÃO: o log NÃO registra leitura de dado — numa suspeita de acesso
-     indevido a dado acadêmico ou financeiro, não há trilha de quem consultou
-     o quê (risco R-07 em docs/engineering/13-governanca.md). -->
+<!-- O log de auditoria (LogAuditoria) registra login, sessões, operações sobre
+     usuários e permissões, redefinição de senha, notas, cobranças e contas
+     externas, com autor e data; o LogErro registra as respostas com status
+     igual ou superior a 500.
+     LIMITAÇÃO: o log não registra a leitura de dados; em suspeita de acesso
+     indevido a dado acadêmico ou financeiro, não há trilha das consultas
+     realizadas (risco R-07 em docs/engineering/13-governanca.md). -->
 
 ## Causa raiz
 
-<!-- Investigar até a causa, não até o sintoma sumir. -->
+<!-- Investigação até a causa, e não apenas até o desaparecimento do sintoma. -->
 
 ## Correção
 
-<!-- Segue o processo de mudança; classificar a classe de risco. -->
+<!-- Conforme o processo de mudança, com indicação da classe de risco. -->
 
-## Onde mais esse mesmo padrão pode existir?
+## Outros pontos com o mesmo padrão
 
-<!-- Pergunta obrigatória. O padrão de um defeito costuma se repetir em código
+<!-- Questão obrigatória: o padrão de um defeito tende a repetir-se em código
      semelhante ainda não revisado. -->
 
 ## Registro do aprendizado
 
-- [ ] S1/S2: entrada acrescentada em `docs/engineering/08-divida-tecnica.md` com o **padrão** do erro
-- [ ] Se detectável por revisão: pergunta acrescentada ao checklist em `docs/engineering/12-processo-de-desenvolvimento.md`
+- [ ] S1 ou S2: entrada incluída em `docs/engineering/08-divida-tecnica.md`, com o **padrão** do erro
+- [ ] Se detectável por revisão: questão incluída na lista de verificação de `docs/engineering/12-processo-de-desenvolvimento.md`
