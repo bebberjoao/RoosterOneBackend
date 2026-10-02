@@ -70,3 +70,5 @@ alto, com texto ilegível.
 - Revisão de 01/10/2026 (complemento): `casos-uso-boost` refeito com os atores vigentes (gestor, orientador,
   administrador, aluno externo e visitante), em substituição ao ator único "instrutor", e com os casos de verificação
   de certificado, vínculo de orientadores e gestão de contas externas; `contexto` corrigido para 64 tabelas.
+- Revisão de 02/10/2026: `casos-uso-boost` acrescido do ator "aluno da instituição" (login institucional no portal)
+  e do caso "matricular e cancelar matrículas" da gestão; "gerir contas externas" passou a "gerir contas do portal".

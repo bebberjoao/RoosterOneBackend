@@ -3,6 +3,7 @@ flowchart LR
   ORI((Orientador - professor, login do Hub))
   ADM((Administrador))
   EXT((Aluno externo - login proprio))
+  INT((Aluno da instituicao - login institucional))
   VIS((Visitante nao autenticado))
 
   subgraph Boost[Rooster Boost]
@@ -12,8 +13,9 @@ flowchart LR
     B4([Configurar certificado])
     B5([Vincular orientadores])
     B6([Acompanhar progresso dos alunos])
+    B16([Matricular e cancelar matriculas])
     B7([Responder conversas dos alunos])
-    B8([Gerir contas externas])
+    B8([Gerir contas do portal])
     B9([Navegar no catalogo publico])
     B10([Verificar certificado])
     B11([Cadastrar-se])
@@ -29,6 +31,7 @@ flowchart LR
   GES --> B4
   GES --> B5
   GES --> B6
+  GES --> B16
   ORI --> B7
   ADM --> B8
   VIS --> B9
@@ -38,3 +41,7 @@ flowchart LR
   EXT --> B13
   EXT --> B14
   EXT --> B15
+  INT --> B12
+  INT --> B13
+  INT --> B14
+  INT --> B15
