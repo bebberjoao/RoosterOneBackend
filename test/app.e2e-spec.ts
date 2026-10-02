@@ -83,6 +83,7 @@ const PERMISSION_CATALOG: Array<[modulo: string, recurso: string, acao: string]>
   ['Rooster Learn', '/learn', 'acessar'],
   ['Rooster Learn', '/learn/classes', 'acessar'],
   ['Rooster Learn', '/learn/classes', 'criar-atividade'],
+  ['Rooster Learn', '/learn/classes', 'editar-questoes'],
   ['Rooster Learn', '/learn/classes', 'corrigir'],
   ['Rooster Learn', '/learn/classes', 'excluir'],
   ['Rooster Learn', '/learn/classes', 'gerenciar-turmas'],
@@ -1364,6 +1365,7 @@ describe('Full API e2e tests', () => {
       ['Rooster Academy', '/academy/grades', 'configurar-pesos'],
       ['Rooster Learn', '/learn/classes', 'acessar'],
       ['Rooster Learn', '/learn/classes', 'criar-atividade'],
+      ['Rooster Learn', '/learn/classes', 'editar-questoes'],
       ['Rooster Learn', '/learn/classes', 'corrigir'],
     ];
     const ALUNO_KEYS: Array<[string, string, string]> = [
@@ -1663,6 +1665,156 @@ describe('Full API e2e tests', () => {
         .expect(200);
       const itemLearn = minhasNotasRes.body[0].itens.find((item: any) => item.origem === 'learn');
       expect(itemLearn.nota).toBe('9');
+    });
+
+    it('Rooster Learn: questões objetivas são corrigidas no envio, sem expor o gabarito ao aluno, e bloqueiam a edição após a entrega', async () => {
+      const cenario = await montarCenarioAcademico();
+      const servidor = app.getHttpServer();
+
+      const atividadeId = (await request(servidor)
+        .post('/v1/atividades').set('Authorization', cenario.profLima.header)
+        .send({ titulo: 'Questionário 1', tipo: 'questionario', turmaId: cenario.turmaAlg.id, peso: 1, notaMaxima: 10 })
+        .expect(201)).body.id;
+
+      // Regras de alternativas por tipo.
+      await request(servidor).post(`/v1/atividades/${atividadeId}/questoes`).set('Authorization', cenario.profLima.header)
+        .send({ tipo: 'multipla-uma', enunciado: 'Sem correta', alternativas: [{ texto: 'A' }, { texto: 'B' }] }).expect(400);
+      await request(servidor).post(`/v1/atividades/${atividadeId}/questoes`).set('Authorization', cenario.profLima.header)
+        .send({ tipo: 'vf', enunciado: 'Três alternativas', alternativas: [{ texto: 'V', correta: true }, { texto: 'F' }, { texto: 'X' }] }).expect(400);
+      await request(servidor).post(`/v1/atividades/${atividadeId}/questoes`).set('Authorization', cenario.profLima.header)
+        .send({ tipo: 'discursiva', enunciado: 'Com alternativa', alternativas: [{ texto: 'A' }] }).expect(400);
+      // Professor de outra turma não edita questões.
+      await request(servidor).post(`/v1/atividades/${atividadeId}/questoes`).set('Authorization', cenario.profCosta.header)
+        .send({ tipo: 'discursiva', enunciado: 'Indevida' }).expect(403);
+
+      const q1 = (await request(servidor).post(`/v1/atividades/${atividadeId}/questoes`).set('Authorization', cenario.profLima.header)
+        .send({
+          tipo: 'multipla-uma', enunciado: 'Complexidade do Merge Sort?', textoApoio: 'Pior caso.', pontos: 2,
+          alternativas: [{ texto: 'O(n)' }, { texto: 'O(n log n)', correta: true }, { texto: 'O(n²)' }],
+        }).expect(201)).body;
+      const q2 = (await request(servidor).post(`/v1/atividades/${atividadeId}/questoes`).set('Authorization', cenario.profLima.header)
+        .send({ tipo: 'multipla-varias', enunciado: 'Algoritmos estáveis?', alternativas: [{ texto: 'Merge', correta: true }, { texto: 'Insertion', correta: true }, { texto: 'Heap' }] })
+        .expect(201)).body;
+      const q3 = (await request(servidor).post(`/v1/atividades/${atividadeId}/questoes`).set('Authorization', cenario.profLima.header)
+        .send({ tipo: 'vf', enunciado: 'Quick Sort é estável.', alternativas: [{ texto: 'Verdadeiro' }, { texto: 'Falso', correta: true }] })
+        .expect(201)).body;
+      expect(q1.ordem).toBe(1);
+      expect(q3.ordem).toBe(3);
+      expect(q1.alternativas[1].correta).toBe(true);
+
+      // Imagem de apoio: o conteúdo precisa corresponder ao tipo declarado.
+      const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('imagem de teste')]);
+      await request(servidor).post(`/v1/questoes/${q1.id}/imagem`).set('Authorization', cenario.profLima.header)
+        .attach('arquivo', Buffer.from('não é png'), { filename: 'falsa.png', contentType: 'image/png' }).expect(400);
+      const comImagem = await request(servidor).post(`/v1/questoes/${q1.id}/imagem`).set('Authorization', cenario.profLima.header)
+        .attach('arquivo', png, { filename: 'grafico.png', contentType: 'image/png' }).expect(201);
+      expect(comImagem.body.possuiImagem).toBe(true);
+      expect(comImagem.body.imagemCaminho).toBeUndefined();
+
+      // Reordenação: a terceira questão passa a ser a primeira.
+      const reordenadas = await request(servidor).patch(`/v1/atividades/${atividadeId}/questoes/ordem`).set('Authorization', cenario.profLima.header)
+        .send({ ids: [q3.id, q1.id, q2.id] }).expect(200);
+      expect(reordenadas.body.map((q: any) => q.id)).toEqual([q3.id, q1.id, q2.id]);
+
+      // Antes da publicação, o aluno não acessa as questões.
+      await request(servidor).get(`/v1/atividades/${atividadeId}/questoes`).set('Authorization', cenario.alunoJoao.header).expect(403);
+      await request(servidor).patch(`/v1/atividades/${atividadeId}/publicar`).set('Authorization', cenario.profLima.header).expect(200);
+
+      const vistaAluno = await request(servidor).get(`/v1/atividades/${atividadeId}/questoes`).set('Authorization', cenario.alunoJoao.header).expect(200);
+      expect(vistaAluno.body).toHaveLength(3);
+      expect(vistaAluno.body.every((q: any) => q.alternativas.every((a: any) => a.correta === undefined))).toBe(true);
+      const imagemRes = await request(servidor).get(`/v1/questoes/${q1.id}/imagem`).set('Authorization', cenario.alunoJoao.header)
+        .buffer(true).parse((res, cb) => { const partes: Buffer[] = []; res.on('data', (c: Buffer) => partes.push(c)); res.on('end', () => cb(null, Buffer.concat(partes))); })
+        .expect(200);
+      expect(Buffer.compare(imagemRes.body as Buffer, png)).toBe(0);
+      await request(servidor).get(`/v1/questoes/${q1.id}/imagem`).set('Authorization', cenario.alunoMaria.header).expect(403);
+
+      // Questão obrigatória sem resposta e alternativa alheia são recusadas.
+      await request(servidor).post(`/v1/atividades/${atividadeId}/entregas`).set('Authorization', cenario.alunoJoao.header)
+        .send({ respostas: [{ questaoId: q1.id, alternativasIds: [q1.alternativas[1].id] }] }).expect(400);
+      await request(servidor).post(`/v1/atividades/${atividadeId}/entregas`).set('Authorization', cenario.alunoJoao.header)
+        .send({ respostas: [
+          { questaoId: q1.id, alternativasIds: [q2.alternativas[0].id] },
+          { questaoId: q2.id, alternativasIds: [q2.alternativas[0].id] },
+          { questaoId: q3.id, alternativasIds: [q3.alternativas[1].id] },
+        ] }).expect(400);
+
+      // Acerta q1 (2 pontos) e q3 (1 ponto); erra q2 parcialmente (1 ponto, tudo ou nada): 3/4 × 10 = 7,5.
+      const entrega = await request(servidor).post(`/v1/atividades/${atividadeId}/entregas`).set('Authorization', cenario.alunoJoao.header)
+        .send({ respostas: [
+          { questaoId: q1.id, alternativasIds: [q1.alternativas[1].id] },
+          { questaoId: q2.id, alternativasIds: [q2.alternativas[0].id] },
+          { questaoId: q3.id, alternativasIds: [q3.alternativas[1].id] },
+        ] }).expect(201);
+      expect(entrega.body.status).toBe('corrigida');
+      expect(Number(entrega.body.nota)).toBe(7.5);
+      expect(entrega.body.respostas.find((r: any) => r.questaoId === q2.id).pontuacao).toBe(0);
+      expect(entrega.body.respostas.find((r: any) => r.questaoId === q1.id).alternativasIds).toEqual([q1.alternativas[1].id]);
+
+      // Após a correção, o aluno passa a ver o gabarito; a nota chega ao Academy.
+      const corrigidaAluno = await request(servidor).get(`/v1/atividades/${atividadeId}/questoes`).set('Authorization', cenario.alunoJoao.header).expect(200);
+      expect(corrigidaAluno.body[0].alternativas.some((a: any) => a.correta === true)).toBe(true);
+      const notas = await request(servidor).get('/v1/me/notas').set('Authorization', cenario.alunoJoao.header).expect(200);
+      expect(Number(notas.body[0].itens.find((i: any) => i.origem === 'learn').nota)).toBe(7.5);
+
+      // Com entrega registrada, as questões não podem mais ser alteradas.
+      await request(servidor).patch(`/v1/questoes/${q1.id}`).set('Authorization', cenario.profLima.header).send({ enunciado: 'Alterado' }).expect(409);
+      await request(servidor).delete(`/v1/questoes/${q2.id}`).set('Authorization', cenario.profLima.header).expect(409);
+    });
+
+    it('Rooster Learn: questões discursivas e de arquivo são pontuadas pelo professor e a nota é proporcional aos pontos', async () => {
+      const cenario = await montarCenarioAcademico();
+      const servidor = app.getHttpServer();
+      const atividadeId = (await request(servidor)
+        .post('/v1/atividades').set('Authorization', cenario.profLima.header)
+        .send({ titulo: 'Prova 1', tipo: 'prova', turmaId: cenario.turmaAlg.id, peso: 1, notaMaxima: 10 })
+        .expect(201)).body.id;
+
+      const objetiva = (await request(servidor).post(`/v1/atividades/${atividadeId}/questoes`).set('Authorization', cenario.profLima.header)
+        .send({ tipo: 'vf', enunciado: 'Pilha é LIFO.', alternativas: [{ texto: 'Verdadeiro', correta: true }, { texto: 'Falso' }] })
+        .expect(201)).body;
+      const discursiva = (await request(servidor).post(`/v1/atividades/${atividadeId}/questoes`).set('Authorization', cenario.profLima.header)
+        .send({ tipo: 'discursiva', enunciado: 'Explique a recursão.', pontos: 3 }).expect(201)).body;
+      const arquivo = (await request(servidor).post(`/v1/atividades/${atividadeId}/questoes`).set('Authorization', cenario.profLima.header)
+        .send({ tipo: 'arquivo', enunciado: 'Envie o código-fonte.', pontos: 1 }).expect(201)).body;
+      // Troca de tipo valida as alternativas contra o novo tipo.
+      await request(servidor).patch(`/v1/questoes/${discursiva.id}`).set('Authorization', cenario.profLima.header).send({ tipo: 'multipla-uma' }).expect(400);
+      await request(servidor).patch(`/v1/atividades/${atividadeId}/publicar`).set('Authorization', cenario.profLima.header).expect(200);
+
+      // Discursiva obrigatória sem texto é recusada.
+      await request(servidor).post(`/v1/atividades/${atividadeId}/entregas`).set('Authorization', cenario.alunoJoao.header)
+        .send({ respostas: [{ questaoId: objetiva.id, alternativasIds: [objetiva.alternativas[0].id] }] }).expect(400);
+      const entrega = await request(servidor).post(`/v1/atividades/${atividadeId}/entregas`).set('Authorization', cenario.alunoJoao.header)
+        .send({ respostas: [
+          { questaoId: objetiva.id, alternativasIds: [objetiva.alternativas[0].id] },
+          { questaoId: discursiva.id, texto: 'A função chama a si mesma.' },
+        ] }).expect(201);
+      expect(entrega.body.status).toBe('enviada');
+      expect(entrega.body.nota).toBeNull();
+
+      // O arquivo responde à questão do tipo "arquivo"; não é aceito para a discursiva.
+      await request(servidor).post(`/v1/entregas/${entrega.body.id}/anexos`).set('Authorization', cenario.alunoJoao.header)
+        .field('questaoId', discursiva.id).attach('arquivo', Buffer.from('print("ok")'), 'main.txt').expect(400);
+      const anexo = await request(servidor).post(`/v1/entregas/${entrega.body.id}/anexos`).set('Authorization', cenario.alunoJoao.header)
+        .field('questaoId', arquivo.id).attach('arquivo', Buffer.from('print("ok")'), 'main.txt').expect(201);
+      expect(anexo.body.questaoId).toBe(arquivo.id);
+
+      // Sem a pontuação das questões abertas, a correção é recusada; acima do valor da questão, também.
+      await request(servidor).patch(`/v1/entregas/${entrega.body.id}/corrigir`).set('Authorization', cenario.profLima.header)
+        .send({ pontuacoes: [{ questaoId: discursiva.id, pontuacao: 2 }] }).expect(400);
+      await request(servidor).patch(`/v1/entregas/${entrega.body.id}/corrigir`).set('Authorization', cenario.profLima.header)
+        .send({ pontuacoes: [{ questaoId: discursiva.id, pontuacao: 4 }, { questaoId: arquivo.id, pontuacao: 1 }] }).expect(400);
+
+      // (1 + 2 + 0,5) / 5 × 10 = 7.
+      const corrigida = await request(servidor).patch(`/v1/entregas/${entrega.body.id}/corrigir`).set('Authorization', cenario.profLima.header)
+        .send({ pontuacoes: [{ questaoId: discursiva.id, pontuacao: 2 }, { questaoId: arquivo.id, pontuacao: 0.5 }], feedback: 'Bom trabalho.' })
+        .expect(200);
+      expect(Number(corrigida.body.nota)).toBe(7);
+
+      const entregas = await request(servidor).get(`/v1/atividades/${atividadeId}/entregas`).set('Authorization', cenario.profLima.header).expect(200);
+      const respostas = entregas.body[0].respostas;
+      expect(respostas.find((r: any) => r.questaoId === discursiva.id).pontuacao).toBe(2);
+      expect(respostas.find((r: any) => r.questaoId === objetiva.id).corrigidaAutomaticamente).toBe(true);
     });
   });
 

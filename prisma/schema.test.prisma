@@ -689,6 +689,7 @@ model Atividade {
   professor Professor? @relation(fields: [professorId], references: [id])
   itemAvaliativo ItemAvaliativo?
   entregas Entrega[]
+  questoes QuestaoAtividade[]
 }
 
 model Entrega {
@@ -705,6 +706,7 @@ model Entrega {
   atividade Atividade @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
   aluno Aluno @relation(fields: [alunoId], references: [id], onDelete: Cascade)
   anexos AnexoEntrega[]
+  respostas RespostaQuestao[]
 
   @@unique([atividadeId, alunoId])
 }
@@ -717,7 +719,55 @@ model AnexoEntrega {
   tipo String?
   tamanho BigInt?
   criadoEm DateTime?
+  questaoId String?
   entrega Entrega @relation(fields: [entregaId], references: [id], onDelete: Cascade)
+  questao QuestaoAtividade? @relation(fields: [questaoId], references: [id], onDelete: SetNull)
+}
+
+model QuestaoAtividade {
+  id String @id @default(uuid())
+  atividadeId String
+  ordem Int @default(0)
+  tipo String
+  enunciado String
+  textoApoio String?
+  imagemCaminho String?
+  imagemNome String?
+  imagemTipo String?
+  pontos Decimal @default(1)
+  obrigatoria Boolean @default(true)
+  criadoEm DateTime?
+  atividade Atividade @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
+  alternativas AlternativaQuestao[]
+  respostas RespostaQuestao[]
+  anexos AnexoEntrega[]
+
+  @@index([atividadeId])
+}
+
+model AlternativaQuestao {
+  id String @id @default(uuid())
+  questaoId String
+  ordem Int @default(0)
+  texto String
+  correta Boolean @default(false)
+  questao QuestaoAtividade @relation(fields: [questaoId], references: [id], onDelete: Cascade)
+
+  @@index([questaoId])
+}
+
+model RespostaQuestao {
+  id String @id @default(uuid())
+  entregaId String
+  questaoId String
+  alternativasIds String?
+  texto String?
+  pontuacao Decimal?
+  corrigidaAutomaticamente Boolean @default(false)
+  entrega Entrega @relation(fields: [entregaId], references: [id], onDelete: Cascade)
+  questao QuestaoAtividade @relation(fields: [questaoId], references: [id], onDelete: Cascade)
+
+  @@unique([entregaId, questaoId])
 }
 
 model BoostUsuario {

@@ -820,6 +820,7 @@ model Atividade {
   professor      Professor?      @relation(fields: [professorId], references: [id])
   itemAvaliativo ItemAvaliativo?
   entregas       Entrega[]
+  questoes       QuestaoAtividade[]
 
   @@map("atividades")
 }
@@ -839,6 +840,7 @@ model Entrega {
   atividade Atividade      @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
   aluno     Aluno          @relation(fields: [alunoId], references: [id], onDelete: Cascade)
   anexos    AnexoEntrega[]
+  respostas RespostaQuestao[]
 
   @@unique([atividadeId, alunoId])
   @@map("entregas")
@@ -852,10 +854,70 @@ model AnexoEntrega {
   tipo        String?   @db.VarChar(80)
   tamanho     BigInt?
   criadoEm    DateTime? @map("criado_em") @db.Timestamp()
+  /// Questão do tipo "arquivo" respondida por este anexo; nulo para anexo geral da entrega.
+  questaoId   String?   @map("questao_id") @db.Uuid
 
-  entrega Entrega @relation(fields: [entregaId], references: [id], onDelete: Cascade)
+  entrega Entrega           @relation(fields: [entregaId], references: [id], onDelete: Cascade)
+  questao QuestaoAtividade? @relation(fields: [questaoId], references: [id], onDelete: SetNull)
 
   @@map("anexos_entrega")
+}
+
+/// Questão de uma atividade do Learn. Tipos: multipla-uma | multipla-varias | vf | discursiva | arquivo.
+/// As objetivas (multipla-uma, multipla-varias e vf) são corrigidas automaticamente no envio da entrega.
+model QuestaoAtividade {
+  id            String    @id @default(uuid()) @db.Uuid
+  atividadeId   String    @map("atividade_id") @db.Uuid
+  ordem         Int       @default(0)
+  tipo          String    @db.VarChar(20)
+  enunciado     String
+  textoApoio    String?   @map("texto_apoio")
+  /// Imagem de apoio: nome gerado do arquivo cifrado em disco, nome original e tipo MIME.
+  imagemCaminho String?   @map("imagem_caminho") @db.VarChar(255)
+  imagemNome    String?   @map("imagem_nome") @db.VarChar(255)
+  imagemTipo    String?   @map("imagem_tipo") @db.VarChar(80)
+  pontos        Decimal   @default(1) @db.Decimal(6, 2)
+  obrigatoria   Boolean   @default(true)
+  criadoEm      DateTime? @map("criado_em") @db.Timestamp()
+
+  atividade    Atividade            @relation(fields: [atividadeId], references: [id], onDelete: Cascade)
+  alternativas AlternativaQuestao[]
+  respostas    RespostaQuestao[]
+  anexos       AnexoEntrega[]
+
+  @@index([atividadeId])
+  @@map("questoes_atividade")
+}
+
+model AlternativaQuestao {
+  id        String  @id @default(uuid()) @db.Uuid
+  questaoId String  @map("questao_id") @db.Uuid
+  ordem     Int     @default(0)
+  texto     String
+  correta   Boolean @default(false)
+
+  questao QuestaoAtividade @relation(fields: [questaoId], references: [id], onDelete: Cascade)
+
+  @@index([questaoId])
+  @@map("alternativas_questao")
+}
+
+/// Resposta do aluno a uma questão. `alternativasIds` guarda, em JSON, os identificadores escolhidos
+/// (questões objetivas); `pontuacao` é atribuída automaticamente (objetivas) ou pelo professor.
+model RespostaQuestao {
+  id                 String   @id @default(uuid()) @db.Uuid
+  entregaId          String   @map("entrega_id") @db.Uuid
+  questaoId          String   @map("questao_id") @db.Uuid
+  alternativasIds    String?  @map("alternativas_ids")
+  texto              String?
+  pontuacao          Decimal? @db.Decimal(6, 2)
+  corrigidaAutomaticamente Boolean @default(false) @map("corrigida_automaticamente")
+
+  entrega Entrega          @relation(fields: [entregaId], references: [id], onDelete: Cascade)
+  questao QuestaoAtividade @relation(fields: [questaoId], references: [id], onDelete: Cascade)
+
+  @@unique([entregaId, questaoId])
+  @@map("respostas_questao")
 }
 
 // =====================================================================

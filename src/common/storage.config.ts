@@ -80,6 +80,9 @@ export const MIMETYPES_DOCUMENTO = [
   'image/webp',
 ];
 
+/** Imagens aceitas como apoio de questão do Learn. */
+export const MIMETYPES_IMAGEM = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
 /**
  * Opções comuns a todo `FileInterceptor`. `defParamCharset: 'utf8'` faz o busboy decodificar o
  * nome do arquivo multipart como UTF-8; o padrão (`latin1`) gravava nomes acentuados — comuns
@@ -101,6 +104,8 @@ export const PASTAS = {
   certificadosBoost: () => resolverPastaUpload('certificados-boost', 'BOOST_CERTIFICADOS_DIR'),
   anexosTickets: () => resolverPastaUpload('anexos-tickets', 'DESK_ANEXOS_DIR'),
   anexosEntregas: () => resolverPastaUpload('anexos-entregas', 'LEARN_ANEXOS_DIR'),
+  /** Imagens de apoio das questões das atividades do Learn. */
+  imagensQuestoes: () => resolverPastaUpload('imagens-questoes', 'LEARN_IMAGENS_DIR'),
   documentosAcademicos: () => resolverPastaUpload('documentos-academicos', 'ACADEMY_DOCUMENTOS_DIR'),
   notasFiscais: () => resolverPastaUpload('notas-fiscais', 'FINANCE_NOTAS_DIR'),
 } as const;

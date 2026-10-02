@@ -45,6 +45,7 @@ trabalho definido, recomenda-se **caminho absoluto**.
 | `BOOST_CERTIFICADOS_DIR` | `<UPLOADS_DIR>/certificados-boost` | Certificados em PDF. |
 | `DESK_ANEXOS_DIR` | `<UPLOADS_DIR>/anexos-tickets` | Anexos de chamado. |
 | `LEARN_ANEXOS_DIR` | `<UPLOADS_DIR>/anexos-entregas` | Anexos de entrega do Learn. |
+| `LEARN_IMAGENS_DIR` | `<UPLOADS_DIR>/imagens-questoes` | Imagens de apoio das questões das atividades do Learn. |
 | `ACADEMY_DOCUMENTOS_DIR` | `<UPLOADS_DIR>/documentos-academicos` | Documentos acadêmicos. |
 | `FINANCE_NOTAS_DIR` | `<UPLOADS_DIR>/notas-fiscais` | Notas fiscais (PDF e XML). |
 

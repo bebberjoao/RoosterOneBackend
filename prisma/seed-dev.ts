@@ -424,7 +424,7 @@ const academyProfessorKeys = [
   'academy.dashboard.acessar',
   'academy.attendance.acessar', 'academy.attendance.registrar-chamada', 'academy.attendance.editar-chamada',
   'academy.grades.acessar', 'academy.grades.lancar-notas', 'academy.grades.configurar-pesos',
-  'learn.dashboard.acessar', 'learn.classes.acessar', 'learn.classes.criar-atividade', 'learn.classes.corrigir', 'learn.classes.excluir',
+  'learn.dashboard.acessar', 'learn.classes.acessar', 'learn.classes.criar-atividade', 'learn.classes.editar-questoes', 'learn.classes.corrigir', 'learn.classes.excluir',
   'student.documents.acessar',
   // Orientador do Boost = Professor do Academy vinculado a um curso: SÓ conversa com os alunos
   // dele. Gerir curso (criar, editar, tirar do ar, certificado) é permissão de gestão, abaixo.
@@ -481,7 +481,10 @@ async function clearDatabase() {
     prisma.cursoBoost.deleteMany(),
     prisma.redefinicaoSenhaBoost.deleteMany(),
     prisma.boostUsuario.deleteMany(),
+    prisma.respostaQuestao.deleteMany(),
     prisma.anexoEntrega.deleteMany(),
+    prisma.alternativaQuestao.deleteMany(),
+    prisma.questaoAtividade.deleteMany(),
     prisma.entrega.deleteMany(),
     prisma.atividade.deleteMany(),
     prisma.nota.deleteMany(),

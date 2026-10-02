@@ -14,6 +14,7 @@ TIPOS_DE_UPLOAD=(
   "certificados-boost:BOOST_CERTIFICADOS_DIR"
   "anexos-tickets:DESK_ANEXOS_DIR"
   "anexos-entregas:LEARN_ANEXOS_DIR"
+  "imagens-questoes:LEARN_IMAGENS_DIR"
   "documentos-academicos:ACADEMY_DOCUMENTOS_DIR"
   "notas-fiscais:FINANCE_NOTAS_DIR"
 )

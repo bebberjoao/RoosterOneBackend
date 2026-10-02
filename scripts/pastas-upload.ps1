@@ -14,6 +14,7 @@ $TiposDeUpload = @(
     @{ Subpasta = 'certificados-boost';    Variavel = 'BOOST_CERTIFICADOS_DIR' },
     @{ Subpasta = 'anexos-tickets';        Variavel = 'DESK_ANEXOS_DIR' },
     @{ Subpasta = 'anexos-entregas';       Variavel = 'LEARN_ANEXOS_DIR' },
+    @{ Subpasta = 'imagens-questoes';      Variavel = 'LEARN_IMAGENS_DIR' },
     @{ Subpasta = 'documentos-academicos'; Variavel = 'ACADEMY_DOCUMENTOS_DIR' },
     @{ Subpasta = 'notas-fiscais';         Variavel = 'FINANCE_NOTAS_DIR' }
 )

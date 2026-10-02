@@ -1,5 +1,5 @@
 import {
-  BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post,
+  BadRequestException, Body, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, Patch, Post,
   Req, Res, UseGuards, UseInterceptors, UploadedFile,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
@@ -7,13 +7,17 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { join } from 'path';
 import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { isUUID } from 'class-validator';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { UsuariosService } from '../roster-hub/usuarios/usuarios.service';
 import { AcademyService } from '../rooster-academy/academy.service';
 import { LearnService } from './learn.service';
-import { CorrigirEntregaDto, CreateAtividadeDto, EnviarEntregaDto, UpdateAtividadeDto } from './dto/learn.dto';
-import { PASTAS, MIMETYPES_DOCUMENTO, OPCOES_UPLOAD, criarFiltroMimetype } from '../common/storage.config';
+import { IMAGENS_QUESTOES_DIR, QuestoesService } from './questoes.service';
+import {
+  CorrigirEntregaDto, CreateAtividadeDto, CreateQuestaoDto, EnviarEntregaDto, ReordenarQuestoesDto, UpdateAtividadeDto, UpdateQuestaoDto,
+} from './dto/learn.dto';
+import { PASTAS, MIMETYPES_DOCUMENTO, MIMETYPES_IMAGEM, OPCOES_UPLOAD, criarFiltroMimetype } from '../common/storage.config';
 import { escreverDocumentoEncriptado, lerDocumentoDescriptografado } from '../common/file-encryption.util';
 import { exigirConteudoCompativel } from '../common/assinatura-arquivo';
 
@@ -23,6 +27,7 @@ const TELA_STUDENT = '/learn/student';
 
 const UPLOADS_DIR = PASTAS.anexosEntregas();
 const MAX_ANEXO_BYTES = 15 * 1024 * 1024; // 15MB
+const MAX_IMAGEM_BYTES = 5 * 1024 * 1024; // 5MB
 
 type AuthedUser = { id: string };
 
@@ -32,6 +37,7 @@ type AuthedUser = { id: string };
 export class LearnController {
   constructor(
     private readonly learnService: LearnService,
+    private readonly questoesService: QuestoesService,
     private readonly academyService: AcademyService,
     private readonly usuariosService: UsuariosService,
   ) {}
@@ -79,6 +85,94 @@ export class LearnController {
     const atividade = await this.learnService.findOneAtividade(id);
     await this.exigirDonoOuGestor((request.user as AuthedUser).id, atividade.turmaId, 'excluir');
     return this.learnService.removeAtividade(id);
+  }
+
+  // ===================== Questões =====================
+  @Get('atividades/:id/questoes')
+  @ApiOperation({ summary: 'Lista as questões da atividade; o gabarito é exibido ao professor e, após a correção da própria entrega, ao aluno' })
+  async listarQuestoes(@Req() request: Request, @Param('id') atividadeId: string) {
+    const atividade = await this.learnService.findOneAtividade(atividadeId);
+    await this.exigirEscopoTurma(request, atividade.turmaId);
+    const usuarioId = (request.user as AuthedUser).id;
+    if (await this.isGestorOuProfessorDaTurma(usuarioId, atividade.turmaId)) {
+      return this.questoesService.listar(atividadeId, true);
+    }
+    this.exigirAtividadeAberta(atividade.status);
+    const aluno = await this.academyService.findAlunoByUsuarioId(usuarioId);
+    const entrega = await this.learnService.findEntregaDoAluno(atividadeId, aluno.id).catch(() => null);
+    return this.questoesService.listar(atividadeId, entrega?.status === 'corrigida');
+  }
+
+  @Post('atividades/:id/questoes')
+  @ApiOperation({ summary: 'Adiciona questão à atividade (permitido enquanto não houver entregas)' })
+  async criarQuestao(@Req() request: Request, @Param('id') atividadeId: string, @Body() dto: CreateQuestaoDto) {
+    const atividade = await this.learnService.findOneAtividade(atividadeId);
+    await this.exigirDonoOuGestor((request.user as AuthedUser).id, atividade.turmaId, 'editar-questoes');
+    return this.questoesService.criar(atividadeId, dto);
+  }
+
+  @Patch('atividades/:id/questoes/ordem')
+  @ApiOperation({ summary: 'Reordena as questões da atividade' })
+  async reordenarQuestoes(@Req() request: Request, @Param('id') atividadeId: string, @Body() dto: ReordenarQuestoesDto) {
+    const atividade = await this.learnService.findOneAtividade(atividadeId);
+    await this.exigirDonoOuGestor((request.user as AuthedUser).id, atividade.turmaId, 'editar-questoes');
+    return this.questoesService.reordenar(atividadeId, dto.ids);
+  }
+
+  @Patch('questoes/:id')
+  @ApiOperation({ summary: 'Altera a questão (permitido enquanto a atividade não possuir entregas)' })
+  async atualizarQuestao(@Req() request: Request, @Param('id') questaoId: string, @Body() dto: UpdateQuestaoDto) {
+    const questao = await this.questoesService.findQuestao(questaoId);
+    await this.exigirDonoOuGestor((request.user as AuthedUser).id, questao.atividade.turmaId, 'editar-questoes');
+    return this.questoesService.atualizar(questaoId, dto);
+  }
+
+  @Delete('questoes/:id')
+  async removerQuestao(@Req() request: Request, @Param('id') questaoId: string) {
+    const questao = await this.questoesService.findQuestao(questaoId);
+    await this.exigirDonoOuGestor((request.user as AuthedUser).id, questao.atividade.turmaId, 'editar-questoes');
+    return this.questoesService.remover(questaoId);
+  }
+
+  @Post('questoes/:id/imagem')
+  @ApiOperation({ summary: 'Define a imagem de apoio da questão (JPEG, PNG, GIF ou WebP, até 5MB)' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('arquivo', {
+    ...OPCOES_UPLOAD,
+    storage: memoryStorage(),
+    limits: { fileSize: MAX_IMAGEM_BYTES },
+    fileFilter: criarFiltroMimetype(MIMETYPES_IMAGEM),
+  }))
+  async definirImagemQuestao(@Req() request: Request, @Param('id') questaoId: string, @UploadedFile() arquivo?: Express.Multer.File) {
+    if (!arquivo) throw new BadRequestException('Nenhuma imagem enviada, ou formato não aceito (campo "arquivo"; JPEG, PNG, GIF ou WebP).');
+    const questao = await this.questoesService.findQuestao(questaoId);
+    await this.exigirDonoOuGestor((request.user as AuthedUser).id, questao.atividade.turmaId, 'editar-questoes');
+    exigirConteudoCompativel(arquivo);
+    const { filename } = escreverDocumentoEncriptado(IMAGENS_QUESTOES_DIR, arquivo.originalname, arquivo.buffer);
+    return this.questoesService.definirImagem(questaoId, { filename, originalname: arquivo.originalname, mimetype: arquivo.mimetype });
+  }
+
+  @Delete('questoes/:id/imagem')
+  async removerImagemQuestao(@Req() request: Request, @Param('id') questaoId: string) {
+    const questao = await this.questoesService.findQuestao(questaoId);
+    await this.exigirDonoOuGestor((request.user as AuthedUser).id, questao.atividade.turmaId, 'editar-questoes');
+    return this.questoesService.removerImagem(questaoId);
+  }
+
+  @Get('questoes/:id/imagem')
+  @ApiOperation({ summary: 'Exibe a imagem de apoio da questão (professor da turma, coordenação ou aluno matriculado)' })
+  async imagemQuestao(@Req() request: Request, @Res() response: Response, @Param('id') questaoId: string) {
+    const questao = await this.questoesService.findQuestao(questaoId);
+    await this.exigirEscopoTurma(request, questao.atividade.turmaId);
+    if (!(await this.isGestorOuProfessorDaTurma((request.user as AuthedUser).id, questao.atividade.turmaId))) {
+      this.exigirAtividadeAberta(questao.atividade.status);
+    }
+    if (!questao.imagemCaminho) throw new NotFoundException('A questão não possui imagem de apoio.');
+    response.setHeader('Content-Disposition', `inline; filename="${(questao.imagemNome ?? 'imagem').replace(/["\\\r\n]/g, '_')}"`);
+    response.setHeader('Cache-Control', 'private, max-age=300');
+    return response
+      .type(questao.imagemTipo ?? questao.imagemCaminho)
+      .send(lerDocumentoDescriptografado(join(IMAGENS_QUESTOES_DIR, questao.imagemCaminho)));
   }
 
   // ===================== Entregas (professor corrige) =====================
@@ -135,7 +229,7 @@ export class LearnController {
   // ===================== Anexos de entrega =====================
   @Post('entregas/:id/anexos')
   @RequirePermission(MODULO, TELA_STUDENT, 'anexar')
-  @ApiOperation({ summary: 'Anexa um arquivo (até 15MB) à própria entrega' })
+  @ApiOperation({ summary: 'Anexa um arquivo (até 15MB) à própria entrega; com "questaoId", responde à questão do tipo envio de arquivo' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('arquivo', {
     ...OPCOES_UPLOAD,
@@ -143,8 +237,14 @@ export class LearnController {
     limits: { fileSize: MAX_ANEXO_BYTES },
     fileFilter: criarFiltroMimetype(MIMETYPES_DOCUMENTO),
   }))
-  async uploadAnexoEntrega(@Req() request: Request, @Param('id') entregaId: string, @UploadedFile() arquivo?: Express.Multer.File) {
+  async uploadAnexoEntrega(
+    @Req() request: Request,
+    @Param('id') entregaId: string,
+    @UploadedFile() arquivo?: Express.Multer.File,
+    @Body('questaoId') questaoId?: string,
+  ) {
     if (!arquivo) throw new BadRequestException('Nenhum arquivo enviado, ou formato não aceito (campo "arquivo").');
+    if (questaoId !== undefined && !isUUID(questaoId)) throw new BadRequestException('Identificador de questão inválido.');
     const aluno = await this.academyService.findAlunoByUsuarioId((request.user as AuthedUser).id);
     if (!(await this.learnService.isEntregaDoAluno(entregaId, aluno.id))) {
       throw new ForbiddenException('Esta entrega não pertence ao aluno autenticado.');
@@ -153,7 +253,7 @@ export class LearnController {
     const { filename } = escreverDocumentoEncriptado(UPLOADS_DIR, arquivo.originalname, arquivo.buffer);
     return this.learnService.createAnexoEntrega(entregaId, {
       originalname: arquivo.originalname, filename, mimetype: arquivo.mimetype, size: arquivo.size,
-    });
+    }, questaoId || undefined);
   }
 
   @Get('entregas/:id/anexos/:anexoId/arquivo')
@@ -192,6 +292,20 @@ export class LearnController {
       return;
     }
     throw new ForbiddenException(`Sem permissão para ${acao} em atividades.`);
+  }
+
+  /** Coordenação do Learn ou professor responsável pela turma: acesso ao gabarito das questões. */
+  private async isGestorOuProfessorDaTurma(usuarioId: string, turmaId: string) {
+    if (await this.usuariosService.hasPermission(usuarioId, MODULO, TELA_CLASSES, 'gerenciar-turmas')) return true;
+    const professor = await this.academyService.findProfessorByUsuarioId(usuarioId);
+    return !!professor && (await this.academyService.isTurmaDoProfessor(turmaId, professor.id));
+  }
+
+  /** O aluno só visualiza as questões de atividade publicada ou encerrada. */
+  private exigirAtividadeAberta(status: string | null) {
+    if (status !== 'publicada' && status !== 'encerrada') {
+      throw new ForbiddenException('A atividade ainda não foi publicada.');
+    }
   }
 
   /** Leitura: gestão do Learn, o professor dono da turma, ou o aluno matriculado. */
