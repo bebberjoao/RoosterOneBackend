@@ -251,11 +251,28 @@ export class AcademyController {
   @RequirePermission(MODULO, TELA_MANAGE, 'gerenciar-calendario')
   createEventoCalendario(@Body() dto: CreateEventoCalendarioDto) { return this.academyService.createEventoCalendario(dto); }
   @Get('eventos-calendario')
-  @RequirePermission(MODULO, TELA_MANAGE, 'acessar')
-  findAllEventosCalendario() { return this.academyService.findAllEventosCalendario(); }
+  @ApiOperation({ summary: 'Lista os eventos do calendário acadêmico (gestão, professores e alunos)' })
+  async findAllEventosCalendario(@Req() request: Request) {
+    await this.exigirLeituraCalendario((request.user as AuthedUser).id);
+    return this.academyService.findAllEventosCalendario();
+  }
   @Get('eventos-calendario/:id')
-  @RequirePermission(MODULO, TELA_MANAGE, 'acessar')
-  findOneEventoCalendario(@Param('id') id: string) { return this.academyService.findOneEventoCalendario(id); }
+  async findOneEventoCalendario(@Req() request: Request, @Param('id') id: string) {
+    await this.exigirLeituraCalendario((request.user as AuthedUser).id);
+    return this.academyService.findOneEventoCalendario(id);
+  }
+
+  /**
+   * O calendário acadêmico é institucional: a leitura cabe à gestão acadêmica, a quem acessa o Academy (professores)
+   * e ao aluno com acesso ao calendário do portal. A criação, a alteração e a exclusão exigem `gerenciar-calendario`.
+   */
+  private async exigirLeituraCalendario(usuarioId: string) {
+    const permitido =
+      (await this.usuariosService.hasPermission(usuarioId, MODULO, TELA_MANAGE, 'acessar')) ||
+      (await this.usuariosService.hasPermission(usuarioId, MODULO, '/academy', 'acessar')) ||
+      (await this.usuariosService.hasPermission(usuarioId, 'Rooster Student', '/student/calendar', 'acessar'));
+    if (!permitido) throw new ForbiddenException('Sem permissão para consultar o calendário acadêmico.');
+  }
   @Patch('eventos-calendario/:id')
   @RequirePermission(MODULO, TELA_MANAGE, 'gerenciar-calendario')
   updateEventoCalendario(@Param('id') id: string, @Body() dto: UpdateEventoCalendarioDto) { return this.academyService.updateEventoCalendario(id, dto); }

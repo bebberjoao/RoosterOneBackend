@@ -71,7 +71,7 @@ contém "—". Revisão de 01/10/2026, abrangendo os nove módulos.
 | RF-AC05 Matrícula em turma | `/academy/manage` | `POST /turmas/:id/matriculas`, `PATCH/DELETE /matriculas/:id` | RN020 | `matriculas` | `academy.manage.matricular` |
 | RF-AC06 Frequência em lote | `/academy/attendance` | `POST/GET /turmas/:id/frequencia` | RN021, RN023 | `registros_frequencia` | `academy.attendance.registrar-chamada` (professor responsável) ou gestão |
 | RF-AC07 Itens avaliativos e notas | `/academy/grades` | `POST/GET /turmas/:id/itens-avaliativos`, `PATCH/DELETE /itens-avaliativos/:id`, `PATCH /itens-avaliativos/:id/notas` | RN021, RN022 | `itens_avaliativos`, `notas`, `logs_auditoria`, `notificacoes` | `academy.grades.configurar-pesos`, `lancar-notas` (professor responsável) ou gestão |
-| RF-AC08 Calendário acadêmico | `/academy/manage`, `/student/calendar` | `GET/POST/PATCH/DELETE /eventos-calendario` | — | `eventos_calendario_academico` | `academy.manage.gerenciar-calendario` |
+| RF-AC08 Calendário acadêmico | `/academy/manage`, `/student/calendar` | `GET/POST/PATCH/DELETE /eventos-calendario` | — | `eventos_calendario_academico` | `academy.manage.gerenciar-calendario` (escrita); leitura: `academy.manage.acessar`, `academy.dashboard.acessar` ou `student.calendar.acessar` |
 | RF-AC09 Documentos acadêmicos | `/academy/manage`, `/student/documents` | `POST/GET /documentos-academicos`, `GET /documentos-academicos/:id/arquivo`, `DELETE /documentos-academicos/:id` | — | `documentos_academicos` | `academy.manage.gerenciar-disciplinas` ou `student.documents.*` |
 | RF-AC10 Escopo por vínculo com a turma | todas as telas por turma | endpoints por `turmaId` | RN021 | `turmas`, `matriculas` | permissão da ação combinada ao vínculo |
 

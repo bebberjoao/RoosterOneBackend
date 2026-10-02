@@ -244,6 +244,20 @@ estão indicadas; as demais não alteram o banco de dados.
 
 ### Corrigido
 
+- **Calendário acadêmico inacessível a alunos e professores** (02/10/2026). `GET /eventos-calendario` e
+  `GET /eventos-calendario/:id` exigiam `/academy/manage acessar`, permissão exclusiva da gestão acadêmica; o
+  calendário do portal do aluno e o painel do aluno recebiam `403` e exibiam a agenda vazia. A leitura passou a ser
+  permitida também a quem possui `/academy acessar` (professores) ou `Rooster Student /student/calendar acessar`
+  (`exigirLeituraCalendario`); a criação, a alteração e a exclusão continuam restritas a `gerenciar-calendario`.
+  Coberto por teste e2e.
+- **Painel do aluno não carregava** (02/10/2026; frontend). Em `/student`, o hook `useNotificacoes` era chamado
+  após os retornos antecipados de carregamento, o que alterava a ordem dos hooks entre renderizações e interrompia a
+  tela com a mensagem "This page didn't load". O hook passou a ser chamado antes de qualquer retorno.
+- **Detalhe do curso do Boost e do chamado do Desk indisponíveis no acesso direto** (02/10/2026; frontend).
+  `/boost/manage/:id` e `/desk/tickets/:id` carregavam os dados no `loader` da rota, executado no servidor
+  (SSR) quando a página era aberta pelo endereço ou atualizada; sem a sessão, mantida no navegador, a requisição
+  falhava e a tela informava "Curso não encontrado" ou "Chamado não encontrado". As duas rotas passaram a declarar
+  `ssr: false`, de modo que o carregamento ocorre sempre no navegador.
 - **Logotipo ausente nas telas de login, redefinição de senha e portal do Boost** (02/10/2026; frontend). A imagem do
   galo era referenciada por endereço do CDN do editor Lovable (`/__l5e/assets-v1/…`), inexistente fora daquele
   ambiente. O arquivo original foi recuperado e incorporado ao repositório (`src/assets/rooster-logo.png`), importado

@@ -486,8 +486,8 @@ Ordem de declaração: `GET /patrimonio-emprestimos-atrasados` e `PATCH /patrimo
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
 | POST | `/eventos-calendario` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-calendario` | Cria evento de calendário |
-| GET | `/eventos-calendario` | Bearer | Rooster Academy / `/academy/manage` / `acessar` | Lista eventos |
-| GET | `/eventos-calendario/:id` | Bearer | Rooster Academy / `/academy/manage` / `acessar` | Busca evento por id |
+| GET | `/eventos-calendario` | Bearer | manual — `exigirLeituraCalendario`: Rooster Academy / `/academy/manage` / `acessar`, **ou** Rooster Academy / `/academy` / `acessar`, **ou** Rooster Student / `/student/calendar` / `acessar` | Lista eventos (calendário institucional, lido pela gestão, pelos professores e pelos alunos) |
+| GET | `/eventos-calendario/:id` | Bearer | manual — mesma regra da listagem | Busca evento por id |
 | PATCH | `/eventos-calendario/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-calendario` | Atualiza evento |
 | DELETE | `/eventos-calendario/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-calendario` | Remove evento |
 

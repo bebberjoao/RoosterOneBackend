@@ -7,12 +7,12 @@ quantitativos) e, ao final, a matriz que associa cada teste ao requisito ou regr
 
 | Camada | Localização | Comando | Quantidade |
 |---|---|---|---|
-| e2e de API (backend) | `test/*.e2e-spec.ts` | `npm run test:e2e` | 85 testes, 2 arquivos |
+| e2e de API (backend) | `test/*.e2e-spec.ts` | `npm run test:e2e` | 86 testes, 2 arquivos |
 | Unitário (backend) | `src/**/*.spec.ts` | `npm test` | 137 testes, 12 arquivos |
 | Unitário e de componente (frontend) | `src/**/*.test.{ts,tsx}` | `npm test` (repositório do frontend) | 81 testes, 7 arquivos |
 | Acessibilidade (frontend) | `src/components/shared/acessibilidade.test.tsx` | incluída em `npm test` | 12 dos 81 acima |
 
-Total: **303 testes**. No backend, `npm run test:all` executa os testes unitários e e2e em sequência. Todas as
+Total: **304 testes**. No backend, `npm run test:all` executa os testes unitários e e2e em sequência. Todas as
 camadas são executadas pelo CI a cada envio para `main` e a cada pull request (ver
 `docs/operations/05-cicd.md`).
 
@@ -147,6 +147,7 @@ teste automatizado estão indicadas, com o motivo.
 
 | Requisito | Teste |
 |---|---|
+| Leitura do calendário acadêmico por gestão, professor e aluno, sem concessão de escrita | e2e: "Calendário acadêmico: leitura por gestão, professor e aluno com acesso ao calendário; escrita restrita" |
 | Versionamento da API (`/v1` obrigatório) | e2e: "Rota de negócio sem o prefixo /v1 não existe"; "Health check responde em / (fora do versionamento)". Frontend: `client.test.ts` ("prefixo de versão") |
 | Verificação de saúde com consulta ao banco | e2e: "GET /health verifica o banco de verdade" |
 | Paginação opcional e retrocompatível | e2e: "Paginação opcional: sem `pagina`/`limite` devolve array…". Unitário: `pagination.spec.ts` |

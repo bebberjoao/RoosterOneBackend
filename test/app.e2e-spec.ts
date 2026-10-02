@@ -1518,6 +1518,28 @@ describe('Full API e2e tests', () => {
         .expect(200);
     });
 
+    it('Calendário acadêmico: leitura por gestão, professor e aluno com acesso ao calendário; escrita restrita', async () => {
+      const cenario = await montarCenarioAcademico();
+      const servidor = app.getHttpServer();
+      const evento = await prisma.eventoCalendarioAcademico.create({
+        data: { titulo: 'Semana de provas', data: new Date('2026-11-16'), tipo: 'prova', criadoEm: new Date() },
+      });
+      const alunoComCalendario = await criarUsuarioComPermissoes('Aluna Calendário', 'aluna.calendario@example.com', [
+        ['Rooster Student', '/student/calendar', 'acessar'],
+      ]);
+      const semPermissao = await criarUsuarioComPermissoes('Sem Permissão', 'sem.permissao.calendario@example.com', []);
+
+      for (const leitor of [cenario.coordenador, cenario.profLima, alunoComCalendario]) {
+        const lista = await request(servidor).get('/v1/eventos-calendario').set('Authorization', leitor.header).expect(200);
+        expect(lista.body.some((e: any) => e.id === evento.id)).toBe(true);
+        await request(servidor).get(`/v1/eventos-calendario/${evento.id}`).set('Authorization', leitor.header).expect(200);
+      }
+      await request(servidor).get('/v1/eventos-calendario').set('Authorization', semPermissao.header).expect(403);
+      // A leitura não concede escrita.
+      await request(servidor).post('/v1/eventos-calendario').set('Authorization', alunoComCalendario.header)
+        .send({ titulo: 'Indevido', data: '2026-11-20', tipo: 'evento' }).expect(403);
+    });
+
     it('Professor só acessa/gerencia a própria turma — 403 na turma de outro professor', async () => {
       const cenario = await montarCenarioAcademico();
 
