@@ -729,9 +729,22 @@ model BoostUsuario {
   criadoEm DateTime?
   usuarioId String? @unique
   usuario Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  redefinicoesSenha RedefinicaoSenhaBoost[]
   matriculas MatriculaBoost[]
   mensagens MensagemBoost[]
   conversas ConversaBoost[]
+}
+
+model RedefinicaoSenhaBoost {
+  id String @id @default(uuid())
+  boostUsuarioId String
+  tokenHash String @unique
+  expiraEm DateTime
+  usadoEm DateTime?
+  criadoEm DateTime @default(now())
+  boostUsuario BoostUsuario @relation(fields: [boostUsuarioId], references: [id], onDelete: Cascade)
+
+  @@index([boostUsuarioId])
 }
 
 model CursoBoost {

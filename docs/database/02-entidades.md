@@ -1,6 +1,6 @@
 # Entidades — Rooster One
 
-Fonte: `prisma/schema.prisma`. Todos os modelos estão documentados (**64 no total**), agrupados pelos **oito módulos de negócio com tabelas próprias** (Hub, Desk, Rooms, Assets, Academy, Learn, Boost e Finance). O Rooster Student não possui tabela própria e utiliza as do Academy, do Learn e do Finance. Os nomes reais de coluna são indicados quando há `@map`, e o nome real da tabela, pelo `@@map`.
+Fonte: `prisma/schema.prisma`. Todos os modelos estão documentados (**65 no total**), agrupados pelos **oito módulos de negócio com tabelas próprias** (Hub, Desk, Rooms, Assets, Academy, Learn, Boost e Finance). O Rooster Student não possui tabela própria e utiliza as do Academy, do Learn e do Finance. Os nomes reais de coluna são indicados quando há `@map`, e o nome real da tabela, pelo `@@map`.
 
 Legenda de obrigatoriedade: **obrigatório** = coluna `NOT NULL` no PostgreSQL (campo sem `?` no Prisma); **opcional** = coluna que aceita `NULL` (campo com `?`).
 
@@ -857,7 +857,7 @@ PK: `id`.
 | criadoEm | criado_em | Timestamp | opcional | |
 | usuarioId | usuario_id | Uuid | opcional | `@unique`; FK → `Usuario.id` (`ON DELETE SET NULL`). Preenchido na conta vinculada à conta institucional (RN045); a senha dessa conta não é utilizável, e o acesso ocorre pelo login institucional |
 
-Relações: `usuario` → `Usuario?`, `matriculas` → `MatriculaBoost[]`, `mensagens` → `MensagemBoost[]`, `conversas` → `ConversaBoost[]`.
+Relações: `usuario` → `Usuario?`, `redefinicoesSenha` → `RedefinicaoSenhaBoost[]`, `matriculas` → `MatriculaBoost[]`, `mensagens` → `MensagemBoost[]`, `conversas` → `ConversaBoost[]`.
 
 ### CursoBoost — tabela `cursos_boost`
 
@@ -995,6 +995,20 @@ Mensagem de uma `ConversaBoost`. PK: `id`. FKs: `conversaId` → `ConversaBoost.
 | criadoEm | criado_em | Timestamp | opcional | |
 
 Índice: `(conversaId, criadoEm)`.
+
+### RedefinicaoSenhaBoost — tabela `redefinicoes_senha_boost`
+
+Token de redefinição de senha da conta do portal (RN047), em tabela própria, separada de `redefinicoes_senha` (Hub).
+PK: `id`. FK: `boostUsuarioId` → `BoostUsuario.id` (`onDelete: Cascade`). Índice em `boostUsuarioId`.
+
+| Campo (Prisma) | Coluna real | Tipo | Nullability |
+|---|---|---|---|
+| id | id | Uuid | obrigatório |
+| boostUsuarioId | boost_usuario_id | Uuid | obrigatório |
+| tokenHash | token_hash | VarChar(64) | obrigatório, `@unique` (hash SHA-256 do token) |
+| expiraEm | expira_em | Timestamp | obrigatório (1 hora após a emissão) |
+| usadoEm | usado_em | Timestamp | opcional (preenchido no uso ou na invalidação por novo pedido) |
+| criadoEm | criado_em | Timestamp | obrigatório, `@default(now())` |
 
 ### CertificadoBoost — tabela `certificados_boost`
 
@@ -1154,8 +1168,8 @@ Documento **interno**, gerado por `NotaFiscalService.emitir()` (PDF por `pdfkit`
 | Assets | 4 |
 | Academy | 12 |
 | Learn | 3 |
-| Boost | 11 |
+| Boost | 12 |
 | Finance | 7 |
-| **Total** | **64** |
+| **Total** | **65** |
 
-O total de 64 corresponde exatamente ao número de `model` declarados em `prisma/schema.prisma` (verificado por contagem direta: `grep -c "^model " prisma/schema.prisma`).
+O total de 65 corresponde exatamente ao número de `model` declarados em `prisma/schema.prisma` (verificado por contagem direta: `grep -c "^model " prisma/schema.prisma`).

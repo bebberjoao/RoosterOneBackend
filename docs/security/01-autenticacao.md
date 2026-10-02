@@ -118,7 +118,8 @@ executado no contexto da página (exposição a XSS), ao contrário do cookie `h
 - Biblioteca: `bcryptjs` (implementação em JavaScript, e não a versão nativa `bcrypt`).
 - Fator de custo: `SALT_ROUNDS = 10` (`src/roster-hub/usuarios/usuarios.service.ts`).
 - Utilizado na criação de usuário (`create()`), na atualização com `senhaHash` no DTO (`update()`), na redefinição
-  por token (`resetPasswordWithToken()`) e no cadastro do portal do Boost. A senha em texto claro nunca é
+  por token (`resetPasswordWithToken()`), no cadastro do portal do Boost e na redefinição de senha do aluno externo
+  do Boost (`redefinirSenhaComToken()`, RN047, com tabela de tokens própria). A senha em texto claro nunca é
   persistida.
 - A comparação no login utiliza `bcrypt.compare()`, resistente a ataque de temporização na comparação do hash.
 - Tamanho mínimo de **8 caracteres** em todos os fluxos que definem senha (criação, redefinição e cadastro do

@@ -580,6 +580,8 @@ Ao contrário dos demais módulos, o Rooster Boost possui **dois mecanismos de a
 |---|---|---|---|
 | POST | `/boost/cadastro` | Público | Cria uma conta no Boost (nome, e-mail e senha, esta com bcrypt e o mesmo custo do Hub). `409` quando o e-mail já está cadastrado. |
 | POST | `/boost/login` | Público | Autentica no Boost e devolve `accessToken` com `tipo: 'boost'`. A conta vinculada à conta institucional não autentica por esta rota |
+| POST | `/boost/esqueci-senha` | Público | Corpo `{ email }`. Envia por e-mail o link de redefinição de senha da conta externa (RN047); resposta genérica, exista ou não a conta. Conta institucional recebe orientação para recuperar a senha no Rooster One. Limite de 8 requisições por minuto |
+| POST | `/boost/redefinir-senha` | Público | Corpo `{ token, novaSenha }` (mínimo de 8 caracteres). `400` para link inválido, expirado ou já utilizado. Limite de 8 requisições por minuto |
 | POST | `/boost/login-institucional` | Público (credencial institucional) | Autentica com o e-mail e a senha do Rooster One, cria ou vincula a conta do portal (RN045) e devolve `accessToken` do portal (`tipo: 'boost'`), com `usuario.institucional: true`. `401` para credencial inválida, usuário inativo no Hub ou conta do portal desativada. Limite de 8 requisições por minuto |
 
 ### 7.2 Catálogo público (sem token)
@@ -698,7 +700,7 @@ Trata-se de gestão **transversal aos cursos**, com `@RequirePermission` estáti
 | DELETE | `/boost-alunos-externos/:id` | Bearer (Hub) | `Rooster Boost` / `/boost/students` / `gerenciar` | Exclui a conta sem matrícula; com matrícula, `409` (a conta deve ser desativada); registra `conta_externa_excluida` |
 | POST | `/boost-alunos-externos/:id/redefinir-senha` | Bearer (Hub) | `Rooster Boost` / `/boost/students` / `gerenciar` | Gera uma **senha temporária aleatória**, armazena apenas o hash e devolve o valor em texto claro **uma única vez** na resposta; registra em auditoria `conta_externa_senha_redefinida`. Recusada (`409`) para conta institucional |
 
-**Simplificação deliberada na redefinição de senha**: `BoostUsuario` não possui tabela de token de redefinição por e-mail (equivalente à `RedefinicaoSenha` do Hub). A construção desse fluxo exclusivamente para a conta externa não se justificava no estágio atual; a senha temporária é repassada pelo administrador por canal seguro, de forma análoga a `PATCH /usuarios/:id` com `senhaHash` no Hub. O fluxo por e-mail permanece como evolução possível.
+**Redefinição de senha**: a senha temporária gerada pelo administrador é repassada ao aluno por canal seguro. Desde 02/10/2026, o próprio aluno externo também pode recuperar a senha por e-mail, em `POST /boost/esqueci-senha` e `POST /boost/redefinir-senha` (seção 7.1, RN047), com tabela de tokens própria (`redefinicoes_senha_boost`).
 
 ### 7.8 WebSocket (chat em tempo real)
 

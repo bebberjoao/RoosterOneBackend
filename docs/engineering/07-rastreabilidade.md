@@ -117,6 +117,7 @@ contém "—". Revisão de 01/10/2026, abrangendo os nove módulos.
 | RF-B14 Verificação pública de certificado | `/boost-portal/verificar` | `GET /certificados-boost/verificar/:codigo` | — | `certificados_boost` | pública (limite de requisições) |
 | RF-B16 Login institucional no portal | `/boost-portal/entrar` | `POST /boost/login-institucional` | RN034, RN045 | `usuarios`, `boost_usuarios` | pública (credencial institucional; limite de requisições) |
 | RF-B17 Matrícula pela gestão | `/boost/manage/:id` (aba Alunos) | `GET /cursos-boost/:id/candidatos-matricula`, `POST /cursos-boost/:id/matriculas`, `PATCH /matriculas-boost/:id/cancelar` | RN046 | `matriculas_boost`, `boost_usuarios`, `logs_auditoria` | `boost.manage.matricular` |
+| RF-B18 Recuperação de senha do aluno externo | `/boost-portal/esqueci-senha`, `/boost-portal/redefinir-senha` | `POST /boost/esqueci-senha`, `POST /boost/redefinir-senha` | RN047 | `redefinicoes_senha_boost`, `boost_usuarios`, `logs_auditoria` | pública (limite de requisições) |
 
 ## Rooster Finance
 

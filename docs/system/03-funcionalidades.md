@@ -129,6 +129,7 @@ próximo, que depende de rotina agendada inexistente.
 | RF-B15 | **Fora do escopo implementado**: cobrança pelo curso e avaliação por estrelas | — | O curso do Boost é sempre gratuito, e não há avaliação de curso. Ver `docs/system/02-escopo.md`. |
 | RF-B16 | Login institucional no portal | Usuário institucional ativo (aluno interno) | `POST /boost/login-institucional` autentica com o e-mail e a senha do Rooster One e cria ou vincula a conta do portal; o token emitido é do portal (RN045). |
 | RF-B17 | Matrícula pela gestão | Usuário com `boost.manage.matricular` | Matrícula de aluno do Academy ou de conta externa no curso, com busca de candidatos, e cancelamento de matrícula não concluída (RN046). |
+| RF-B18 | Recuperação de senha do aluno externo | Aluno externo | `POST /boost/esqueci-senha` envia link de uso único, válido por 1 hora, e `POST /boost/redefinir-senha` define a nova senha (RN047). |
 
 ## Rooster Finance
 

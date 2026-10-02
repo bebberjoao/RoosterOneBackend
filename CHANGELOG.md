@@ -25,6 +25,13 @@ estão indicadas; as demais não alteram o banco de dados.
 
 ### Adicionado
 
+- **Recuperação de senha do aluno externo do Boost** (02/10/2026). **Exige migration**
+  (`20261002150000_boost_redefinicao_senha`). O link "Esqueci minha senha", na opção "Aluno externo" da tela Entrar do
+  portal, envia por e-mail link de redefinição de uso único e válido por 1 hora (`POST /boost/esqueci-senha` e
+  `POST /boost/redefinir-senha`; telas `/boost-portal/esqueci-senha` e `/boost-portal/redefinir-senha`). O token é
+  armazenado apenas como hash SHA-256, em tabela própria (`redefinicoes_senha_boost`), separada da tabela do Hub; novo
+  pedido invalida os links anteriores; a resposta é sempre genérica, para não revelar e-mails cadastrados; e a conta
+  vinculada à conta institucional recebe a orientação de recuperar a senha no Rooster One (RN047).
 - **Login institucional no portal do Boost** (02/10/2026). **Exige migration**
   (`20261002120000_boost_conta_institucional_matricula`). O aluno da instituição acessa o portal com o e-mail e a
   senha do Rooster One (`POST /boost/login-institucional`), sem cadastro adicional; a conta do portal é criada ou

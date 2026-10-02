@@ -6,7 +6,8 @@ Assets; RN019 a RN035, acrescentadas em setembro de 2026, formalizam as regras d
 proteção do último administrador; RN036 a RN038 tratam do vídeo hospedado, do progresso de vídeo e da gestão das
 contas externas do Boost; RN039, da caixa de notificações; RN040 a RN042, da gestão do Boost por permissão, da
 conversa com o orientador e do certificado por curso; RN043 e RN044, da política de multa e juros e do vínculo entre
-reserva e turma; RN045 e RN046, do login institucional no portal do Boost e da matrícula pela gestão. Revisão de
+reserva e turma; RN045 a RN047, do login institucional no portal do Boost, da matrícula pela gestão e da recuperação de senha do aluno
+externo. Revisão de
 02/10/2026.
 
 ## RN001 — O administrador é definido por permissão, e não por papel
@@ -375,8 +376,8 @@ Por ser gestão transversal aos cursos, utiliza permissão própria (`/boost/stu
 administrador; o professor apto a orientar no Boost não tem acesso.
 
 A senha temporária é aleatória, apenas o hash é armazenado, e o valor em texto claro é devolvido **uma única vez**.
-Não há fluxo de redefinição por e-mail para conta externa (não há tabela de token equivalente à do Hub), por
-simplificação deliberada. As operações são registradas em auditoria.
+Desde 02/10/2026, o próprio aluno externo recupera a senha por e-mail (RN047). As operações são registradas em
+auditoria.
 
 **Implementação**: `boost.controller.ts` (rotas `boost-alunos-externos`) e
 `boost.service.ts::findAllBoostUsuarios/criarBoostUsuario/atualizarBoostUsuario/excluirBoostUsuario/redefinirSenhaBoostUsuario`.
@@ -488,3 +489,18 @@ como autor.
 `boost.service.ts::findCandidatosMatricula/matricularPelaGestao/cancelarMatriculaPelaGestao`; a permissão
 `boost.manage.matricular` foi criada pela mesma migration de RN045 e concedida a quem já possuía
 `boost.manage.gerenciar-cursos`.
+
+## RN047 — O aluno externo recupera a senha do portal por e-mail, com link de uso único e válido por 1 hora
+
+Em `POST /boost/esqueci-senha`, a resposta é sempre a mesma, exista ou não a conta, para impedir a descoberta de
+e-mails cadastrados; a conta desativada não recebe link. O token aleatório (32 bytes) é armazenado apenas como hash
+SHA-256, em tabela própria (`redefinicoes_senha_boost`), separada da tabela do Hub, de modo que o token de um
+mecanismo não é aceito no outro. Novo pedido invalida os links anteriores ainda não utilizados. Em
+`POST /boost/redefinir-senha`, o link expirado, já utilizado ou inválido é recusado com `400`, e a nova senha exige
+o mínimo de 8 caracteres. A conta vinculada à conta institucional (RN045) não possui senha própria: recebe por e-mail
+a orientação de recuperar a senha no Rooster One, sem link do portal. Como o portal não mantém sessões persistidas
+(o token do portal vale 8 horas, sem renovação), não há sessões a revogar na troca de senha. O pedido e a
+redefinição são registrados em auditoria.
+
+**Implementação**: `boost-portal.service.ts::solicitarRedefinicaoSenha/redefinirSenhaComToken`; migration
+`20261002150000_boost_redefinicao_senha`.

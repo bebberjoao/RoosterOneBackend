@@ -72,3 +72,5 @@ alto, com texto ilegível.
   de certificado, vínculo de orientadores e gestão de contas externas; `contexto` corrigido para 64 tabelas.
 - Revisão de 02/10/2026: `casos-uso-boost` acrescido do ator "aluno da instituição" (login institucional no portal)
   e do caso "matricular e cancelar matrículas" da gestão; "gerir contas externas" passou a "gerir contas do portal".
+- Revisão de 02/10/2026 (recuperação de senha do portal): `erd-boost` acrescido de `RedefinicaoSenhaBoost` e do
+  vínculo opcional `BoostUsuario.usuarioId`; `contexto` atualizado para 65 tabelas.

@@ -70,7 +70,7 @@ verificação de revisão.
 
 ```bash
 npm test            # 137 testes unitários em 12 arquivos
-npm run test:e2e    # 82 testes e2e em 2 arquivos, sobre SQLite isolado
+npm run test:e2e    # 83 testes e2e em 2 arquivos, sobre SQLite isolado
 ```
 
 Os testes e2e não acessam o PostgreSQL de desenvolvimento.

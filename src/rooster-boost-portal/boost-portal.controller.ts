@@ -17,7 +17,7 @@ import { emitirTokenDeStream, validarTokenDeStream } from '../common/stream-toke
 import { AtualizarProgressoVideoDto } from '../rooster-boost/dto/boost.dto';
 import { BoostJwtAuthGuard } from './boost-jwt-auth.guard';
 import { BoostPortalService } from './boost-portal.service';
-import { CadastroBoostDto, LoginBoostDto } from './dto/boost-portal.dto';
+import { CadastroBoostDto, EsqueciSenhaBoostDto, LoginBoostDto, RedefinirSenhaBoostDto } from './dto/boost-portal.dto';
 
 type AuthedBoostUser = { id: string };
 
@@ -49,6 +49,26 @@ export class BoostPortalController {
    * Login do aluno interno com a conta institucional (e-mail e senha do Rooster One). Emite token do
    * portal (tipo 'boost'), e não do Hub: o isolamento entre os dois sistemas de token é preservado.
    */
+  /** Recuperação de senha da conta externa: resposta sempre genérica, exista ou não a conta. */
+  @Post('boost/esqueci-senha')
+  @Throttle({ default: { limit: LOGIN_THROTTLE_LIMIT, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Envia por e-mail o link de redefinição de senha da conta do portal, se existir' })
+  async esqueciSenha(@Body() dto: EsqueciSenhaBoostDto, @Req() request: Request) {
+    await this.boostPortalService.solicitarRedefinicaoSenha(dto.email, {
+      ip: request.ip,
+      userAgent: request.headers['user-agent'],
+    });
+    return { message: 'Se o e-mail estiver cadastrado, as instruções de redefinição serão enviadas.' };
+  }
+
+  @Post('boost/redefinir-senha')
+  @Throttle({ default: { limit: LOGIN_THROTTLE_LIMIT, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Define nova senha da conta do portal a partir do token recebido por e-mail' })
+  async redefinirSenha(@Body() dto: RedefinirSenhaBoostDto) {
+    await this.boostPortalService.redefinirSenhaComToken(dto.token, dto.novaSenha);
+    return { message: 'Senha redefinida com sucesso.' };
+  }
+
   @Post('boost/login-institucional')
   @Throttle({ default: { limit: LOGIN_THROTTLE_LIMIT, ttl: 60_000 } })
   @ApiOperation({ summary: 'Entra no portal do Boost com a conta institucional, criando ou vinculando a conta do portal' })

@@ -80,7 +80,7 @@ auditoria e a situação de cada uma estão resumidas a seguir.
 |---|---|
 | Ausência de integração contínua, Docker e configuração de implantação | Resolvida: CI no GitHub Actions nos dois repositórios, `Dockerfile` e `docker-compose.yml` (`docs/operations/04-deploy.md` e `05-cicd.md`) |
 | Ausência de rotina de backup | Resolvida: scripts de backup, restauração e simulado de recuperação (`docs/operations/06-backup-e-recuperacao.md`); o agendamento depende do ambiente de produção |
-| Ausência de testes de frontend e de testes unitários de backend | Resolvida: 81 testes de frontend, 137 testes unitários e 82 testes e2e no backend (`docs/engineering/14-estrategia-de-testes.md`) |
+| Ausência de testes de frontend e de testes unitários de backend | Resolvida: 81 testes de frontend, 137 testes unitários e 83 testes e2e no backend (`docs/engineering/14-estrategia-de-testes.md`) |
 | Ausência de limitação de requisições | Resolvida: `ThrottlerGuard` global e limites por rota |
 | Validação de upload restrita ao tamanho | Resolvida: lista de mimetypes e verificação de assinatura binária, com gravação cifrada |
 | Ausência de `.env.example` | Resolvida nos dois repositórios |

@@ -12,11 +12,20 @@ erDiagram
   CursoBoost ||--o{ ConversaBoost : abre
   BoostUsuario ||--o{ ConversaBoost : conversa
   ConversaBoost ||--o{ MensagemBoost : contem
+  BoostUsuario ||--o{ RedefinicaoSenhaBoost : solicita
 
   BoostUsuario {
     uuid id PK
     string email UK
     string senhaHash
+    uuid usuarioId UK "conta institucional, opcional"
+  }
+  RedefinicaoSenhaBoost {
+    uuid id PK
+    uuid boostUsuarioId FK
+    string tokenHash UK
+    datetime expiraEm
+    datetime usadoEm
   }
   CursoBoost {
     uuid id PK

@@ -7,13 +7,19 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { createHash, randomBytes } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../roster-hub/shared/prisma.service';
 import { CertificadoBoostService } from '../rooster-boost/certificado-boost.service';
 import { BoostService } from '../rooster-boost/boost.service';
 import { CadastroBoostDto } from './dto/boost-portal.dto';
+import { MailService } from '../mail/mail.service';
+import { AuditoriaService } from '../roster-hub/shared/auditoria.service';
 
 const SALT_ROUNDS = 10;
+
+/** Validade do link de redefinição de senha da conta do portal (mesmo prazo do Hub). */
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
 /** A partir de quantos % assistidos o vídeo completa a aula sozinho, sem precisar do botão manual. */
 const LIMIAR_CONCLUSAO_PCT = 90;
@@ -25,6 +31,8 @@ export class BoostPortalService {
     private readonly jwt: JwtService,
     private readonly boostService: BoostService,
     private readonly certificadoService: CertificadoBoostService,
+    private readonly mail: MailService,
+    private readonly auditoria: AuditoriaService,
   ) {}
 
   // ===================== Autenticação =====================
@@ -57,6 +65,79 @@ export class BoostPortalService {
     const conta = await this.boostService.obterContaInstitucional(usuario);
     if (!conta.ativo) throw new UnauthorizedException('A conta do portal Boost está desativada. Procure a administração.');
     return this.emitirSessao(conta);
+  }
+
+  // ===================== Recuperação de senha (conta do portal) =====================
+
+  /**
+   * Envia por e-mail o link de redefinição de senha da conta externa. A resposta do controller é sempre
+   * a mesma, exista ou não a conta, para impedir a descoberta de e-mails cadastrados. A conta desativada
+   * não recebe link. A conta vinculada à conta institucional não possui senha própria: recebe orientação
+   * para recuperar a senha no sistema da instituição. Um novo pedido invalida os links anteriores ainda
+   * não utilizados.
+   */
+  async solicitarRedefinicaoSenha(email: string, contexto?: { ip?: string; userAgent?: string }) {
+    const conta = await this.prisma.boostUsuario.findUnique({ where: { email: email.trim().toLowerCase() } })
+      ?? await this.prisma.boostUsuario.findUnique({ where: { email } });
+    if (!conta || !conta.ativo) return;
+    const base = process.env.FRONTEND_URL ?? 'http://localhost:8080';
+
+    if (conta.usuarioId) {
+      await this.mail.send(
+        conta.email,
+        'Acesso ao Rooster Boost — conta institucional',
+        `<p>Prezado(a) ${conta.nome},</p>
+         <p>Foi solicitada a redefinição de senha do portal Rooster Boost para este e-mail. A sua conta no portal utiliza o
+         login institucional: o acesso é feito com o mesmo e-mail e a mesma senha do Rooster One, na opção "Aluno da instituição".</p>
+         <p>Para redefinir a senha, utilize a opção "Esqueci minha senha" em <a href="${base}/login">${base}/login</a>.</p>
+         <p>Caso não tenha feito esta solicitação, desconsidere esta mensagem.</p>`,
+      );
+      return;
+    }
+
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    await this.prisma.$transaction([
+      this.prisma.redefinicaoSenhaBoost.updateMany({
+        where: { boostUsuarioId: conta.id, usadoEm: null },
+        data: { usadoEm: new Date() },
+      }),
+      this.prisma.redefinicaoSenhaBoost.create({
+        data: { boostUsuarioId: conta.id, tokenHash, expiraEm: new Date(Date.now() + RESET_TOKEN_TTL_MS) },
+      }),
+    ]);
+
+    const link = `${base}/boost-portal/redefinir-senha?token=${rawToken}`;
+    await this.mail.send(
+      conta.email,
+      'Redefinição de senha — Rooster Boost',
+      `<p>Prezado(a) ${conta.nome},</p>
+       <p>Foi solicitada a redefinição da senha da sua conta no portal Rooster Boost.</p>
+       <p><a href="${link}">Definir nova senha</a></p>
+       <p>O link é válido por 1 hora e pode ser utilizado uma única vez. Caso não tenha feito esta solicitação, desconsidere esta mensagem.</p>`,
+    );
+    await this.auditoria.registrar({
+      modulo: 'Rooster Boost', acao: 'conta_externa_redefinicao_solicitada', entidade: 'boost_usuario', entidadeId: conta.id,
+      ip: contexto?.ip, navegador: contexto?.userAgent,
+    });
+  }
+
+  async redefinirSenhaComToken(token: string, novaSenha: string) {
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const registro = await this.prisma.redefinicaoSenhaBoost.findUnique({ where: { tokenHash } });
+    if (!registro || registro.usadoEm || registro.expiraEm < new Date()) {
+      throw new BadRequestException('Link de redefinição inválido ou expirado.');
+    }
+    await this.prisma.$transaction([
+      this.prisma.boostUsuario.update({
+        where: { id: registro.boostUsuarioId },
+        data: { senhaHash: await bcrypt.hash(novaSenha, SALT_ROUNDS) },
+      }),
+      this.prisma.redefinicaoSenhaBoost.update({ where: { id: registro.id }, data: { usadoEm: new Date() } }),
+    ]);
+    await this.auditoria.registrar({
+      modulo: 'Rooster Boost', acao: 'conta_externa_senha_redefinida_por_token', entidade: 'boost_usuario', entidadeId: registro.boostUsuarioId,
+    });
   }
 
   private async emitirSessao(boostUsuario: { id: string; nome: string; email: string; usuarioId?: string | null }) {

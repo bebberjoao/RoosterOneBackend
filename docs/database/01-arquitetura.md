@@ -7,7 +7,7 @@
 | SGBD (produção e desenvolvimento) | PostgreSQL |
 | ORM | Prisma ORM (`@prisma/client` ^6.0.0, versão instalada 6.19.3; `prisma` como dependência de desenvolvimento) |
 | Linguagem e framework do backend | NestJS (TypeScript) |
-| Schema de produção | `prisma/schema.prisma` (64 modelos) |
+| Schema de produção | `prisma/schema.prisma` (65 modelos) |
 | Schema da suíte e2e | `prisma/schema.test.prisma` (SQLite); ver a seção *Schema de testes* |
 
 O `datasource` do schema principal é declarado da seguinte forma:
@@ -71,7 +71,7 @@ model Usuario {
 }
 ```
 
-Regras aplicadas de forma consistente nos 64 modelos do schema:
+Regras aplicadas de forma consistente nos 65 modelos do schema:
 
 - **Nome do modelo**: `PascalCase`, no singular (por exemplo, `Usuario`, `CategoriaTicket` e `PatrimonioMovimento`).
 - **Nome da tabela** (`@@map`): `snake_case`, em geral no plural (por exemplo, `usuarios`, `categorias_tickets` e

@@ -127,6 +127,7 @@ A última linha corresponde à integração Learn → Academy: ao publicar ativi
 | MatriculaBoost ↔ CertificadoBoost | 1:1 (opcional) | `CertificadoBoost.matriculaId` (`@unique`) | Cascade |
 | CursoBoost → ConversaBoost | 1:N | `ConversaBoost.cursoId` | Cascade |
 | BoostUsuario → ConversaBoost | 1:N | `ConversaBoost.boostUsuarioId` | Cascade |
+| BoostUsuario → RedefinicaoSenhaBoost | 1:N | `RedefinicaoSenhaBoost.boostUsuarioId` | Cascade |
 | ConversaBoost → MensagemBoost | 1:N | `MensagemBoost.conversaId` | Cascade |
 | BoostUsuario → MensagemBoost | 1:N (opcional) | `MensagemBoost.boostUsuarioId` | — (sem `onDelete` explícito) |
 | Professor (Academy) → MensagemBoost | 1:N (opcional) | `MensagemBoost.professorId` | — (sem `onDelete` explícito) |

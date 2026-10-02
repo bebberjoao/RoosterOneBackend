@@ -227,6 +227,7 @@ describe('Full API e2e tests', () => {
       prisma.moduloBoost.deleteMany(),
       prisma.cursoOrientadorBoost.deleteMany(),
       prisma.cursoBoost.deleteMany(),
+      prisma.redefinicaoSenhaBoost.deleteMany(),
       prisma.boostUsuario.deleteMany(),
       prisma.anexoEntrega.deleteMany(),
       prisma.entrega.deleteMany(),
@@ -2277,6 +2278,65 @@ describe('Full API e2e tests', () => {
       // a senha do cadastro externo deixa de funcionar
       await request(app.getHttpServer())
         .post('/v1/boost/login').send({ email: 'pessoa.interna@example.com', senha: 'SenhaDeTerceiro123' }).expect(401);
+    });
+
+    it('Recuperação de senha da conta externa: link por e-mail, uso único, invalidação de links anteriores e orientação à conta institucional', async () => {
+      await montarCenarioBoost();
+      await request(app.getHttpServer())
+        .post('/v1/boost/cadastro').send({ nome: 'Aluna Esquecida', email: 'aluna.esquecida@example.com', senha: 'SenhaAntiga123' }).expect(201);
+      mail.outbox.length = 0;
+
+      // e-mail inexistente: mesma resposta genérica e nenhum e-mail enviado
+      const generica = await request(app.getHttpServer())
+        .post('/v1/boost/esqueci-senha').send({ email: 'nao.existe.boost@example.com' }).expect(201);
+      expect(mail.outbox.length).toBe(0);
+
+      // dois pedidos: o segundo invalida o primeiro link
+      const respostaConta = await request(app.getHttpServer())
+        .post('/v1/boost/esqueci-senha').send({ email: 'aluna.esquecida@example.com' }).expect(201);
+      expect(respostaConta.body.message).toBe(generica.body.message);
+      await request(app.getHttpServer())
+        .post('/v1/boost/esqueci-senha').send({ email: 'aluna.esquecida@example.com' }).expect(201);
+      expect(mail.outbox.length).toBe(2);
+      const tokenDoLink = (html: string) => new URL(html.match(/href="([^"]+)"/)![1]).searchParams.get('token')!;
+      const primeiroToken = tokenDoLink(mail.outbox[0].html);
+      const segundoToken = tokenDoLink(mail.outbox[1].html);
+      expect(mail.outbox[1].html).toContain('/boost-portal/redefinir-senha?token=');
+
+      await request(app.getHttpServer())
+        .post('/v1/boost/redefinir-senha').send({ token: primeiroToken, novaSenha: 'SenhaNova12345' }).expect(400);
+      await request(app.getHttpServer())
+        .post('/v1/boost/redefinir-senha').send({ token: segundoToken, novaSenha: 'curta' }).expect(400);
+      await request(app.getHttpServer())
+        .post('/v1/boost/redefinir-senha').send({ token: segundoToken, novaSenha: 'SenhaNova12345' }).expect(201);
+
+      // a senha antiga deixa de funcionar, a nova autentica e o link não é reutilizável
+      await request(app.getHttpServer())
+        .post('/v1/boost/login').send({ email: 'aluna.esquecida@example.com', senha: 'SenhaAntiga123' }).expect(401);
+      await request(app.getHttpServer())
+        .post('/v1/boost/login').send({ email: 'aluna.esquecida@example.com', senha: 'SenhaNova12345' }).expect(201);
+      await request(app.getHttpServer())
+        .post('/v1/boost/redefinir-senha').send({ token: segundoToken, novaSenha: 'OutraSenha12345' }).expect(400);
+
+      // o token do portal não é aceito na redefinição do Hub (tabelas separadas)
+      mail.outbox.length = 0;
+      await request(app.getHttpServer())
+        .post('/v1/boost/esqueci-senha').send({ email: 'aluna.esquecida@example.com' }).expect(201);
+      await request(app.getHttpServer())
+        .post('/v1/auth/redefinir-senha').send({ token: tokenDoLink(mail.outbox[0].html), novaSenha: 'SenhaNova12345' }).expect(400);
+
+      // conta institucional: recebe orientação para recuperar a senha no sistema, sem link de redefinição do portal
+      await prisma.usuario.create({
+        data: { nome: 'Aluno Instituição', email: 'aluno.instituicao@example.com', senhaHash: await bcrypt.hash('SenhaInterna123', 10), ativo: true },
+      });
+      await request(app.getHttpServer())
+        .post('/v1/boost/login-institucional').send({ email: 'aluno.instituicao@example.com', senha: 'SenhaInterna123' }).expect(201);
+      mail.outbox.length = 0;
+      await request(app.getHttpServer())
+        .post('/v1/boost/esqueci-senha').send({ email: 'aluno.instituicao@example.com' }).expect(201);
+      expect(mail.outbox.length).toBe(1);
+      expect(mail.outbox[0].html).not.toContain('/boost-portal/redefinir-senha');
+      expect(mail.outbox[0].html).toContain('/login');
     });
 
     it('Matrícula pela gestão: aluno interno e conta externa, candidatos, duplicidade, cancelamento e reativação', async () => {

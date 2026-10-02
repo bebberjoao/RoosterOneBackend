@@ -7,12 +7,12 @@ quantitativos) e, ao final, a matriz que associa cada teste ao requisito ou regr
 
 | Camada | Localização | Comando | Quantidade |
 |---|---|---|---|
-| e2e de API (backend) | `test/*.e2e-spec.ts` | `npm run test:e2e` | 82 testes, 2 arquivos |
+| e2e de API (backend) | `test/*.e2e-spec.ts` | `npm run test:e2e` | 83 testes, 2 arquivos |
 | Unitário (backend) | `src/**/*.spec.ts` | `npm test` | 137 testes, 12 arquivos |
 | Unitário e de componente (frontend) | `src/**/*.test.{ts,tsx}` | `npm test` (repositório do frontend) | 81 testes, 7 arquivos |
 | Acessibilidade (frontend) | `src/components/shared/acessibilidade.test.tsx` | incluída em `npm test` | 12 dos 81 acima |
 
-Total: **300 testes**. No backend, `npm run test:all` executa os testes unitários e e2e em sequência. Todas as
+Total: **301 testes**. No backend, `npm run test:all` executa os testes unitários e e2e em sequência. Todas as
 camadas são executadas pelo CI a cada envio para `main` e a cada pull request (ver
 `docs/operations/05-cicd.md`).
 
@@ -138,6 +138,7 @@ teste automatizado estão indicadas, com o motivo.
 | RN043 | Multa e juros manuais prevalecem sobre a política; o cálculo da política nunca é persistido | e2e: "Política de multa/juros: o financeiro cria a própria regra; ela calcula dinamicamente, mas valor manual sempre vence" |
 | RN044 | Vínculo entre reserva e turma por posse do professor ou gestão ampla do Academy | e2e: "Rooms ↔ Academy: ao criar a reserva de uma aula, só o professor dono da turma pode vinculá-la" |
 | RN045 | Login institucional no portal do Boost, com criação ou vínculo da conta do portal | e2e: "Login institucional no portal: cria e vincula a conta, emite token do portal e acompanha a situação no Hub"; "Login institucional vincula conta externa preexistente com o mesmo e-mail e invalida a senha própria" |
+| RN047 | Recuperação de senha do aluno externo por e-mail | e2e: "Recuperação de senha da conta externa: link por e-mail, uso único, invalidação de links anteriores e orientação à conta institucional" |
 | RN046 | Matrícula e cancelamento pela gestão do Boost | e2e: "Matrícula pela gestão: aluno interno e conta externa, candidatos, duplicidade, cancelamento e reativação" |
 
 ### Requisitos não funcionais e de contrato

@@ -479,6 +479,7 @@ async function clearDatabase() {
     prisma.moduloBoost.deleteMany(),
     prisma.cursoOrientadorBoost.deleteMany(),
     prisma.cursoBoost.deleteMany(),
+    prisma.redefinicaoSenhaBoost.deleteMany(),
     prisma.boostUsuario.deleteMany(),
     prisma.anexoEntrega.deleteMany(),
     prisma.entrega.deleteMany(),
