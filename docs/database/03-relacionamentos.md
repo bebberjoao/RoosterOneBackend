@@ -110,7 +110,7 @@ A última linha corresponde à integração Learn → Academy: ao publicar ativi
 
 ## Módulo Boost
 
-`BoostUsuario` constitui raiz de relacionamento própria, sem qualquer vínculo com `Usuario` (Hub). O `CursoBoost` não possui responsável exclusivo; o `Professor` (Academy) participa como orientador, por meio de `CursoOrientadorBoost`, e como autor de mensagens nas conversas.
+`BoostUsuario` constitui raiz de relacionamento própria; o único vínculo com `Usuario` (Hub) é opcional e 1:1, preenchido apenas na conta do usuário institucional (RN045). O `CursoBoost` não possui responsável exclusivo; o `Professor` (Academy) participa como orientador, por meio de `CursoOrientadorBoost`, e como autor de mensagens nas conversas.
 
 | Relação | Cardinalidade | Campo FK | onDelete |
 |---|---|---|---|
@@ -119,6 +119,7 @@ A última linha corresponde à integração Learn → Academy: ao publicar ativi
 | CursoBoost → ModuloBoost | 1:N | `ModuloBoost.cursoId` | Cascade |
 | ModuloBoost → AulaBoost | 1:N | `AulaBoost.moduloId` | Cascade |
 | AulaBoost → MaterialApoio | 1:N | `MaterialApoio.aulaId` | Cascade |
+| Usuario → BoostUsuario | 1:1 (opcional) | `BoostUsuario.usuarioId` (`@unique`) | SetNull |
 | BoostUsuario → MatriculaBoost | 1:N | `MatriculaBoost.boostUsuarioId` | Cascade |
 | CursoBoost → MatriculaBoost | 1:N | `MatriculaBoost.cursoId` | Cascade |
 | MatriculaBoost → ProgressoAula | 1:N | `ProgressoAula.matriculaId` | Cascade |

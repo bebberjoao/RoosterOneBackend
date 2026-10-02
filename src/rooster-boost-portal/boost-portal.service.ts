@@ -45,9 +45,23 @@ export class BoostPortalService {
     return this.emitirSessao(boostUsuario);
   }
 
-  private async emitirSessao(boostUsuario: { id: string; nome: string; email: string }) {
+  /**
+   * Login com a conta institucional: valida e-mail e senha da tabela de usuários do Hub e obtém (ou cria)
+   * a conta do portal vinculada. A resposta de falha é a mesma do login externo, sem revelar se o e-mail
+   * existe; a conta do portal desativada pela administração também é recusada.
+   */
+  async loginInstitucional(email: string, senha: string) {
+    const usuario = await this.prisma.usuario.findUnique({ where: { email } });
+    const valido = usuario && usuario.ativo && (await bcrypt.compare(senha, usuario.senhaHash));
+    if (!valido) throw new UnauthorizedException('E-mail ou senha inválidos.');
+    const conta = await this.boostService.obterContaInstitucional(usuario);
+    if (!conta.ativo) throw new UnauthorizedException('A conta do portal Boost está desativada. Procure a administração.');
+    return this.emitirSessao(conta);
+  }
+
+  private async emitirSessao(boostUsuario: { id: string; nome: string; email: string; usuarioId?: string | null }) {
     return {
-      usuario: { id: boostUsuario.id, nome: boostUsuario.nome, email: boostUsuario.email },
+      usuario: { id: boostUsuario.id, nome: boostUsuario.nome, email: boostUsuario.email, institucional: !!boostUsuario.usuarioId },
       accessToken: await this.jwt.signAsync({ sub: boostUsuario.id, email: boostUsuario.email, tipo: 'boost' }),
     };
   }

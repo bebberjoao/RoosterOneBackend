@@ -579,7 +579,8 @@ Ao contrário dos demais módulos, o Rooster Boost possui **dois mecanismos de a
 | Método | Rota | Auth | Descrição |
 |---|---|---|---|
 | POST | `/boost/cadastro` | Público | Cria uma conta no Boost (nome, e-mail e senha, esta com bcrypt e o mesmo custo do Hub). `409` quando o e-mail já está cadastrado. |
-| POST | `/boost/login` | Público | Autentica no Boost e devolve `accessToken` com `tipo: 'boost'` |
+| POST | `/boost/login` | Público | Autentica no Boost e devolve `accessToken` com `tipo: 'boost'`. A conta vinculada à conta institucional não autentica por esta rota |
+| POST | `/boost/login-institucional` | Público (credencial institucional) | Autentica com o e-mail e a senha do Rooster One, cria ou vincula a conta do portal (RN045) e devolve `accessToken` do portal (`tipo: 'boost'`), com `usuario.institucional: true`. `401` para credencial inválida, usuário inativo no Hub ou conta do portal desativada. Limite de 8 requisições por minuto |
 
 ### 7.2 Catálogo público (sem token)
 
@@ -607,7 +608,10 @@ Ao contrário dos demais módulos, o Rooster Boost possui **dois mecanismos de a
 | POST | `/aulas-boost/:id/materiais` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` (avaliada pelo guard, antes do recebimento do arquivo) | **Material de apoio** — multipart, até 25 MB; mimetype na lista de documentos e conteúdo verificado pela assinatura binária (`400` se incompatível); gravação cifrada |
 | DELETE | `/materiais-boost/:id` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Remove material |
 | GET | `/materiais-boost/:id/arquivo` | Bearer (Hub) | `/boost/manage` / `gerenciar-conteudo` | Baixa o material (visão do instrutor) |
-| GET | `/cursos-boost/:id/alunos` | Bearer (Hub) | `/boost/manage` / `ver-progresso` | **Progresso dos alunos matriculados**: `progressoPct`, status e indicação de certificado emitido |
+| GET | `/cursos-boost/:id/alunos` | Bearer (Hub) | `/boost/manage` / `ver-progresso` | **Progresso dos alunos matriculados**: `progressoPct`, status, indicação de certificado emitido e `boostUsuario.usuarioId` (conta institucional) |
+| GET | `/cursos-boost/:id/candidatos-matricula` | Bearer (Hub) | `/boost/manage` / `matricular` | Candidatos à matrícula (RN046): `{ externos: [{ id, nome, email }], internos: [{ usuarioId, nome, email, ra }] }`, sem quem já possui matrícula ativa ou concluída; parâmetro opcional `busca` (nome ou e-mail, sem distinção de acentos); até 50 registros por grupo |
+| POST | `/cursos-boost/:id/matriculas` | Bearer (Hub) | `/boost/manage` / `matricular` | Corpo `{ boostUsuarioId }` (conta externa) **ou** `{ usuarioId }` (conta institucional, com criação ou vínculo da conta do portal). Reativa matrícula cancelada; `409` para matrícula existente; `400` sem destinatário ou com ambos |
+| PATCH | `/matriculas-boost/:id/cancelar` | Bearer (Hub) | `/boost/manage` / `matricular` | Cancela a matrícula; `409` para matrícula concluída |
 
 ### 7.3.3 Orientadores (setembro de 2026)
 
@@ -682,15 +686,17 @@ O chat único por curso, visível a todos os participantes, foi **substituído p
 
 ### 7.7.1 Contas externas — painel administrativo (setembro de 2026)
 
-O cadastro público (`POST /boost/cadastro`) permanece **aberto e sem aprovação**, por decisão mantida. Até a introdução destes endpoints, contudo, essas contas (`BoostUsuario`) não eram visíveis no Hub: nenhuma tela ou endpoint permitia listá-las, desativá-las ou redefinir suas senhas. Os endpoints abaixo oferecem essa visibilidade, sem alterar as regras de cadastro e de matrícula.
+O cadastro público (`POST /boost/cadastro`) permanece **aberto e sem aprovação**, por decisão mantida. Os endpoints abaixo permitem à administração relacionar, cadastrar, editar, desativar, excluir e redefinir a senha das contas do portal (`BoostUsuario`), sem alterar as regras de cadastro público e de matrícula (RN038). As contas vinculadas à conta institucional (RN045) são relacionadas com `usuarioId` preenchido; nome, e-mail e senha dessas contas são mantidos no Rooster Hub.
 
 Trata-se de gestão **transversal aos cursos**, com `@RequirePermission` estático em tela própria, `/boost/students`, concedida apenas ao perfil de administrador (o orientador ou o gestor de cursos sem essa permissão recebe `403`).
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
 | GET | `/boost-alunos-externos` | Bearer (Hub) | `Rooster Boost` / `/boost/students` / `acessar` | Lista as contas com contagem de matrículas; paginação opcional (`pagina`/`limite`, ver `01-visao-geral.md`) |
-| PATCH | `/boost-alunos-externos/:id` | Bearer (Hub) | `Rooster Boost` / `/boost/students` / `gerenciar` | Corpo `{ ativo: boolean }`. A conta desativada não consegue autenticar-se (`401`); registra em auditoria `conta_externa_ativada` ou `conta_externa_desativada` |
-| POST | `/boost-alunos-externos/:id/redefinir-senha` | Bearer (Hub) | `Rooster Boost` / `/boost/students` / `gerenciar` | Gera uma **senha temporária aleatória**, armazena apenas o hash e devolve o valor em texto claro **uma única vez** na resposta; registra em auditoria `conta_externa_senha_redefinida` |
+| POST | `/boost-alunos-externos` | Bearer (Hub) | `Rooster Boost` / `/boost/students` / `gerenciar` | Corpo `{ nome, email, senha? }`. Sem `senha`, gera senha temporária, devolvida em `senhaTemporaria` **uma única vez**. E-mail normalizado em minúsculas; `409` para e-mail existente; registra `conta_externa_criada` |
+| PATCH | `/boost-alunos-externos/:id` | Bearer (Hub) | `Rooster Boost` / `/boost/students` / `gerenciar` | Corpo `{ nome?, email?, ativo? }`. A conta desativada não consegue autenticar-se (`401`); nome e e-mail da conta institucional não são editáveis (`409`); registra `conta_externa_editada`, `conta_externa_ativada` ou `conta_externa_desativada` |
+| DELETE | `/boost-alunos-externos/:id` | Bearer (Hub) | `Rooster Boost` / `/boost/students` / `gerenciar` | Exclui a conta sem matrícula; com matrícula, `409` (a conta deve ser desativada); registra `conta_externa_excluida` |
+| POST | `/boost-alunos-externos/:id/redefinir-senha` | Bearer (Hub) | `Rooster Boost` / `/boost/students` / `gerenciar` | Gera uma **senha temporária aleatória**, armazena apenas o hash e devolve o valor em texto claro **uma única vez** na resposta; registra em auditoria `conta_externa_senha_redefinida`. Recusada (`409`) para conta institucional |
 
 **Simplificação deliberada na redefinição de senha**: `BoostUsuario` não possui tabela de token de redefinição por e-mail (equivalente à `RedefinicaoSenha` do Hub). A construção desse fluxo exclusivamente para a conta externa não se justificava no estágio atual; a senha temporária é repassada pelo administrador por canal seguro, de forma análoga a `PATCH /usuarios/:id` com `senhaHash` no Hub. O fluxo por e-mail permanece como evolução possível.
 

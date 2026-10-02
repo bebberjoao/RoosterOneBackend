@@ -98,9 +98,10 @@ Levantadas a partir dos controllers e services do backend:
 - **Atividades e entregas (Learn)**: criação e publicação de atividade em turma do Academy, envio e reenvio de
   entrega, correção com nota e parecer e propagação automática da nota ao Academy. Não há banco de questões nem
   correção automática, por decisão de escopo.
-- **Cursos extracurriculares (Boost)**: cadastro e login públicos independentes do Hub; cursos, módulos, aulas,
+- **Cursos extracurriculares (Boost)**: cadastro e login públicos independentes do Hub e login institucional para os
+  alunos da instituição; matrícula pelo aluno ou pela gestão; cursos, módulos, aulas,
   materiais e vídeo hospedado; matrícula, progresso por aula e certificado em PDF automático na conclusão, com
-  verificação pública; conversa em tempo real entre aluno e orientador; administração das contas externas.
+  verificação pública; conversa em tempo real entre aluno e orientador; administração das contas do portal.
 - **Financeiro do aluno (Finance)**: produtos, serviços, descontos e políticas de multa e juros; cobrança única
   (`Cobranca`) para mensalidade, produto, serviço ou taxa; geração de mensalidades em lote com desconto automático;
   boleto e nota fiscal simulados internamente (sem intermediador de pagamento e sem SEFAZ); relatórios e painel.

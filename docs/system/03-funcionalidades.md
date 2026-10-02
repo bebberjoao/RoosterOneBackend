@@ -124,9 +124,11 @@ próximo, que depende de rotina agendada inexistente.
 | RF-B10 | Retirada de publicação | Usuário com `boost.manage.gerenciar-cursos` | `status: arquivado` remove o curso do catálogo e impede novas matrículas; os alunos matriculados mantêm o acesso. |
 | RF-B11 | Configuração do certificado | Usuário com `boost.manage.certificado` | Ativa ou desativa a emissão (curso de material de apoio) e define o texto e a carga horária impressos. |
 | RF-B12 | Vínculo de orientadores | Usuário com `boost.manage.vincular-orientadores` | `PUT /cursos-boost/:id/orientadores`. |
-| RF-B13 | Administração de contas externas | Usuário com `boost.students.*` | Listagem das contas de aluno externo, ativação e desativação e redefinição de senha com senha temporária, com auditoria. `boost.controller.ts` |
+| RF-B13 | Administração das contas do portal | Usuário com `boost.students.*` | Listagem das contas do portal (externas e institucionais), cadastro de conta externa (com senha informada ou senha temporária gerada), edição de nome e e-mail, ativação e desativação, exclusão de conta sem matrícula e redefinição de senha temporária (RN038). |
 | RF-B14 | Verificação pública de certificado | Qualquer pessoa | `GET /certificados-boost/verificar/:codigo` confirma a autenticidade do certificado pelo código impresso, com limite de requisições. `boost-portal.controller.ts` |
 | RF-B15 | **Fora do escopo implementado**: cobrança pelo curso e avaliação por estrelas | — | O curso do Boost é sempre gratuito, e não há avaliação de curso. Ver `docs/system/02-escopo.md`. |
+| RF-B16 | Login institucional no portal | Usuário institucional ativo (aluno interno) | `POST /boost/login-institucional` autentica com o e-mail e a senha do Rooster One e cria ou vincula a conta do portal; o token emitido é do portal (RN045). |
+| RF-B17 | Matrícula pela gestão | Usuário com `boost.manage.matricular` | Matrícula de aluno do Academy ou de conta externa no curso, com busca de candidatos, e cancelamento de matrícula não concluída (RN046). |
 
 ## Rooster Finance
 

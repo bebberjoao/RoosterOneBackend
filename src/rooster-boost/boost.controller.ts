@@ -23,7 +23,8 @@ import { enviarVideoComRange } from '../common/video-stream.util';
 import { emitirTokenDeStream, validarTokenDeStream } from '../common/stream-token.util';
 import {
   ConfigurarCertificadoDto, CreateAulaBoostDto, CreateCursoBoostDto, CreateMensagemBoostDto, CreateModuloBoostDto,
-  DefinirOrientadoresDto, ToggleAtivoBoostUsuarioDto, UpdateAulaBoostDto, UpdateCursoBoostDto, UpdateModuloBoostDto,
+  CreateBoostUsuarioDto, DefinirOrientadoresDto, MatricularBoostDto, UpdateAulaBoostDto, UpdateBoostUsuarioDto,
+  UpdateCursoBoostDto, UpdateModuloBoostDto,
 } from './dto/boost.dto';
 
 const MODULO = 'Rooster Boost';
@@ -256,6 +257,30 @@ export class BoostController {
     return this.boostService.findAlunosDoCurso(cursoId);
   }
 
+  // ===================== Matrícula pela gestão =====================
+  @Get('cursos-boost/:id/candidatos-matricula')
+  @ApiOperation({ summary: 'Contas externas e alunos internos disponíveis para matrícula no curso' })
+  async findCandidatosMatricula(@Req() request: Request, @Param('id') cursoId: string, @Query('busca') busca?: string) {
+    await this.exigirPermissao((request.user as AuthedUser).id, 'matricular');
+    return this.boostService.findCandidatosMatricula(cursoId, busca);
+  }
+
+  @Post('cursos-boost/:id/matriculas')
+  @ApiOperation({ summary: 'Matricula conta externa ou aluno interno no curso (reativa matrícula cancelada)' })
+  async matricularPelaGestao(@Req() request: Request, @Param('id') cursoId: string, @Body() dto: MatricularBoostDto) {
+    const usuarioId = (request.user as AuthedUser).id;
+    await this.exigirPermissao(usuarioId, 'matricular');
+    return this.boostService.matricularPelaGestao(cursoId, dto, usuarioId);
+  }
+
+  @Patch('matriculas-boost/:id/cancelar')
+  @ApiOperation({ summary: 'Cancela a matrícula (a matrícula concluída não pode ser cancelada)' })
+  async cancelarMatricula(@Req() request: Request, @Param('id') matriculaId: string) {
+    const usuarioId = (request.user as AuthedUser).id;
+    await this.exigirPermissao(usuarioId, 'matricular');
+    return this.boostService.cancelarMatriculaPelaGestao(matriculaId, usuarioId);
+  }
+
   // ===================== Conversas com alunos (orientador) =====================
   // Permissão da tela /boost/conversas E vínculo de orientador com o curso da conversa.
   @Get('boost-conversas')
@@ -302,11 +327,25 @@ export class BoostController {
     return this.boostService.findAllBoostUsuarios(paginacao);
   }
 
+  @Post('boost-alunos-externos')
+  @RequirePermission(MODULO, TELA_STUDENTS, 'gerenciar')
+  @ApiOperation({ summary: 'Cadastra conta externa; sem senha informada, devolve senha temporária uma única vez' })
+  criarBoostUsuario(@Req() request: Request, @Body() dto: CreateBoostUsuarioDto) {
+    return this.boostService.criarBoostUsuario(dto, (request.user as AuthedUser).id);
+  }
+
   @Patch('boost-alunos-externos/:id')
   @RequirePermission(MODULO, TELA_STUDENTS, 'gerenciar')
-  @ApiOperation({ summary: 'Ativa ou desativa uma conta externa' })
-  toggleAtivoBoostUsuario(@Req() request: Request, @Param('id') id: string, @Body() dto: ToggleAtivoBoostUsuarioDto) {
-    return this.boostService.toggleAtivoBoostUsuario(id, dto.ativo, (request.user as AuthedUser).id);
+  @ApiOperation({ summary: 'Edita nome, e-mail ou situação da conta externa' })
+  atualizarBoostUsuario(@Req() request: Request, @Param('id') id: string, @Body() dto: UpdateBoostUsuarioDto) {
+    return this.boostService.atualizarBoostUsuario(id, dto, (request.user as AuthedUser).id);
+  }
+
+  @Delete('boost-alunos-externos/:id')
+  @RequirePermission(MODULO, TELA_STUDENTS, 'gerenciar')
+  @ApiOperation({ summary: 'Exclui conta externa sem matrícula (com matrícula, a conta deve ser desativada)' })
+  excluirBoostUsuario(@Req() request: Request, @Param('id') id: string) {
+    return this.boostService.excluirBoostUsuario(id, (request.user as AuthedUser).id);
   }
 
   @Post('boost-alunos-externos/:id/redefinir-senha')

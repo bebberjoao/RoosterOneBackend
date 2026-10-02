@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -345,7 +346,7 @@ export class BoostService {
     return this.prisma.matriculaBoost.findMany({
       where: { cursoId },
       orderBy: { matriculadoEm: 'desc' },
-      include: { boostUsuario: { select: { id: true, nome: true, email: true } }, certificado: true },
+      include: { boostUsuario: { select: { id: true, nome: true, email: true, usuarioId: true } }, certificado: true },
     });
   }
 
@@ -424,7 +425,7 @@ export class BoostService {
     const consulta = {
       orderBy: { criadoEm: 'desc' },
       select: {
-        id: true, nome: true, email: true, ativo: true, criadoEm: true,
+        id: true, nome: true, email: true, ativo: true, criadoEm: true, usuarioId: true,
         _count: { select: { matriculas: true } },
       },
     } satisfies Prisma.BoostUsuarioFindManyArgs;
@@ -439,25 +440,6 @@ export class BoostService {
     return montarPagina(dados, total, paginacao);
   }
 
-  async toggleAtivoBoostUsuario(id: string, ativo: boolean, atorId?: string) {
-    const existente = await this.prisma.boostUsuario.findUnique({ where: { id } });
-    if (!existente) throw new NotFoundException(`Aluno externo com id ${id} não encontrado.`);
-    let atualizado;
-    try {
-      atualizado = await this.prisma.boostUsuario.update({
-        where: { id },
-        data: { ativo },
-        select: { id: true, nome: true, email: true, ativo: true },
-      });
-    } catch (error) {
-      this.handleError(error, 'atualizar situação do aluno externo');
-    }
-    await this.auditoria.registrar({
-      usuarioId: atorId, modulo: 'Rooster Boost', acao: ativo ? 'conta_externa_ativada' : 'conta_externa_desativada', entidade: 'boost_usuario', entidadeId: id,
-    });
-    return atualizado;
-  }
-
   /**
    * `BoostUsuario` não tem uma tabela de token de redefinição por e-mail
    * (equivalente a `RedefinicaoSenha`, do Hub) — construir esse fluxo
@@ -469,6 +451,9 @@ export class BoostService {
   async redefinirSenhaBoostUsuario(id: string, atorId?: string) {
     const existente = await this.prisma.boostUsuario.findUnique({ where: { id } });
     if (!existente) throw new NotFoundException(`Aluno externo com id ${id} não encontrado.`);
+    if (existente.usuarioId) {
+      throw new ConflictException('A conta utiliza o login institucional; a senha é a mesma do sistema e é redefinida no Rooster Hub.');
+    }
 
     const senhaTemporaria = randomBytes(9).toString('base64url'); // 12 chars, sem caractere ambíguo
     await this.prisma.boostUsuario.update({
@@ -479,6 +464,209 @@ export class BoostService {
       usuarioId: atorId, modulo: 'Rooster Boost', acao: 'conta_externa_senha_redefinida', entidade: 'boost_usuario', entidadeId: id,
     });
     return { id, email: existente.email, senhaTemporaria };
+  }
+
+  /**
+   * Cadastro de conta externa pela administração. Sem senha informada, gera senha temporária,
+   * devolvida uma única vez, no mesmo padrão de `redefinirSenhaBoostUsuario`.
+   */
+  async criarBoostUsuario(dto: { nome: string; email: string; senha?: string }, atorId?: string) {
+    const email = dto.email.trim().toLowerCase();
+    if (await this.prisma.boostUsuario.findUnique({ where: { email } })) {
+      throw new ConflictException('Já existe uma conta com este e-mail no Rooster Boost.');
+    }
+    const senhaTemporaria = dto.senha ? undefined : randomBytes(9).toString('base64url');
+    let criado;
+    try {
+      criado = await this.prisma.boostUsuario.create({
+        data: {
+          nome: dto.nome.trim(), email, criadoEm: new Date(),
+          senhaHash: await bcrypt.hash(dto.senha ?? (senhaTemporaria as string), SALT_ROUNDS),
+        },
+        select: { id: true, nome: true, email: true, ativo: true, criadoEm: true, usuarioId: true },
+      });
+    } catch (error) {
+      this.handleError(error, 'cadastrar o aluno externo');
+    }
+    await this.auditoria.registrar({
+      usuarioId: atorId, modulo: 'Rooster Boost', acao: 'conta_externa_criada', entidade: 'boost_usuario', entidadeId: criado.id,
+    });
+    return { ...criado, senhaTemporaria };
+  }
+
+  /**
+   * Edição de nome, e-mail e situação. A conta vinculada à conta institucional tem nome e e-mail
+   * derivados do Rooster Hub e não os aceita por aqui (seriam sobrescritos no login seguinte).
+   */
+  async atualizarBoostUsuario(id: string, dto: { nome?: string; email?: string; ativo?: boolean }, atorId?: string) {
+    const existente = await this.prisma.boostUsuario.findUnique({ where: { id } });
+    if (!existente) throw new NotFoundException(`Aluno externo com id ${id} não encontrado.`);
+    if (existente.usuarioId && (dto.nome !== undefined || dto.email !== undefined)) {
+      throw new ConflictException('Nome e e-mail da conta institucional são mantidos no Rooster Hub.');
+    }
+    const data: Prisma.BoostUsuarioUpdateInput = {};
+    if (dto.nome !== undefined) data.nome = dto.nome.trim();
+    if (dto.email !== undefined) data.email = dto.email.trim().toLowerCase();
+    if (dto.ativo !== undefined) data.ativo = dto.ativo;
+    let atualizado;
+    try {
+      atualizado = await this.prisma.boostUsuario.update({
+        where: { id }, data,
+        select: { id: true, nome: true, email: true, ativo: true, criadoEm: true, usuarioId: true },
+      });
+    } catch (error) {
+      this.handleError(error, 'atualizar o aluno externo');
+    }
+    const acao = dto.ativo === undefined || dto.ativo === existente.ativo
+      ? 'conta_externa_editada'
+      : dto.ativo ? 'conta_externa_ativada' : 'conta_externa_desativada';
+    await this.auditoria.registrar({ usuarioId: atorId, modulo: 'Rooster Boost', acao, entidade: 'boost_usuario', entidadeId: id });
+    return atualizado;
+  }
+
+  /** Exclusão apenas de conta sem matrícula; com histórico, a conta deve ser desativada. */
+  async excluirBoostUsuario(id: string, atorId?: string) {
+    const existente = await this.prisma.boostUsuario.findUnique({
+      where: { id }, include: { _count: { select: { matriculas: true } } },
+    });
+    if (!existente) throw new NotFoundException(`Aluno externo com id ${id} não encontrado.`);
+    if (existente._count.matriculas > 0) {
+      throw new ConflictException('A conta possui matrículas e não pode ser excluída; desative-a para preservar o histórico.');
+    }
+    try {
+      await this.prisma.boostUsuario.delete({ where: { id } });
+    } catch (error) {
+      this.handleError(error, 'excluir o aluno externo');
+    }
+    await this.auditoria.registrar({
+      usuarioId: atorId, modulo: 'Rooster Boost', acao: 'conta_externa_excluida', entidade: 'boost_usuario', entidadeId: id,
+    });
+    return { id };
+  }
+
+  // ===================== Conta institucional no portal =====================
+
+  /**
+   * Obtém a conta do portal vinculada ao usuário institucional, criando-a quando não existe. Conta
+   * externa preexistente com o mesmo e-mail é vinculada (mesma pessoa, preservando as matrículas) e tem a
+   * senha própria invalidada: como o cadastro externo não confirma o e-mail, manter a senha permitiria
+   * que terceiro que o tivesse registrado acessasse a conta. Nome e e-mail acompanham o Rooster Hub.
+   */
+  async obterContaInstitucional(usuario: { id: string; nome: string; email: string }) {
+    const senhaInutilizavel = () => bcrypt.hash(randomBytes(32).toString('hex'), SALT_ROUNDS);
+    const vinculada = await this.prisma.boostUsuario.findUnique({ where: { usuarioId: usuario.id } });
+    if (vinculada) {
+      if (vinculada.nome === usuario.nome && vinculada.email === usuario.email) return vinculada;
+      const emailLivre = vinculada.email === usuario.email
+        || !(await this.prisma.boostUsuario.findUnique({ where: { email: usuario.email } }));
+      return this.prisma.boostUsuario.update({
+        where: { id: vinculada.id },
+        data: { nome: usuario.nome, ...(emailLivre && { email: usuario.email }) },
+      });
+    }
+    const porEmail = await this.prisma.boostUsuario.findUnique({ where: { email: usuario.email } });
+    if (porEmail) {
+      return this.prisma.boostUsuario.update({
+        where: { id: porEmail.id },
+        data: { usuarioId: usuario.id, nome: usuario.nome, senhaHash: await senhaInutilizavel() },
+      });
+    }
+    return this.prisma.boostUsuario.create({
+      data: {
+        nome: usuario.nome, email: usuario.email, usuarioId: usuario.id,
+        senhaHash: await senhaInutilizavel(), criadoEm: new Date(),
+      },
+    });
+  }
+
+  // ===================== Matrícula pela gestão =====================
+
+  /**
+   * Candidatos à matrícula manual: contas externas ativas e alunos do Academy (contas institucionais
+   * ativas), excluídos os que já possuem matrícula ativa ou concluída no curso.
+   */
+  async findCandidatosMatricula(cursoId: string, busca?: string) {
+    await this.findOneCurso(cursoId);
+    const normalizar = (v: string) => v.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const termo = normalizar(busca?.trim() ?? '');
+    const corresponde = (c: { nome: string; email: string }) => !termo || normalizar(`${c.nome} ${c.email}`).includes(termo);
+    const matriculados = await this.prisma.matriculaBoost.findMany({
+      where: { cursoId, status: { not: 'cancelada' } },
+      select: { boostUsuario: { select: { id: true, usuarioId: true } } },
+    });
+    const contasMatriculadas = new Set(matriculados.map((m) => m.boostUsuario.id));
+    const usuariosMatriculados = new Set(matriculados.map((m) => m.boostUsuario.usuarioId).filter(Boolean));
+
+    // Filtragem textual em memória: mantém a mesma consulta no PostgreSQL e no SQLite dos testes
+    // (sem `mode: "insensitive"`) e ignora acentos; o volume de contas de uma instituição é compatível.
+    const [externos, internos] = await Promise.all([
+      this.prisma.boostUsuario.findMany({
+        where: { ativo: true, usuarioId: null },
+        orderBy: { nome: 'asc' },
+        select: { id: true, nome: true, email: true },
+      }),
+      this.prisma.usuario.findMany({
+        where: { ativo: true, alunoAcademico: { isNot: null } },
+        orderBy: { nome: 'asc' },
+        select: { id: true, nome: true, email: true, alunoAcademico: { select: { ra: true } } },
+      }),
+    ]);
+    return {
+      externos: externos.filter((c) => !contasMatriculadas.has(c.id) && corresponde(c)).slice(0, 50),
+      internos: internos
+        .filter((u) => !usuariosMatriculados.has(u.id) && corresponde(u))
+        .slice(0, 50)
+        .map((u) => ({ usuarioId: u.id, nome: u.nome, email: u.email, ra: u.alunoAcademico?.ra ?? null })),
+    };
+  }
+
+  /**
+   * Matrícula feita pela gestão, de conta externa (`boostUsuarioId`) ou de usuário institucional
+   * (`usuarioId`, com criação ou vínculo automático da conta do portal). Matrícula cancelada é reativada.
+   */
+  async matricularPelaGestao(cursoId: string, dto: { boostUsuarioId?: string; usuarioId?: string }, atorId?: string) {
+    if (!dto.boostUsuarioId === !dto.usuarioId) {
+      throw new BadRequestException('Informe exatamente um destinatário: boostUsuarioId (conta externa) ou usuarioId (conta institucional).');
+    }
+    await this.findOneCurso(cursoId);
+
+    let boostUsuarioId: string;
+    if (dto.usuarioId) {
+      const usuario = await this.prisma.usuario.findUnique({ where: { id: dto.usuarioId } });
+      if (!usuario || !usuario.ativo) throw new NotFoundException('Usuário institucional não encontrado ou inativo.');
+      boostUsuarioId = (await this.obterContaInstitucional(usuario)).id;
+    } else {
+      const conta = await this.prisma.boostUsuario.findUnique({ where: { id: dto.boostUsuarioId } });
+      if (!conta) throw new NotFoundException('Conta do portal Boost não encontrada.');
+      if (!conta.ativo) throw new ConflictException('A conta do portal Boost está desativada.');
+      boostUsuarioId = conta.id;
+    }
+
+    const existente = await this.prisma.matriculaBoost.findUnique({
+      where: { boostUsuarioId_cursoId: { boostUsuarioId, cursoId } },
+    });
+    if (existente && existente.status !== 'cancelada') {
+      throw new ConflictException('O aluno já possui matrícula neste curso.');
+    }
+    const matricula = existente
+      ? await this.prisma.matriculaBoost.update({ where: { id: existente.id }, data: { status: 'ativa', matriculadoEm: new Date() } })
+      : await this.prisma.matriculaBoost.create({ data: { boostUsuarioId, cursoId, status: 'ativa', matriculadoEm: new Date() } });
+    await this.auditoria.registrar({
+      usuarioId: atorId, modulo: 'Rooster Boost', acao: 'matricula_boost_pela_gestao', entidade: 'matricula_boost', entidadeId: matricula.id,
+    });
+    return matricula;
+  }
+
+  async cancelarMatriculaPelaGestao(matriculaId: string, atorId?: string) {
+    const matricula = await this.prisma.matriculaBoost.findUnique({ where: { id: matriculaId } });
+    if (!matricula) throw new NotFoundException('Matrícula não encontrada.');
+    if (matricula.status === 'concluida') throw new ConflictException('A matrícula concluída não pode ser cancelada.');
+    if (matricula.status === 'cancelada') return matricula;
+    const atualizada = await this.prisma.matriculaBoost.update({ where: { id: matriculaId }, data: { status: 'cancelada' } });
+    await this.auditoria.registrar({
+      usuarioId: atorId, modulo: 'Rooster Boost', acao: 'matricula_boost_cancelada', entidade: 'matricula_boost', entidadeId: matriculaId,
+    });
+    return atualizada;
   }
 
   private handleError(error: unknown, action: string): never {

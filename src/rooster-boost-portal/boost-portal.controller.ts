@@ -45,6 +45,17 @@ export class BoostPortalController {
     return this.boostPortalService.login(dto.email, dto.senha);
   }
 
+  /**
+   * Login do aluno interno com a conta institucional (e-mail e senha do Rooster One). Emite token do
+   * portal (tipo 'boost'), e não do Hub: o isolamento entre os dois sistemas de token é preservado.
+   */
+  @Post('boost/login-institucional')
+  @Throttle({ default: { limit: LOGIN_THROTTLE_LIMIT, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Entra no portal do Boost com a conta institucional, criando ou vinculando a conta do portal' })
+  loginInstitucional(@Body() dto: LoginBoostDto) {
+    return this.boostPortalService.loginInstitucional(dto.email, dto.senha);
+  }
+
   // ===================== Catálogo público (navegação livre, sem login) =====================
   @Get('cursos-boost-publicos')
   findCatalogo() {

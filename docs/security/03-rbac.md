@@ -289,6 +289,12 @@ utilizado pelos demais módulos e pelos gestores e orientadores do Boost) e um *
 destinado a pessoas externas à instituição, que se cadastram e realizam cursos sem conta no Hub. Trata-se de decisão
 de produto explícita (o Boost como plataforma aberta de cursos), e não de inconsistência.
 
+**Login institucional no portal (outubro de 2026)**: o usuário institucional (aluno interno) acessa o portal com o
+e-mail e a senha do Rooster One, em `POST /boost/login-institucional`, sem cadastro adicional. A credencial do Hub é
+validada uma única vez, e a conta do portal é obtida pelo vínculo `BoostUsuario.usuarioId` ou criada no primeiro
+acesso; o token emitido é **do portal** (`tipo: 'boost'`), e o isolamento entre os dois mecanismos permanece
+integral (RN034 e RN045). O `BoostJwtAuthGuard` recusa a conta vinculada a usuário desativado no Hub.
+
 **Fundamentação do não aproveitamento dos guards globais**: o `JwtAuthGuard` e o `PermissionGuard` são a base de
 autenticação e autorização dos demais módulos, e qualquer alteração neles afetaria módulos sem relação com o Boost.
 Optou-se pelo isolamento completo:
@@ -326,8 +332,9 @@ coordenação podiam editá-lo (`exigirDonoOuGestor`). Esse modelo foi **removid
 | | `ver-progresso` | Alunos matriculados e progresso |
 | | `certificado` | Ativação ou desativação do certificado e edição do texto |
 | | `vincular-orientadores` | Seleção dos professores orientadores do curso |
+| | `matricular` | Matrícula de alunos da instituição e de contas externas e cancelamento de matrícula não concluída (RN046) |
 | `/boost/conversas` | `acessar` / `responder` | Leitura e resposta das conversas **dos cursos em que o usuário é orientador** |
-| `/boost/students` | `acessar` / `gerenciar` | Listagem das contas externas; ativação, desativação e redefinição de senha |
+| `/boost/students` | `acessar` / `gerenciar` | Listagem das contas do portal; cadastro, edição, ativação, desativação, exclusão (sem matrícula) e redefinição de senha de conta externa |
 
 O **orientador** é o professor com `/boost/conversas` **e** vínculo `CursoOrientadorBoost` com o curso. As duas
 condições são simultâneas: a permissão sem o vínculo resulta em caixa de entrada vazia e `404` em conversa de outro
@@ -347,7 +354,9 @@ matrícula, e não do status do curso.
 ### Tela `/boost/students`: gestão de contas externas (setembro de 2026)
 
 Único ponto do Boost em que o Hub **administra** contas do outro mecanismo de autenticação, com as ações `acessar`
-(listagem) e `gerenciar` (ativação, desativação e redefinição de senha) sobre `BoostUsuario`. Por ser gestão
+(listagem) e `gerenciar` (cadastro, edição, ativação, desativação, exclusão de conta sem matrícula e redefinição de
+senha) sobre `BoostUsuario`. A conta vinculada à conta institucional é apenas consultada e ativada ou desativada:
+nome, e-mail e senha são mantidos no Hub. Por ser gestão
 transversal aos cursos, possui tela própria, com `@RequirePermission` estático (RN038).
 
 ### Transmissão de vídeo: exceção à autenticação por cabeçalho

@@ -28,8 +28,15 @@ export class BoostJwtAuthGuard implements CanActivate {
     try {
       const payload = await this.jwt.verifyAsync<{ sub: string; tipo?: string }>(authorization.slice(7));
       if (payload.tipo !== 'boost') throw new UnauthorizedException('Token inválido para o portal Boost.');
-      const boostUsuario = await this.prisma.boostUsuario.findUnique({ where: { id: payload.sub } });
+      const boostUsuario = await this.prisma.boostUsuario.findUnique({
+        where: { id: payload.sub },
+        include: { usuario: { select: { ativo: true } } },
+      });
       if (!boostUsuario?.ativo) throw new UnauthorizedException('Usuário inválido ou inativo.');
+      // Conta vinculada acompanha a conta institucional: usuário desativado no Hub perde o portal.
+      if (boostUsuario.usuarioId && !boostUsuario.usuario?.ativo) {
+        throw new UnauthorizedException('Usuário inválido ou inativo.');
+      }
       request.user = boostUsuario;
       return true;
     } catch (error) {

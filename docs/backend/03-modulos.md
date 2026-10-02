@@ -162,7 +162,8 @@ nem questões de múltipla escolha (ver `docs/engineering/10-melhorias-futuras.m
 
 Área do **instrutor** do Rooster Boost, autenticada pelo login do Hub. O `BoostController` abrange cursos, módulos,
 aulas, materiais de apoio (upload de até 25 MB), vídeos hospedados (até 2 GB), configuração de certificado,
-orientadores, progresso dos alunos, conversas com os alunos e administração das contas externas. A autorização
+orientadores, progresso dos alunos, matrícula pela gestão (RN046), conversas com os alunos e administração das contas
+do portal. A autorização
 baseia-se exclusivamente em permissão (`/boost/manage`); o vínculo de orientador, obtido de um `Professor` do
 Academy, restringe apenas o acesso às conversas. Os três providers exportados são utilizados por
 `RoosterBoostPortalModule`.

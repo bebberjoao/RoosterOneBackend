@@ -63,7 +63,10 @@ usuários existentes no Hub), turmas e matrículas. A matrícula respeita a capa
 
 A gestão dos cursos é realizada por permissão, sem responsável exclusivo por curso: quem possui a permissão de
 gestão atua sobre todos os cursos. Os professores são vinculados como orientadores, apenas para a comunicação com os
-alunos. A tela de contas externas permite desativar contas e gerar senha temporária, exibida uma única vez.
+alunos. A tela "Alunos do portal" permite cadastrar alunos externos (com senha informada ou senha temporária, exibida
+uma única vez), editar nome e e-mail, desativar e reativar contas, excluir conta sem matrícula e gerar senha
+temporária. Os alunos da instituição acessam o portal com a conta institucional, sem cadastro adicional, e são
+matriculados nos cursos pela aba "Alunos" da gestão do curso (permissão `boost.manage.matricular`).
 
 ## Financeiro (Rooster Finance)
 

@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
 import {
-  ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Length, Max, Min,
+  ArrayUnique, IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsOptional, IsString, IsUUID, Length, Max, Min,
 } from 'class-validator';
 
 // ===================== Curso =====================
@@ -111,7 +111,32 @@ export class AtualizarProgressoVideoDto {
 }
 
 // ===================== Contas externas (painel admin) =====================
-export class ToggleAtivoBoostUsuarioDto {
-  @ApiProperty({ example: false, description: 'Novo estado de ativação da conta externa' })
-  @IsBoolean() ativo: boolean;
+export class CreateBoostUsuarioDto {
+  @ApiProperty({ example: 'Pedro Aluno', description: 'Nome completo do aluno externo' })
+  @IsString() @Length(2, 150) nome: string;
+
+  @ApiProperty({ example: 'pedro.aluno@gmail.com', description: 'E-mail do aluno, utilizado como login no portal do Boost' })
+  @IsEmail() @Length(5, 180) email: string;
+
+  @ApiPropertyOptional({ example: 'SenhaSegura123', description: 'Senha inicial (mínimo de 8 caracteres). Omitida, o sistema gera senha temporária, devolvida uma única vez' })
+  @IsOptional() @IsString() @Length(8, 255) senha?: string;
+}
+
+export class UpdateBoostUsuarioDto {
+  @ApiPropertyOptional({ example: 'Pedro Aluno', description: 'Nome completo (não aplicável à conta institucional)' })
+  @IsOptional() @IsString() @Length(2, 150) nome?: string;
+
+  @ApiPropertyOptional({ example: 'pedro.aluno@gmail.com', description: 'E-mail de login (não aplicável à conta institucional)' })
+  @IsOptional() @IsEmail() @Length(5, 180) email?: string;
+
+  @ApiPropertyOptional({ example: false, description: 'Situação da conta' })
+  @IsOptional() @IsBoolean() ativo?: boolean;
+}
+
+export class MatricularBoostDto {
+  @ApiPropertyOptional({ description: 'Conta externa do portal a matricular (informar este campo ou usuarioId)' })
+  @IsOptional() @IsUUID() boostUsuarioId?: string;
+
+  @ApiPropertyOptional({ description: 'Usuário institucional a matricular; a conta do portal é criada ou vinculada automaticamente' })
+  @IsOptional() @IsUUID() usuarioId?: string;
 }

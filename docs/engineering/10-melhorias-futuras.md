@@ -26,7 +26,7 @@ dependência de infraestrutura inexistente ou ausência de necessidade no volume
 ## Médio prazo
 
 - ~~Implementar refresh token, aproveitando a tabela `Sessao`~~ — **concluído (setembro/2026)**. `POST /auth/login` devolve também um `refreshToken`; `POST /auth/refresh` emite um novo par **com rotação** (a sessão utilizada é sempre revogada); `POST /auth/logout` revoga a sessão. O banco armazena apenas o hash SHA-256 do token. Ver `docs/api/03-autenticacao.md`.
-- ~~Adicionar testes automatizados de frontend e testes unitários de backend~~ — **concluído (setembro/2026)**. Situação em 01/10/2026: 81 testes de frontend (Vitest e Testing Library), 137 testes unitários e 78 testes e2e no backend. Ver `14-estrategia-de-testes.md`, que contém também a matriz entre testes e requisitos.
+- ~~Adicionar testes automatizados de frontend e testes unitários de backend~~ — **concluído (setembro/2026)**. Situação em 01/10/2026: 81 testes de frontend (Vitest e Testing Library), 137 testes unitários e 82 testes e2e no backend. Ver `14-estrategia-de-testes.md`, que contém também a matriz entre testes e requisitos.
 - Teste de jornada em navegador (Playwright ou Cypress) — **pendente**. Os testes de frontend atuais cobrem lógica e componentes isolados, não o fluxo completo de telas.
 - Armazenamento dos arquivos enviados em serviço de objetos externo — **pendente, depende de infraestrutura**. Atualmente, os arquivos permanecem em disco local, cifrados em repouso, com pastas configuráveis por variável de ambiente.
 - ~~Índice composto em `Reserva(ambienteId, data)`~~ — **concluído (30/09/2026)**, migration `20260930170607_reserva_ambiente_data_idx`. A verificação de conflito de horário (`RoomsService.assertReservaDisponivel`) filtra exatamente por essa combinação.

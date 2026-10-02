@@ -25,6 +25,26 @@ estão indicadas; as demais não alteram o banco de dados.
 
 ### Adicionado
 
+- **Login institucional no portal do Boost** (02/10/2026). **Exige migration**
+  (`20261002120000_boost_conta_institucional_matricula`). O aluno da instituição acessa o portal com o e-mail e a
+  senha do Rooster One (`POST /boost/login-institucional`), sem cadastro adicional; a conta do portal é criada ou
+  vinculada automaticamente (`boost_usuarios.usuario_id`, opcional e único), e o token emitido continua sendo do
+  portal, de modo que o isolamento entre os dois mecanismos de autenticação é preservado (RN034 e RN045). Conta
+  externa preexistente com o mesmo e-mail é vinculada e tem a senha própria invalidada; o usuário desativado no Hub
+  perde o acesso ao portal. A tela "Entrar" do portal oferece as opções "Aluno da instituição" e "Aluno externo".
+- **Matrícula pela gestão do Boost** (02/10/2026). A aba "Alunos" da gestão do curso passou a matricular alunos do
+  Academy e contas externas, com busca de candidatos, e a cancelar matrícula não concluída
+  (`GET /cursos-boost/:id/candidatos-matricula`, `POST /cursos-boost/:id/matriculas` e
+  `PATCH /matriculas-boost/:id/cancelar`), com a permissão nova `boost.manage.matricular`, concedida pela migration a
+  quem já gerenciava cursos (RN046). As operações são auditadas, com o gestor como autor.
+- **Cadastro completo das contas do portal** (02/10/2026). A tela "Alunos externos", renomeada "Alunos do portal",
+  passou a cadastrar aluno externo (com senha informada ou senha temporária exibida uma única vez), editar nome e
+  e-mail e excluir conta sem matrícula (`POST` e `DELETE /boost-alunos-externos`; `PATCH` aceita `nome`, `email` e
+  `ativo`), além das funções existentes de ativação, desativação e redefinição de senha (RN038). As contas vinculadas
+  à conta institucional são identificadas e não aceitam edição de nome, e-mail ou senha, mantidos no Rooster Hub.
+- **Acesso ao portal do Boost a partir do sistema** (02/10/2026; frontend). Antes, o portal só era alcançado pela
+  digitação do endereço `/boost-portal`. Foram incluídos o item "Cursos livres (Boost)" no menu do Rooster Student, o
+  item "Portal do aluno" no menu do Rooster Boost e o link "acessar o Rooster Boost" na tela de login.
 - **Central de documentos do aluno integrada à API** (30/09/2026; alteração no frontend, sem migration). A tela
   `/student/documents`, antes alimentada por dados simulados, lista os documentos institucionais e os documentos das
   disciplinas em que o aluno está matriculado (`GET /documentos-academicos`, filtrado pelas matrículas de
@@ -203,6 +223,10 @@ estão indicadas; as demais não alteram o banco de dados.
 
 ### Corrigido
 
+- **Logotipo ausente nas telas de login, redefinição de senha e portal do Boost** (02/10/2026; frontend). A imagem do
+  galo era referenciada por endereço do CDN do editor Lovable (`/__l5e/assets-v1/…`), inexistente fora daquele
+  ambiente. O arquivo original foi recuperado e incorporado ao repositório (`src/assets/rooster-logo.png`), importado
+  diretamente pelas telas.
 - **Calendário de reservas com "Invalid Date" e dias "NaN"** (01/10/2026; frontend). As colunas de data pura
   (`@db.Date`) são serializadas pela API como meia-noite UTC (`2026-10-03T00:00:00.000Z`), e o serviço do Rooms
   repassava o valor sem normalização ao calendário, que esperava `aaaa-mm-dd`. O defeito se manifestava ao abrir a

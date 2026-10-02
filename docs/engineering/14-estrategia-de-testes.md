@@ -7,12 +7,12 @@ quantitativos) e, ao final, a matriz que associa cada teste ao requisito ou regr
 
 | Camada | Localização | Comando | Quantidade |
 |---|---|---|---|
-| e2e de API (backend) | `test/*.e2e-spec.ts` | `npm run test:e2e` | 78 testes, 2 arquivos |
+| e2e de API (backend) | `test/*.e2e-spec.ts` | `npm run test:e2e` | 82 testes, 2 arquivos |
 | Unitário (backend) | `src/**/*.spec.ts` | `npm test` | 137 testes, 12 arquivos |
 | Unitário e de componente (frontend) | `src/**/*.test.{ts,tsx}` | `npm test` (repositório do frontend) | 81 testes, 7 arquivos |
 | Acessibilidade (frontend) | `src/components/shared/acessibilidade.test.tsx` | incluída em `npm test` | 12 dos 81 acima |
 
-Total: **296 testes**. No backend, `npm run test:all` executa os testes unitários e e2e em sequência. Todas as
+Total: **300 testes**. No backend, `npm run test:all` executa os testes unitários e e2e em sequência. Todas as
 camadas são executadas pelo CI a cada envio para `main` e a cada pull request (ver
 `docs/operations/05-cicd.md`).
 
@@ -130,13 +130,15 @@ teste automatizado estão indicadas, com o motivo.
 | RN035 | A instituição nunca fica sem administrador | e2e: "Proteção do último administrador: não dá para revogar, excluir nem desativar o único admin ativo". Unitário: `administradores.service.spec.ts` |
 | RN036 | Vídeo hospedado servido por token de 5 minutos restrito a uma aula | e2e: "Vídeo hospedado: instrutor envia, recusa mimetype errado, e o player consegue arrastar a barra (Range)" (token ausente ou inválido → 403; Range → 206; conteúdo sem assinatura de vídeo → 400). Unitário: `video-stream.util.spec.ts` (200, 206 e 416) |
 | RN037 | Progresso de vídeo real: não regride e conclui a partir de 90% | e2e: "Progresso real de vídeo: retoma posição, completa automaticamente perto do fim e emite certificado na última aula" |
-| RN038 | Contas externas: o administrador lista, desativa e redefine senha; professor recebe 403 | e2e: "Contas externas (painel admin): lista, desativa e redefine senha; professor sem a permissão recebe 403" |
+| RN038 | Contas do portal: o administrador lista, cadastra, edita, desativa, exclui (sem matrícula) e redefine senha; professor recebe 403 | e2e: "Contas externas (painel admin): lista, desativa e redefine senha; professor sem a permissão recebe 403"; "Contas externas: cadastro com senha temporária, edição e exclusão restrita a conta sem matrícula" |
 | RN039 | Notificação: cada usuário lê e marca apenas as próprias; a emissão não interrompe a operação | e2e: "Caixa de entrada: cada usuário lê e marca só as próprias notificações (sem exigir permissão)"; "Cobrança criada e paga gera notificação para o aluno na caixa de entrada dele — e só dele"; aviso ao técnico na atribuição de chamado ("Rooster Desk should create, read, update and delete a ticket flow"). Frontend: `role-context.test.ts` (`deriveRole` e `tempoRelativo`) |
 | RN040 | Boost sem dono: gestão por permissão; professor como orientador; retirada do ar preserva matriculados | e2e: "Gestão por permissão: quem tem a permissão gere QUALQUER curso; professor orientador (sem permissão de gestão) recebe 403"; "Tirar do ar: some do catálogo e bloqueia nova matrícula, mas o aluno já matriculado continua com acesso e com a conversa" |
 | RN041 | Conversa por aluno; orientador acessa apenas os cursos vinculados | e2e: "Orientadores: o gestor vincula professores; só orientador vinculado enxerga e responde as conversas do curso" |
 | RN042 | Certificado por curso: pode não existir; texto definido pelo gestor | e2e: "Certificado: desligado, o curso conclui sem emitir (material de apoio); ligado, usa o texto configurado". Unitário: `certificado-boost.service.spec.ts` (`aplicarModelo`) |
 | RN043 | Multa e juros manuais prevalecem sobre a política; o cálculo da política nunca é persistido | e2e: "Política de multa/juros: o financeiro cria a própria regra; ela calcula dinamicamente, mas valor manual sempre vence" |
 | RN044 | Vínculo entre reserva e turma por posse do professor ou gestão ampla do Academy | e2e: "Rooms ↔ Academy: ao criar a reserva de uma aula, só o professor dono da turma pode vinculá-la" |
+| RN045 | Login institucional no portal do Boost, com criação ou vínculo da conta do portal | e2e: "Login institucional no portal: cria e vincula a conta, emite token do portal e acompanha a situação no Hub"; "Login institucional vincula conta externa preexistente com o mesmo e-mail e invalida a senha própria" |
+| RN046 | Matrícula e cancelamento pela gestão do Boost | e2e: "Matrícula pela gestão: aluno interno e conta externa, candidatos, duplicidade, cancelamento e reativação" |
 
 ### Requisitos não funcionais e de contrato
 

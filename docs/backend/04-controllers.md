@@ -83,11 +83,12 @@ responsabilidades; a relação rota a rota encontra-se em `docs/api/02-endpoints
 ## Rooster Boost
 
 - **`BoostController`** (instrutor): cursos, módulos, aulas, materiais de apoio, vídeos hospedados, configuração de
-  certificado, orientadores, progresso dos alunos, conversas com os alunos e administração das contas externas.
+  certificado, orientadores, progresso dos alunos, matrícula pela gestão, conversas com os alunos e administração das
+  contas do portal.
   Autenticado pelo `JwtAuthGuard` global e autorizado por `@RequirePermission` ou pelo método privado
   `exigirPermissao` sobre `/boost/manage`. Não há responsável exclusivo por curso: qualquer usuário com a permissão
   atua sobre qualquer curso; o vínculo de orientador restringe apenas o acesso às conversas.
-- **`BoostPortalController`** (aluno externo): marcado com `@Public()` na classe inteira, de modo que o
+- **`BoostPortalController`** (aluno do portal, externo ou institucional): marcado com `@Public()` na classe inteira, de modo que o
   `JwtAuthGuard` global **não é executado**; a proteção é realizada rota a rota pelo `BoostJwtAuthGuard`, que valida
   o token contra `boost_usuarios` e exige a declaração `tipo: 'boost'`. A autorização baseia-se exclusivamente na
   titularidade da matrícula (`exigirMatriculaDoCurso` e `exigirMatriculaDaAula`, no `BoostPortalService`), sem

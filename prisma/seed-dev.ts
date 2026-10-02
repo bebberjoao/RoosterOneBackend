@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
 import PDFDocument from 'pdfkit';
 import { escreverDocumentoEncriptadoComNome } from '../src/common/file-encryption.util';
 import { PASTAS } from '../src/common/storage.config';
@@ -331,12 +332,13 @@ function permissionDefinitions(
     ['boost.manage.ver-progresso', 'Ver progresso dos alunos', boostModulo, '/boost/manage', 'ver-progresso'],
     ['boost.manage.certificado', 'Configurar certificado do curso', boostModulo, '/boost/manage', 'certificado'],
     ['boost.manage.vincular-orientadores', 'Vincular orientadores ao curso', boostModulo, '/boost/manage', 'vincular-orientadores'],
+    ['boost.manage.matricular', 'Matricular e cancelar matrícula de alunos', boostModulo, '/boost/manage', 'matricular'],
     // Conversa aluno ↔ orientador: o professor vinculado a um curso só conversa (não gere o curso).
     ['boost.conversas.acessar', 'Acessar conversas com alunos', boostModulo, '/boost/conversas', 'acessar'],
     ['boost.conversas.responder', 'Responder alunos', boostModulo, '/boost/conversas', 'responder'],
     // Contas externas (BoostUsuario) — gestão entre cursos, por isso tela própria.
     ['boost.students.acessar', 'Ver contas externas do Boost', boostModulo, '/boost/students', 'acessar'],
-    ['boost.students.gerenciar', 'Ativar/desativar e redefinir senha de conta externa', boostModulo, '/boost/students', 'gerenciar'],
+    ['boost.students.gerenciar', 'Cadastrar, editar, ativar/desativar, excluir e redefinir senha de conta externa', boostModulo, '/boost/students', 'gerenciar'],
 
     // Rooster Finance
     ['finance.dashboard.acessar', 'Acessar Rooster Finance', financeModulo, '/finance', 'acessar'],
@@ -432,7 +434,7 @@ const academyProfessorKeys = [
 const boostGestaoKeys = [
   'boost.dashboard.acessar', 'boost.manage.acessar', 'boost.manage.gerenciar-cursos',
   'boost.manage.gerenciar-conteudo', 'boost.manage.ver-progresso',
-  'boost.manage.certificado', 'boost.manage.vincular-orientadores',
+  'boost.manage.certificado', 'boost.manage.vincular-orientadores', 'boost.manage.matricular',
 ];
 /** Aluno: portal do Rooster Student + as ações do Rooster Learn como respondente. */
 const alunoKeys = [
@@ -1257,6 +1259,18 @@ async function main() {
     data: { boostUsuarioId: boostAluno3.id, cursoId: cursoBoost.id, status: 'cancelada', progressoPct: 0, matriculadoEm: new Date(Date.now() - 15 * 86400000) },
   });
 
+  // Aluno interno (João, do Academy) matriculado pela gestão: conta do portal vinculada à conta
+  // institucional, sem senha própria — o acesso ao portal é feito pelo login institucional.
+  const boostJoao = await prisma.boostUsuario.create({
+    data: {
+      nome: 'João Pereira', email: 'joao.pereira@rooster.local', usuarioId: ids.academyUsers.alunoJoao,
+      senhaHash: await senha(randomBytes(32).toString('hex')), criadoEm: new Date(Date.now() - 5 * 86400000),
+    },
+  });
+  await prisma.matriculaBoost.create({
+    data: { boostUsuarioId: boostJoao.id, cursoId: cursoBoost.id, status: 'ativa', progressoPct: 0, matriculadoEm: new Date(Date.now() - 5 * 86400000) },
+  });
+
   // Conversa do admin (orientador) com Rafael — pra ter conversa em mais de um orientador.
   const conversaBoostAdmin = await prisma.conversaBoost.create({
     data: { cursoId: cursoBoost.id, boostUsuarioId: boostAluno2.id, criadoEm: new Date(Date.now() - 18 * 86400000), ultimaMensagemEm: new Date(Date.now() - 18 * 86400000) },
@@ -1278,6 +1292,7 @@ async function main() {
   console.log('  Admin também é Professor (turma POO101-A, POO101-T1 com entrega corrigida de Pedro) E Aluno (matriculado em ALG101-A e BD101-A, com notas/frequência/cobranças variadas) — admin@rooster.local / Admin123!');
   console.log('Rooster Boost: orientadores ricardo.lima@rooster.local e admin (curso "Fundamentos de Lógica de Programação"); gestão: coordenacao.academica@rooster.local e admin.');
   console.log('  Alunos externos (login próprio, fora do Hub) / Boost123!: camila.externa@example.com (ativa, 50%), rafael.torres@example.com (concluída, com certificado), bianca.alves@example.com (cancelada).');
+  console.log('  Aluno interno no Boost: joao.pereira@rooster.local, matriculado pela gestão; acessa o portal pelo login institucional (Aluno123!).');
   console.log('Rooster Finance: financeiro@rooster.local / Financeiro123!');
   console.log('  João (sem desconto): paga, vencida com boleto emitido e futura. Maria (bolsa 50%): paga e futura.');
   console.log('  Admin (aluno): vencida (com multa/juros), negociada e cancelada — cobre todos os status de Cobranca.');

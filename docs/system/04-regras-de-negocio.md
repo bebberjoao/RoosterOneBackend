@@ -6,7 +6,8 @@ Assets; RN019 a RN035, acrescentadas em setembro de 2026, formalizam as regras d
 proteção do último administrador; RN036 a RN038 tratam do vídeo hospedado, do progresso de vídeo e da gestão das
 contas externas do Boost; RN039, da caixa de notificações; RN040 a RN042, da gestão do Boost por permissão, da
 conversa com o orientador e do certificado por curso; RN043 e RN044, da política de multa e juros e do vínculo entre
-reserva e turma. Revisão de 01/10/2026.
+reserva e turma; RN045 e RN046, do login institucional no portal do Boost e da matrícula pela gestão. Revisão de
+02/10/2026.
 
 ## RN001 — O administrador é definido por permissão, e não por papel
 
@@ -313,6 +314,9 @@ declaração `tipo: 'boost'`. O token do Hub é recusado no portal, e o token do
 A não extensão dos guards globais decorre do impacto potencial: `JwtAuthGuard` e `PermissionGuard` sustentam a
 autenticação de todo o sistema, e sua alteração afetaria módulos sem relação com o Boost.
 
+O login institucional no portal (RN045) não altera a regra: a credencial do Hub é validada uma única vez, em
+`POST /boost/login-institucional`, e o token emitido é do portal (`tipo: 'boost'`), sujeito às mesmas restrições.
+
 **Implementação**: `rooster-boost-portal/boost-jwt-auth.guard.ts`, com cobertura e2e nos dois sentidos.
 
 ## RN035 — A instituição não pode ficar sem administrador
@@ -359,10 +363,14 @@ o progresso parcial, o registro pode existir (posição armazenada) sem que a au
 **Implementação**: `boost-portal.service.ts::atualizarProgressoVideo` e `recalcularProgressoEEmitirCertificado`
 (compartilhado com `concluirAula`).
 
-## RN038 — A conta externa do Boost pode ser desativada e ter a senha redefinida pelo administrador, sem restrição ao cadastro
+## RN038 — As contas do portal do Boost são administradas pelo administrador, sem restrição ao cadastro público
 
 O cadastro público permanece aberto e sem aprovação (RN033). Esta regra acrescenta visibilidade e controle: o
-administrador relaciona as contas externas, desativa uma conta (que deixa de autenticar-se) e gera senha temporária.
+administrador relaciona as contas do portal, cadastra conta externa (com senha informada ou senha temporária gerada
+pelo sistema), edita nome e e-mail, desativa e reativa a conta (a conta desativada deixa de autenticar-se), gera senha
+temporária e exclui a conta **sem matrícula**; a conta com matrícula não é excluída, mas desativada, para preservar o
+histórico (`409`). A conta vinculada à conta institucional (RN045) é exibida para consulta e desativação, mas nome,
+e-mail e senha são mantidos no Rooster Hub: a edição desses campos e a redefinição de senha são recusadas com `409`.
 Por ser gestão transversal aos cursos, utiliza permissão própria (`/boost/students`), concedida apenas ao perfil de
 administrador; o professor apto a orientar no Boost não tem acesso.
 
@@ -371,7 +379,7 @@ Não há fluxo de redefinição por e-mail para conta externa (não há tabela d
 simplificação deliberada. As operações são registradas em auditoria.
 
 **Implementação**: `boost.controller.ts` (rotas `boost-alunos-externos`) e
-`boost.service.ts::findAllBoostUsuarios/toggleAtivoBoostUsuario/redefinirSenhaBoostUsuario`.
+`boost.service.ts::findAllBoostUsuarios/criarBoostUsuario/atualizarBoostUsuario/excluirBoostUsuario/redefinirSenhaBoostUsuario`.
 
 ## RN039 — Cada usuário lê e marca apenas as próprias notificações, e a emissão não interrompe a operação de origem
 
@@ -448,3 +456,35 @@ reserva existente.
 
 **Implementação**: `rooms.controller.ts::exigirTurmaValida` e `academy.service.ts::isTurmaDoProfessor`; migration
 `20260928090000_multa_juros_turma_auditoria_notificacao_rota`.
+
+## RN045 — O usuário institucional acessa o portal do Boost com a própria conta, sem cadastro adicional
+
+O aluno interno (ou qualquer usuário institucional ativo) entra no portal com o e-mail e a senha do Rooster One, em
+`POST /boost/login-institucional`. A conta do portal (`BoostUsuario`) é obtida pelo vínculo `usuarioId`, único, ou
+criada automaticamente no primeiro acesso, sem senha própria utilizável. Conta externa preexistente com o mesmo e-mail
+é vinculada (mesma pessoa, preservando matrículas e certificados) e tem a senha própria invalidada: como o cadastro
+externo não confirma o e-mail, manter essa senha permitiria que terceiro que o tivesse registrado acessasse a conta.
+Nome e e-mail da conta vinculada acompanham o Rooster Hub a cada acesso. A conta vinculada não autentica pelo login
+externo; o usuário desativado no Hub perde o acesso ao portal, inclusive com token já emitido, e a conta do portal
+desativada pela administração é recusada no login institucional. A falha de credencial devolve a mesma mensagem
+genérica do login externo.
+
+**Implementação**: `boost-portal.service.ts::loginInstitucional`, `boost.service.ts::obterContaInstitucional` e
+`boost-jwt-auth.guard.ts`; migration `20261002120000_boost_conta_institucional_matricula` (coluna
+`boost_usuarios.usuario_id`).
+
+## RN046 — A gestão do Boost matricula alunos da instituição e contas externas, e cancela matrícula não concluída
+
+Além da matrícula feita pelo próprio aluno no catálogo (RN033), o detentor de `/boost/manage matricular` matricula
+alunos do Academy (contas institucionais ativas com vínculo de aluno, cuja conta do portal é criada ou vinculada
+conforme RN045) ou contas externas ativas, em qualquer curso, inclusive não publicado. Os candidatos excluem quem já
+possui matrícula ativa ou concluída; a matrícula cancelada é reativada pela nova matrícula, preservando o histórico de
+progresso. A matrícula duplicada é recusada com `409`; a matrícula concluída não pode ser cancelada (`409`). As
+operações são registradas em auditoria (`matricula_boost_pela_gestao` e `matricula_boost_cancelada`), com o gestor
+como autor.
+
+**Implementação**: `boost.controller.ts` (rotas `cursos-boost/:id/candidatos-matricula`,
+`cursos-boost/:id/matriculas` e `matriculas-boost/:id/cancelar`) e
+`boost.service.ts::findCandidatosMatricula/matricularPelaGestao/cancelarMatriculaPelaGestao`; a permissão
+`boost.manage.matricular` foi criada pela mesma migration de RN045 e concedida a quem já possuía
+`boost.manage.gerenciar-cursos`.

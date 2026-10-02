@@ -135,6 +135,7 @@ const PERMISSION_CATALOG: Array<[modulo: string, recurso: string, acao: string]>
   ['Rooster Boost', '/boost/manage', 'ver-progresso'],
   ['Rooster Boost', '/boost/manage', 'certificado'],
   ['Rooster Boost', '/boost/manage', 'vincular-orientadores'],
+  ['Rooster Boost', '/boost/manage', 'matricular'],
   ['Rooster Boost', '/boost/conversas', 'acessar'],
   ['Rooster Boost', '/boost/conversas', 'responder'],
   ['Rooster Boost', '/boost/students', 'acessar'],
@@ -2171,6 +2172,183 @@ describe('Full API e2e tests', () => {
         .post('/v1/boost/login')
         .send({ email: 'aluna.painel.admin@example.com', senha: resetRes.body.senhaTemporaria })
         .expect(201);
+    });
+
+    it('Contas externas: cadastro com senha temporária, edição e exclusão restrita a conta sem matrícula', async () => {
+      const cenario = await montarCenarioBoost();
+
+      // sem a permissão de gestão de contas externas: 403
+      await request(app.getHttpServer())
+        .post('/v1/boost-alunos-externos').set('Authorization', cenario.gestor.header)
+        .send({ nome: 'Sem Permissão', email: 'sem.permissao@example.com' }).expect(403);
+
+      // sem senha informada: devolve senha temporária uma única vez, que autentica no portal
+      const criadoRes = await request(app.getHttpServer())
+        .post('/v1/boost-alunos-externos').set('Authorization', authHeader)
+        .send({ nome: 'Aluno Cadastrado', email: 'Aluno.Cadastrado@Example.com' }).expect(201);
+      expect(criadoRes.body.email).toBe('aluno.cadastrado@example.com');
+      expect(criadoRes.body.senhaTemporaria).toBeTruthy();
+      await request(app.getHttpServer())
+        .post('/v1/boost/login').send({ email: 'aluno.cadastrado@example.com', senha: criadoRes.body.senhaTemporaria }).expect(201);
+
+      // com senha informada: não devolve senha temporária
+      const comSenhaRes = await request(app.getHttpServer())
+        .post('/v1/boost-alunos-externos').set('Authorization', authHeader)
+        .send({ nome: 'Aluna Com Senha', email: 'aluna.com.senha@example.com', senha: 'SenhaInicial123' }).expect(201);
+      expect(comSenhaRes.body.senhaTemporaria).toBeUndefined();
+
+      // e-mail duplicado e senha curta são recusados
+      await request(app.getHttpServer())
+        .post('/v1/boost-alunos-externos').set('Authorization', authHeader)
+        .send({ nome: 'Duplicado', email: 'aluno.cadastrado@example.com' }).expect(409);
+      await request(app.getHttpServer())
+        .post('/v1/boost-alunos-externos').set('Authorization', authHeader)
+        .send({ nome: 'Senha Curta', email: 'senha.curta@example.com', senha: '123' }).expect(400);
+
+      // edição de nome e e-mail
+      const editadoRes = await request(app.getHttpServer())
+        .patch(`/v1/boost-alunos-externos/${criadoRes.body.id}`).set('Authorization', authHeader)
+        .send({ nome: 'Aluno Renomeado', email: 'aluno.renomeado@example.com' }).expect(200);
+      expect(editadoRes.body.nome).toBe('Aluno Renomeado');
+      expect(editadoRes.body.email).toBe('aluno.renomeado@example.com');
+
+      // conta com matrícula não é excluída (deve ser desativada); sem matrícula, é excluída
+      const { body: sessao } = await request(app.getHttpServer())
+        .post('/v1/boost/login').send({ email: 'aluna.com.senha@example.com', senha: 'SenhaInicial123' }).expect(201);
+      await request(app.getHttpServer())
+        .post(`/v1/cursos-boost/${cenario.curso.id}/matricular`).set('Authorization', `Bearer ${sessao.accessToken}`).expect(201);
+      await request(app.getHttpServer())
+        .delete(`/v1/boost-alunos-externos/${comSenhaRes.body.id}`).set('Authorization', authHeader).expect(409);
+      await request(app.getHttpServer())
+        .delete(`/v1/boost-alunos-externos/${criadoRes.body.id}`).set('Authorization', authHeader).expect(200);
+      expect(await prisma.boostUsuario.findUnique({ where: { id: criadoRes.body.id } })).toBeNull();
+    });
+
+    it('Login institucional no portal: cria e vincula a conta, emite token do portal e acompanha a situação no Hub', async () => {
+      await montarCenarioBoost();
+      const interno = await prisma.usuario.create({
+        data: { nome: 'Aluno Interno', email: 'aluno.interno@example.com', senhaHash: await bcrypt.hash('SenhaInterna123', 10), ativo: true },
+      });
+
+      // senha errada: mesma resposta genérica do login externo
+      await request(app.getHttpServer())
+        .post('/v1/boost/login-institucional').send({ email: 'aluno.interno@example.com', senha: 'errada123' }).expect(401);
+
+      const loginRes = await request(app.getHttpServer())
+        .post('/v1/boost/login-institucional').send({ email: 'aluno.interno@example.com', senha: 'SenhaInterna123' }).expect(201);
+      expect(loginRes.body.usuario.institucional).toBe(true);
+      const portalHeader = `Bearer ${loginRes.body.accessToken}`;
+      const conta = await prisma.boostUsuario.findUnique({ where: { usuarioId: interno.id } });
+      expect(conta?.email).toBe('aluno.interno@example.com');
+
+      // o token emitido é do portal: vale no Boost e não vale no Hub (isolamento preservado)
+      await request(app.getHttpServer()).get('/v1/boost/me/matriculas').set('Authorization', portalHeader).expect(200);
+      await request(app.getHttpServer()).get('/v1/turmas').set('Authorization', portalHeader).expect(401);
+
+      // novo login reutiliza a mesma conta, sem duplicar
+      await request(app.getHttpServer())
+        .post('/v1/boost/login-institucional').send({ email: 'aluno.interno@example.com', senha: 'SenhaInterna123' }).expect(201);
+      expect(await prisma.boostUsuario.count({ where: { usuarioId: interno.id } })).toBe(1);
+
+      // a conta vinculada não aceita o login externo nem redefinição de senha pelo painel
+      await request(app.getHttpServer())
+        .post('/v1/boost/login').send({ email: 'aluno.interno@example.com', senha: 'SenhaInterna123' }).expect(401);
+      await request(app.getHttpServer())
+        .post(`/v1/boost-alunos-externos/${conta!.id}/redefinir-senha`).set('Authorization', authHeader).expect(409);
+
+      // usuário desativado no Hub perde o portal, inclusive com token já emitido
+      await prisma.usuario.update({ where: { id: interno.id }, data: { ativo: false } });
+      await request(app.getHttpServer()).get('/v1/boost/me/matriculas').set('Authorization', portalHeader).expect(401);
+      await request(app.getHttpServer())
+        .post('/v1/boost/login-institucional').send({ email: 'aluno.interno@example.com', senha: 'SenhaInterna123' }).expect(401);
+    });
+
+    it('Login institucional vincula conta externa preexistente com o mesmo e-mail e invalida a senha própria', async () => {
+      await montarCenarioBoost();
+      await request(app.getHttpServer())
+        .post('/v1/boost/cadastro').send({ nome: 'Registro Prévio', email: 'pessoa.interna@example.com', senha: 'SenhaDeTerceiro123' }).expect(201);
+      await prisma.usuario.create({
+        data: { nome: 'Pessoa Interna', email: 'pessoa.interna@example.com', senhaHash: await bcrypt.hash('SenhaInterna123', 10), ativo: true },
+      });
+
+      await request(app.getHttpServer())
+        .post('/v1/boost/login-institucional').send({ email: 'pessoa.interna@example.com', senha: 'SenhaInterna123' }).expect(201);
+      expect(await prisma.boostUsuario.count({ where: { email: 'pessoa.interna@example.com' } })).toBe(1);
+      // a senha do cadastro externo deixa de funcionar
+      await request(app.getHttpServer())
+        .post('/v1/boost/login').send({ email: 'pessoa.interna@example.com', senha: 'SenhaDeTerceiro123' }).expect(401);
+    });
+
+    it('Matrícula pela gestão: aluno interno e conta externa, candidatos, duplicidade, cancelamento e reativação', async () => {
+      const cenario = await montarCenarioBoost();
+      const gestorSemMatricula = cenario.gestor;
+      const gestor = await criarUsuarioComPermissoes('Gestor Matrícula', 'gestor.matricula@example.com', [
+        ...BOOST_GESTOR_KEYS, ['Rooster Boost', '/boost/manage', 'matricular'],
+      ]);
+
+      const usuarioAluno = await prisma.usuario.create({
+        data: { nome: 'Aluno Do Academy', email: 'aluno.academy@example.com', senhaHash: await bcrypt.hash('SenhaAluno123', 10), ativo: true },
+      });
+      const cursoAcademico = await prisma.curso.create({ data: { nome: 'Curso Boost Teste', codigo: 'BOOST-T', grau: 'Graduação', ativo: true } });
+      await prisma.aluno.create({ data: { usuarioId: usuarioAluno.id, ra: 'RA-BOOST-1', cursoId: cursoAcademico.id } });
+      const externo = await prisma.boostUsuario.create({
+        data: { nome: 'Externo Candidato', email: 'externo.candidato@example.com', senhaHash: await bcrypt.hash('SenhaExterna123', 10), criadoEm: new Date() },
+      });
+
+      // sem a permissão `matricular`: 403
+      await request(app.getHttpServer())
+        .get(`/v1/cursos-boost/${cenario.curso.id}/candidatos-matricula`).set('Authorization', gestorSemMatricula.header).expect(403);
+
+      const candidatosRes = await request(app.getHttpServer())
+        .get(`/v1/cursos-boost/${cenario.curso.id}/candidatos-matricula?busca=academy`).set('Authorization', gestor.header).expect(200);
+      expect(candidatosRes.body.internos.map((c: any) => c.usuarioId)).toEqual([usuarioAluno.id]);
+      expect(candidatosRes.body.externos).toHaveLength(0);
+
+      // destinatário ambíguo ou ausente: 400
+      await request(app.getHttpServer())
+        .post(`/v1/cursos-boost/${cenario.curso.id}/matriculas`).set('Authorization', gestor.header).send({}).expect(400);
+
+      // aluno interno: a conta do portal é criada e vinculada; o aluno acessa pelo login institucional
+      const matriculaInternaRes = await request(app.getHttpServer())
+        .post(`/v1/cursos-boost/${cenario.curso.id}/matriculas`).set('Authorization', gestor.header)
+        .send({ usuarioId: usuarioAluno.id }).expect(201);
+      const { body: sessao } = await request(app.getHttpServer())
+        .post('/v1/boost/login-institucional').send({ email: 'aluno.academy@example.com', senha: 'SenhaAluno123' }).expect(201);
+      const minhas = await request(app.getHttpServer())
+        .get('/v1/boost/me/matriculas').set('Authorization', `Bearer ${sessao.accessToken}`).expect(200);
+      expect(minhas.body.map((m: any) => m.id)).toEqual([matriculaInternaRes.body.id]);
+
+      // conta externa; matrícula duplicada é recusada
+      await request(app.getHttpServer())
+        .post(`/v1/cursos-boost/${cenario.curso.id}/matriculas`).set('Authorization', gestor.header)
+        .send({ boostUsuarioId: externo.id }).expect(201);
+      await request(app.getHttpServer())
+        .post(`/v1/cursos-boost/${cenario.curso.id}/matriculas`).set('Authorization', gestor.header)
+        .send({ usuarioId: usuarioAluno.id }).expect(409);
+
+      // matriculados deixam de ser candidatos
+      const depoisRes = await request(app.getHttpServer())
+        .get(`/v1/cursos-boost/${cenario.curso.id}/candidatos-matricula`).set('Authorization', gestor.header).expect(200);
+      expect(depoisRes.body.internos.some((c: any) => c.usuarioId === usuarioAluno.id)).toBe(false);
+      expect(depoisRes.body.externos.some((c: any) => c.id === externo.id)).toBe(false);
+
+      // cancelamento e reativação pela nova matrícula
+      const canceladaRes = await request(app.getHttpServer())
+        .patch(`/v1/matriculas-boost/${matriculaInternaRes.body.id}/cancelar`).set('Authorization', gestor.header).expect(200);
+      expect(canceladaRes.body.status).toBe('cancelada');
+      const reativadaRes = await request(app.getHttpServer())
+        .post(`/v1/cursos-boost/${cenario.curso.id}/matriculas`).set('Authorization', gestor.header)
+        .send({ usuarioId: usuarioAluno.id }).expect(201);
+      expect(reativadaRes.body.id).toBe(matriculaInternaRes.body.id);
+      expect(reativadaRes.body.status).toBe('ativa');
+
+      // matrícula concluída não é cancelada
+      await prisma.matriculaBoost.update({ where: { id: matriculaInternaRes.body.id }, data: { status: 'concluida' } });
+      await request(app.getHttpServer())
+        .patch(`/v1/matriculas-boost/${matriculaInternaRes.body.id}/cancelar`).set('Authorization', gestor.header).expect(409);
+
+      const auditoria = await prisma.logAuditoria.findMany({ where: { acao: 'matricula_boost_pela_gestao' } });
+      expect(auditoria.every((l) => l.usuarioId === gestor.usuario.id)).toBe(true);
     });
   });
 

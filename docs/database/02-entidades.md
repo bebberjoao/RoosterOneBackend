@@ -841,7 +841,7 @@ PK: `id`. FK: `entregaId` → `Entrega.id` (`ON DELETE CASCADE`).
 
 ## Módulo Boost (11 entidades)
 
-`BoostUsuario` é uma tabela de autenticação **paralela** a `Usuario` (Hub), com cadastro público e independente, sem vínculo com `usuarios`. O `CursoBoost` **não possui responsável exclusivo**: a gestão cabe a quem possui a permissão. Os professores do Academy participam como **orientadores** (`CursoOrientadorBoost`), apenas para a comunicação com os alunos; o aluno é sempre um `BoostUsuario`. Ver `docs/security/03-rbac.md` para a fundamentação dos dois mecanismos de autenticação.
+`BoostUsuario` é uma tabela de autenticação **paralela** a `Usuario` (Hub), com cadastro público e independente. Desde 02/10/2026, a conta pode estar **vinculada** a um `Usuario` (`usuarioId`, opcional e único), quando o usuário institucional acessa o portal pelo login institucional ou é matriculado pela gestão (RN045 e RN046); a conta do aluno externo permanece sem vínculo. O `CursoBoost` **não possui responsável exclusivo**: a gestão cabe a quem possui a permissão. Os professores do Academy participam como **orientadores** (`CursoOrientadorBoost`), apenas para a comunicação com os alunos; o aluno é sempre um `BoostUsuario`. Ver `docs/security/03-rbac.md` para a fundamentação dos dois mecanismos de autenticação.
 
 ### BoostUsuario — tabela `boost_usuarios`
 
@@ -855,8 +855,9 @@ PK: `id`.
 | senhaHash | senha_hash | VarChar(255) | obrigatório | bcrypt, mesmo custo (10) do Hub |
 | ativo | ativo | Boolean | obrigatório | padrão `true` |
 | criadoEm | criado_em | Timestamp | opcional | |
+| usuarioId | usuario_id | Uuid | opcional | `@unique`; FK → `Usuario.id` (`ON DELETE SET NULL`). Preenchido na conta vinculada à conta institucional (RN045); a senha dessa conta não é utilizável, e o acesso ocorre pelo login institucional |
 
-Relações: `matriculas` → `MatriculaBoost[]`, `mensagens` → `MensagemBoost[]`, `conversas` → `ConversaBoost[]`.
+Relações: `usuario` → `Usuario?`, `matriculas` → `MatriculaBoost[]`, `mensagens` → `MensagemBoost[]`, `conversas` → `ConversaBoost[]`.
 
 ### CursoBoost — tabela `cursos_boost`
 

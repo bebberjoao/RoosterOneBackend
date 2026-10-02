@@ -99,14 +99,18 @@ Atividades e entregas, integradas ao Academy (mesma migration).
 Plataforma pública de cursos, introduzida pela migration `20260918130355_boost_platform`.
 
 - Cadastro e login públicos (`BoostUsuario`), separados do login do Hub, para alunos externos à instituição.
+- Login institucional no portal para os usuários da instituição, com criação ou vínculo automático da conta do portal
+  e token próprio do portal (RN045).
 - Gestão de cursos, módulos, aulas, materiais de apoio e vídeo hospedado por permissão (`/boost/manage`), sem
   responsável exclusivo por curso.
 - Orientadores: professores do Academy vinculados ao curso para a comunicação com os alunos.
-- Matrícula, progresso por aula (inclusive progresso de vídeo) e conclusão do curso pelo aluno externo.
+- Matrícula pelo próprio aluno, no catálogo, ou pela gestão (alunos da instituição e contas externas, RN046);
+  progresso por aula (inclusive progresso de vídeo) e conclusão do curso.
 - Certificado em PDF gerado automaticamente ao atingir 100% do curso, quando habilitado, sem aprovação manual, com
   verificação pública por código.
 - Conversa em tempo real (WebSocket) entre aluno e orientadores, por curso.
-- Administração das contas externas (ativação, desativação e redefinição de senha).
+- Administração das contas do portal (cadastro, edição, ativação, desativação, exclusão de conta sem matrícula e
+  redefinição de senha).
 - Ver `docs/security/03-rbac.md` quanto à arquitetura de dupla autenticação.
 
 ### Rooster Finance (`src/rooster-finance/`)

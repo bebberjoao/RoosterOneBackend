@@ -1,6 +1,6 @@
 # Migrations — Rooster One
 
-Histórico incremental de `prisma/migrations/` (24 migrations), cada qual em uma pasta
+Histórico incremental de `prisma/migrations/` (25 migrations), cada qual em uma pasta
 `<timestamp>_<descricao>/migration.sql`. O provider registrado em `migration_lock.toml` é `postgresql`: todas as
 migrations foram escritas e aplicadas sobre PostgreSQL.
 
@@ -43,6 +43,7 @@ migrations foram escritas e aplicadas sobre PostgreSQL.
 | 22 | `20260928090000_multa_juros_turma_auditoria_notificacao_rota` | Migration combinada: (1) `notificacoes` recebe `rota` (VARCHAR, destino da navegação a partir da notificação); (2) cria `politicas_multa_juros` (multa, juros e carência configuráveis pela equipe financeira) e a coluna `politica_multa_juros_id` (opcional, `ON DELETE SET NULL`) em `servicos_financeiros` e em `cobrancas`; (3) `reservas` recebe `turma_id` (opcional, `ON DELETE SET NULL`, com índice próprio), vínculo opcional entre Rooms e Academy. **Migração de dados**: cria as permissões `finance.policies.*` (concedidas a quem possui `finance.dashboard.acessar`) e `hub.acessos.relatorio-auditoria` (concedida a quem possui `hub.acessos.gerenciar-permissoes`). |
 | 23 | `20260928120000_rastreamento_de_erros` | Cria `logs_erro` (método, rota, status HTTP, mensagem, pilha de execução e usuário, com índice em `criado_em` e chave estrangeira `usuario_id → usuarios` `ON DELETE SET NULL`), alimentada exclusivamente pelo `AllExceptionsFilter` global, sem endpoint de escrita. **Migração de dados**: cria a permissão `hub.acessos.relatorio-erros`, concedida a quem possui `hub.acessos.gerenciar-permissoes`. |
 | 24 | `20260930170607_reserva_ambiente_data_idx` | Cria o índice composto `reservas_ambiente_id_data_idx` em `reservas(ambiente_id, data)`, que atende à verificação de conflito de horário (`RoomsService.assertReservaDisponivel`) e à consulta de disponibilidade, ambas filtradas por ambiente e data. Sem alteração de dados. |
+| 25 | `20261002120000_boost_conta_institucional_matricula` | Boost: `boost_usuarios` recebe `usuario_id` (UUID, opcional, único, FK para `usuarios` com `ON DELETE SET NULL`), vínculo da conta do portal com a conta institucional (RN045). **Dados**: cria a permissão `boost.manage.matricular` e a concede a quem possui `boost.manage.gerenciar-cursos` (RN046), de forma idempotente |
 
 ## Observação histórica
 

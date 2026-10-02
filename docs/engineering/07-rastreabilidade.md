@@ -113,8 +113,10 @@ contém "—". Revisão de 01/10/2026, abrangendo os nove módulos.
 | RF-B10 Retirada de publicação | `/boost/manage/:id` | `PATCH /cursos-boost/:id` (`status: arquivado`) | — | `cursos_boost` | `boost.manage.gerenciar-cursos` |
 | RF-B11 Configuração do certificado | `/boost/manage/:id` | `PATCH /cursos-boost/:id/certificado` | RN042 | `cursos_boost` | `boost.manage.certificado` |
 | RF-B12 Vínculo de orientadores | `/boost/manage/:id` | `GET/PUT /cursos-boost/:id/orientadores`, `GET /boost-professores` | RN040 | `cursos_orientadores_boost` | `boost.manage.vincular-orientadores` |
-| RF-B13 Administração de contas externas | `/boost/students` | `GET /boost-alunos-externos`, `PATCH /boost-alunos-externos/:id`, `POST /boost-alunos-externos/:id/redefinir-senha` | RN038 | `boost_usuarios`, `logs_auditoria` | `boost.students.*` |
+| RF-B13 Administração das contas do portal | `/boost/students` | `GET/POST /boost-alunos-externos`, `PATCH/DELETE /boost-alunos-externos/:id`, `POST /boost-alunos-externos/:id/redefinir-senha` | RN038 | `boost_usuarios`, `logs_auditoria` | `boost.students.*` |
 | RF-B14 Verificação pública de certificado | `/boost-portal/verificar` | `GET /certificados-boost/verificar/:codigo` | — | `certificados_boost` | pública (limite de requisições) |
+| RF-B16 Login institucional no portal | `/boost-portal/entrar` | `POST /boost/login-institucional` | RN034, RN045 | `usuarios`, `boost_usuarios` | pública (credencial institucional; limite de requisições) |
+| RF-B17 Matrícula pela gestão | `/boost/manage/:id` (aba Alunos) | `GET /cursos-boost/:id/candidatos-matricula`, `POST /cursos-boost/:id/matriculas`, `PATCH /matriculas-boost/:id/cancelar` | RN046 | `matriculas_boost`, `boost_usuarios`, `logs_auditoria` | `boost.manage.matricular` |
 
 ## Rooster Finance
 

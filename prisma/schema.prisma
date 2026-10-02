@@ -37,6 +37,7 @@ model Usuario {
   redefinicoesSenha RedefinicaoSenha[]
   professorAcademico Professor?
   alunoAcademico     Aluno?
+  contaBoost         BoostUsuario?
   politicasMultaJurosCriadas PoliticaMultaJuros[]
 
   @@map("usuarios")
@@ -875,7 +876,10 @@ model BoostUsuario {
   senhaHash String    @map("senha_hash") @db.VarChar(255)
   ativo     Boolean   @default(true)
   criadoEm  DateTime? @map("criado_em") @db.Timestamp()
+  /// Conta institucional vinculada (login institucional no portal). Nulo para aluno externo.
+  usuarioId String?   @unique @map("usuario_id") @db.Uuid
 
+  usuario    Usuario?         @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
   matriculas MatriculaBoost[]
   mensagens  MensagemBoost[]
   conversas  ConversaBoost[]
