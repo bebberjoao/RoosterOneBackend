@@ -164,7 +164,7 @@ Mapa de impacto (documentos a revisar conforme a alteração):
 | Endpoint (novo, alterado ou removido) | `api/02-endpoints.md`, `backend/04-controllers.md` e a seção de API do módulo na Documentação Geral |
 | Permissão ou RBAC | `security/03-rbac.md`, `backend/10-autorizacao-rbac.md`, `database/06-seeds.md` (contagem) e `permission-catalog.ts` no frontend |
 | Regra de negócio | `system/04-regras-de-negocio.md` (com o arquivo e o método que a implementam) |
-| Tela ou rota do frontend | `frontend/03-paginas-e-rotas.md`, `frontend/02-estrutura.md` e o Manual do Usuário |
+| Tela ou rota do frontend | `frontend/03-paginas-e-rotas.md`, `frontend/02-estrutura.md` e o Manual do Usuário (texto e captura da tela, regenerada pelo roteiro de captura automatizada que acompanha o gerador do manual) |
 | Dependência incluída ou removida | `backend/01-arquitetura.md` ou `frontend/01-arquitetura.md`, com **verificação de extensão global de tipos** (ver a lista de verificação) |
 | Módulo novo | Todos os itens anteriores, além de `system/02-escopo.md`, `system/03-funcionalidades.md` e `backend/03-modulos.md` |
 

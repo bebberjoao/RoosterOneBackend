@@ -1,7 +1,8 @@
 # Guia do Usuário — Rooster One
 
 Guia sintético das funcionalidades do Rooster One para o uso cotidiano, sem detalhamento técnico. O procedimento
-completo, tela a tela, consta do Manual do Usuário (documento Word que acompanha o projeto). As funcionalidades
+completo, tela a tela, consta do Manual do Usuário (documento Word que acompanha o projeto, ilustrado com a
+captura de cada uma das 62 telas descritas, obtida do sistema em funcionamento com usuários de demonstração). As funcionalidades
 disponíveis dependem das permissões concedidas pelo administrador a cada conta; a ausência de determinadas telas no
 menu é, portanto, esperada.
 
