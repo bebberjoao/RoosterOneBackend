@@ -1,6 +1,6 @@
 # Entidades — Rooster One
 
-Fonte: `prisma/schema.prisma`. Todos os modelos estão documentados (**65 no total**), agrupados pelos **oito módulos de negócio com tabelas próprias** (Hub, Desk, Rooms, Assets, Academy, Learn, Boost e Finance). O Rooster Student não possui tabela própria e utiliza as do Academy, do Learn e do Finance. Os nomes reais de coluna são indicados quando há `@map`, e o nome real da tabela, pelo `@@map`.
+Fonte: `prisma/schema.prisma`. Todos os modelos estão documentados (**68 no total**), agrupados pelos **oito módulos de negócio com tabelas próprias** (Hub, Desk, Rooms, Assets, Academy, Learn, Boost e Finance). O Rooster Student não possui tabela própria e utiliza as do Academy, do Learn e do Finance. Os nomes reais de coluna são indicados quando há `@map`, e o nome real da tabela, pelo `@@map`.
 
 Legenda de obrigatoriedade: **obrigatório** = coluna `NOT NULL` no PostgreSQL (campo sem `?` no Prisma); **opcional** = coluna que aceita `NULL` (campo com `?`).
 
@@ -771,7 +771,7 @@ Relações: `disciplina` (N:1, opcional).
 
 ---
 
-## Módulo Learn (3 entidades)
+## Módulo Learn (6 entidades)
 
 > Introduzido pela mesma migration `20260917173343_academy_learn_base`. Comentário de cabeçalho no schema, antes de `model Atividade`: *"Atividade referencia a Turma real do Academy (não duplica turma/aluno próprios, ao contrário do mock do frontend). Quando a atividade tem peso/nota, pode gerar um ItemAvaliativo (origem 'learn') no Academy."*
 
@@ -798,9 +798,9 @@ PK: `id`. FKs: `turmaId` → `Turma.id` (`ON DELETE RESTRICT`), `professorId` �
 | criadoEm | criado_em | Timestamp | opcional | |
 | publicadoEm | publicado_em | Timestamp | opcional | |
 
-Relações: `turma` (N:1, obrigatória), `professor` (N:1, opcional), `itemAvaliativo` (1:1, opcional — lado inverso de `ItemAvaliativo.atividadeId`), `entregas` → `Entrega[]`.
+Relações: `turma` (N:1, obrigatória), `professor` (N:1, opcional), `itemAvaliativo` (1:1, opcional — lado inverso de `ItemAvaliativo.atividadeId`), `entregas` → `Entrega[]`, `questoes` → `QuestaoAtividade[]`.
 
-**Fora do escopo implementado**: o protótipo anterior do frontend (`learn/mock-data.ts`) modelava um banco de questões de múltipla escolha (`Question` e `QuestionType`, alternativas embaralhadas e correção automática). O backend não modela questão, alternativa nem resposta: `tipo = 'questionario'` é apenas um rótulo entre os cinco tipos de atividade, e a resposta do aluno é sempre o campo de texto livre `Entrega.texto` (com anexos), corrigida manualmente pelo professor. Ver `docs/engineering/10-melhorias-futuras.md`.
+**Questões** (desde 02/10/2026, migration `20261002170000_learn_questoes`): a atividade pode conter questões (`QuestaoAtividade`), com alternativas (`AlternativaQuestao`) nas objetivas; as respostas do aluno são gravadas em `RespostaQuestao`. Sem questões, a resposta do aluno é o campo de texto livre `Entrega.texto`, com anexos. As questões pertencem a uma única atividade; não há banco de questões reutilizáveis (RN048 a RN050).
 
 ### Entrega — tabela `entregas`
 
@@ -812,30 +812,78 @@ PK: `id`. FKs: `atividadeId` → `Atividade.id` (`ON DELETE CASCADE`) e `alunoId
 | atividadeId | atividade_id | Uuid | obrigatório | |
 | alunoId | aluno_id | Uuid | obrigatório | |
 | status | status | VarChar(20) | obrigatório | padrão `"pendente"` (`pendente`\|`enviada`\|`corrigida`\|`reenvio`\|`atrasada`) |
-| texto | texto | Text | opcional | resposta em texto livre do aluno — não há modelagem de questão/alternativa |
+| texto | texto | Text | opcional | resposta em texto livre do aluno ou, na atividade com questões, observações gerais; as respostas às questões ficam em `RespostaQuestao` |
 | enviadoEm | enviado_em | Timestamp | opcional | |
-| nota | nota | Decimal(4,2) | opcional | espelhada (na correção) para a `Nota` do item avaliativo vinculado, se houver |
+| nota | nota | Decimal(4,2) | opcional | espelhada (na correção) para a `Nota` do item avaliativo vinculado, se houver; na atividade com questões, calculada como (pontos obtidos ÷ total) × `notaMaxima` (RN049) |
 | feedback | feedback | Text | opcional | |
-| corrigidoPorId | corrigido_por_id | Uuid | opcional | identificador sem relação Prisma para `Usuario` |
+| corrigidoPorId | corrigido_por_id | Uuid | opcional | identificador sem relação Prisma para `Usuario`; nulo na correção automática |
 | corrigidoEm | corrigido_em | Timestamp | opcional | |
 
-> **Nota sobre o reenvio**: no reenvio (`POST /atividades/:id/entregas` sobre entrega existente), o `update` do `upsert` limpa `nota`, `feedback`, `corrigidoPorId` e `corrigidoEm`; a correção anterior é invalidada, e o professor deve corrigir novamente. Não há histórico de versões de entrega nem de notas anteriores.
+> **Nota sobre o reenvio**: no reenvio (`POST /atividades/:id/entregas` sobre entrega existente), o `update` do `upsert` limpa `nota`, `feedback`, `corrigidoPorId` e `corrigidoEm`; a correção anterior é invalidada, e o professor deve corrigir novamente. Na atividade com questões, as respostas (`RespostaQuestao`) e os anexos vinculados a questões são substituídos; se todas as questões forem objetivas, a entrega é novamente corrigida de forma automática. Não há histórico de versões de entrega nem de notas anteriores.
 
-Relações: `atividade` (N:1, obrigatória), `aluno` (N:1, obrigatória), `anexos` → `AnexoEntrega[]`.
+Relações: `atividade` (N:1, obrigatória), `aluno` (N:1, obrigatória), `anexos` → `AnexoEntrega[]`, `respostas` → `RespostaQuestao[]`.
 
 ### AnexoEntrega — tabela `anexos_entrega`
 
-PK: `id`. FK: `entregaId` → `Entrega.id` (`ON DELETE CASCADE`).
+PK: `id`. FKs: `entregaId` → `Entrega.id` (`ON DELETE CASCADE`) e `questaoId` → `QuestaoAtividade.id` (opcional, `ON DELETE SET NULL`).
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
 |---|---|---|---|---|
 | id | id | Uuid | obrigatório | |
 | entregaId | entrega_id | Uuid | obrigatório | |
+| questaoId | questao_id | Uuid | opcional | questão do tipo envio de arquivo respondida pelo anexo; nulo para anexo geral da entrega |
 | nomeArquivo | nome_arquivo | VarChar(255) | opcional | nome original do arquivo |
 | caminho | caminho | VarChar(255) | opcional | nome do arquivo em disco (`uploads/anexos-entregas/`) |
 | tipo | tipo | VarChar(80) | opcional | mimetype |
 | **tamanho** | tamanho | **BigInt** | opcional | mesmo padrão de `AnexoTicket.tamanho`/`DocumentoAcademico.tamanho` — convertido para `Number` antes da resposta JSON |
 | criadoEm | criado_em | Timestamp | opcional | |
+
+### QuestaoAtividade — tabela `questoes_atividade`
+
+PK: `id`. FK: `atividadeId` → `Atividade.id` (`ON DELETE CASCADE`). Índice: `@@index([atividadeId])`.
+
+| Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
+|---|---|---|---|---|
+| id | id | Uuid | obrigatório | |
+| atividadeId | atividade_id | Uuid | obrigatório | |
+| ordem | ordem | Int | obrigatório | padrão `0`; sequência sem lacunas, mantida pela criação, exclusão e reordenação |
+| tipo | tipo | VarChar(20) | obrigatório | `multipla-uma`\|`multipla-varias`\|`vf`\|`discursiva`\|`arquivo` |
+| enunciado | enunciado | Text | obrigatório | |
+| textoApoio | texto_apoio | Text | opcional | exibido acima do enunciado |
+| imagemCaminho | imagem_caminho | VarChar(255) | opcional | nome do arquivo cifrado em disco (`uploads/imagens-questoes/`, ou `LEARN_IMAGENS_DIR`); nunca exposto na API |
+| imagemNome | imagem_nome | VarChar(255) | opcional | nome original da imagem |
+| imagemTipo | imagem_tipo | VarChar(80) | opcional | mimetype (JPEG, PNG, GIF ou WebP) |
+| pontos | pontos | Decimal(6,2) | obrigatório | padrão `1`; maior que zero |
+| obrigatoria | obrigatoria | Boolean | obrigatório | padrão `true` |
+| criadoEm | criado_em | Timestamp | opcional | |
+
+Relações: `atividade` (N:1, obrigatória), `alternativas` → `AlternativaQuestao[]`, `respostas` → `RespostaQuestao[]`, `anexos` → `AnexoEntrega[]`. A alteração é recusada após a primeira entrega da atividade (RN048).
+
+### AlternativaQuestao — tabela `alternativas_questao`
+
+PK: `id`. FK: `questaoId` → `QuestaoAtividade.id` (`ON DELETE CASCADE`). Índice: `@@index([questaoId])`.
+
+| Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
+|---|---|---|---|---|
+| id | id | Uuid | obrigatório | |
+| questaoId | questao_id | Uuid | obrigatório | |
+| ordem | ordem | Int | obrigatório | padrão `0` |
+| texto | texto | Text | obrigatório | |
+| correta | correta | Boolean | obrigatório | padrão `false`; compõe o gabarito, omitido ao aluno até a correção da própria entrega (RN050) |
+
+### RespostaQuestao — tabela `respostas_questao`
+
+PK: `id`. FKs: `entregaId` → `Entrega.id` e `questaoId` → `QuestaoAtividade.id` (ambas `ON DELETE CASCADE`). `@@unique([entregaId, questaoId])`: uma resposta por questão em cada entrega.
+
+| Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
+|---|---|---|---|---|
+| id | id | Uuid | obrigatório | |
+| entregaId | entrega_id | Uuid | obrigatório | |
+| questaoId | questao_id | Uuid | obrigatório | |
+| alternativasIds | alternativas_ids | Text | opcional | identificadores das alternativas escolhidas, em JSON (questões objetivas); convertido em lista na resposta da API |
+| texto | texto | Text | opcional | resposta escrita (questão discursiva) |
+| pontuacao | pontuacao | Decimal(6,2) | opcional | atribuída no envio (objetivas, critério tudo ou nada) ou pelo professor (demais); convertida para `Number` na resposta JSON |
+| corrigidaAutomaticamente | corrigida_automaticamente | Boolean | obrigatório | padrão `false` |
 
 ---
 
@@ -1167,9 +1215,9 @@ Documento **interno**, gerado por `NotaFiscalService.emitir()` (PDF por `pdfkit`
 | Rooms | 6 |
 | Assets | 4 |
 | Academy | 12 |
-| Learn | 3 |
+| Learn | 6 |
 | Boost | 12 |
 | Finance | 7 |
-| **Total** | **65** |
+| **Total** | **68** |
 
-O total de 65 corresponde exatamente ao número de `model` declarados em `prisma/schema.prisma` (verificado por contagem direta: `grep -c "^model " prisma/schema.prisma`).
+O total de 68 corresponde exatamente ao número de `model` declarados em `prisma/schema.prisma` (verificado por contagem direta: `grep -c "^model " prisma/schema.prisma`).

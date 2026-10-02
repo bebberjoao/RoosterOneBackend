@@ -75,8 +75,9 @@ responsabilidades; a relação rota a rota encontra-se em `docs/api/02-endpoints
 
 ## Rooster Learn
 
-- **`LearnController`**: atividades (rascunho, publicada, encerrada ou arquivada), entregas do aluno (texto e
-  anexo) e correção com nota e parecer. Possui implementação própria dos métodos `exigirEscopoTurma` e
+- **`LearnController`**: atividades (rascunho, publicada, encerrada ou arquivada), questões das atividades
+  (cadastro, reordenação e imagem de apoio, com a ação `editar-questoes`; consulta com gabarito restrito, RN050),
+  entregas do aluno (texto, respostas às questões e anexos) e correção com nota e parecer ou por questão. Possui implementação própria dos métodos `exigirEscopoTurma` e
   `exigirDonoOuGestor`, equivalentes aos do Academy (duplicação deliberada, para manter os módulos independentes). A
   correção propaga a nota ao `ItemAvaliativo` do Academy na mesma transação.
 

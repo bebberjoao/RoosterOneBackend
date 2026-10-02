@@ -8,6 +8,7 @@ erDiagram
   ALUNO ||--o{ MATRICULA : cursa
   TURMA ||--o{ MATRICULA : recebe
   TURMA ||--o{ ATIVIDADE : "Learn"
+  ATIVIDADE ||--o{ QUESTAO : contem
   ATIVIDADE ||--o{ ENTREGA : recebe
   ALUNO ||--o{ ENTREGA : envia
   ALUNO ||--o{ COBRANCA : "Finance: deve"

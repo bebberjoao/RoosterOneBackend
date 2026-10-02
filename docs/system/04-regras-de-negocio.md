@@ -7,8 +7,8 @@ proteção do último administrador; RN036 a RN038 tratam do vídeo hospedado, d
 contas externas do Boost; RN039, da caixa de notificações; RN040 a RN042, da gestão do Boost por permissão, da
 conversa com o orientador e do certificado por curso; RN043 e RN044, da política de multa e juros e do vínculo entre
 reserva e turma; RN045 a RN047, do login institucional no portal do Boost, da matrícula pela gestão e da recuperação de senha do aluno
-externo. Revisão de
-02/10/2026.
+externo; RN048 a RN050, das questões das atividades do Learn, da correção automática e por questão e da restrição do
+gabarito. Revisão de 02/10/2026.
 
 ## RN001 — O administrador é definido por permissão, e não por papel
 
@@ -234,9 +234,10 @@ com matrícula ativa são notificados.
 A correção de entrega exige `learn.classes.corrigir` e vínculo com a turma. A nota é validada contra o máximo da
 atividade e propagada ao `ItemAvaliativo` do Academy **na mesma transação**; em caso de falha em qualquer etapa,
 nenhuma das alterações é aplicada, de modo que não existe o estado "corrigido no Learn sem nota no Academy". O aluno é
-notificado da correção.
+notificado da correção. Na atividade com questões, a nota não é informada pelo professor, e sim calculada a partir da
+pontuação de cada questão (RN049), gravada na mesma transação.
 
-**Implementação**: `learn.service.ts`, em `prisma.$transaction`.
+**Implementação**: `learn.service.ts::corrigirEntrega`, em `prisma.$transaction`.
 
 ## RN027 — O prazo de entrega é determinado pelo servidor, e o reenvio invalida a correção
 
@@ -244,7 +245,8 @@ A entrega exige `learn.student.responder`, matrícula na turma da atividade e at
 prazo é marcada como atrasada, se a atividade admitir atraso, ou recusada, em caso contrário, sempre com base no
 relógio do servidor, e nunca no do cliente. O reenvio é permitido enquanto a atividade o admitir e **sempre invalida
 a correção anterior** (nota, parecer e corretor são limpos), pois a correção anterior refere-se a conteúdo que não é
-mais o entregue.
+mais o entregue. Na atividade com questões, o reenvio substitui as respostas e os arquivos enviados como resposta a
+questões; na atividade composta apenas por questões objetivas, o reenvio produz nova correção automática (RN049).
 
 **Implementação**: `learn.service.ts::enviarEntrega`.
 
@@ -504,3 +506,47 @@ redefinição são registrados em auditoria.
 
 **Implementação**: `boost-portal.service.ts::solicitarRedefinicaoSenha/redefinirSenhaComToken`; migration
 `20261002150000_boost_redefinicao_senha`.
+
+## RN048 — As questões da atividade seguem regras por tipo e não podem ser alteradas após a primeira entrega
+
+A atividade do Learn pode conter questões, cada uma com enunciado, texto de apoio opcional, imagem de apoio opcional,
+valor em pontos (maior que zero, padrão 1) e indicação de obrigatoriedade. Os tipos e as regras de alternativas são:
+múltipla escolha com uma resposta (de duas a dez alternativas, exatamente uma correta), múltipla escolha com várias
+respostas (de duas a dez alternativas, ao menos uma correta), verdadeiro ou falso (exatamente duas alternativas, uma
+correta), discursiva e envio de arquivo (ambas sem alternativas). A alteração de tipo revalida as alternativas contra
+o novo tipo. A criação, a alteração, a exclusão e a troca ou remoção da imagem de apoio exigem
+`learn.classes.editar-questoes` e vínculo com a turma (RN021), e são **recusadas com `409` quando a atividade já
+possui entregas**, pois invalidariam as respostas enviadas e a pontuação calculada sobre elas; a reordenação permanece
+permitida, por não alterar o conteúdo. A imagem de apoio aceita JPEG, PNG, GIF ou WebP, até 5 MB, com verificação do
+conteúdo pela assinatura do arquivo, e é armazenada cifrada em repouso (AES-256-GCM), como os demais documentos.
+
+**Implementação**: `questoes.service.ts::criar/atualizar/remover/reordenar/definirImagem/removerImagem`
+(`validarAlternativas` e `exigirEditavel`) e `learn.controller.ts`; migration `20261002170000_learn_questoes`,
+que também concede `learn.classes.editar-questoes` a quem já possuía `learn.classes.criar-atividade`.
+
+## RN049 — As questões objetivas são corrigidas no envio, e a nota da atividade com questões é proporcional aos pontos
+
+No envio da entrega de atividade com questões, cada resposta é validada: a questão obrigatória sem resposta é recusada
+(`400`), exceto a de envio de arquivo, cujo arquivo é anexado após o registro da entrega; a alternativa que não
+pertence à questão e a escolha de mais de uma alternativa em questão de resposta única também são recusadas. As
+questões objetivas (múltipla escolha e verdadeiro ou falso) são pontuadas de imediato, pelo critério "tudo ou nada": a
+pontuação integral é atribuída apenas quando o conjunto de alternativas escolhidas coincide exatamente com o gabarito.
+Quando todas as questões são objetivas, a entrega é registrada já corrigida, com parecer "Correção automática.", a nota
+é propagada ao Academy na mesma transação (RN026) e o aluno é notificado. Nos demais casos, o professor pontua cada
+questão discursiva e de envio de arquivo, podendo rever a pontuação automática das objetivas; a correção sem a
+pontuação de alguma questão, ou com pontuação superior ao valor da questão, é recusada (`400`). Em todos os casos, a
+nota é **(pontos obtidos ÷ total de pontos) × nota máxima da atividade**, com duas casas decimais.
+
+**Implementação**: `questoes.service.ts::calcularRespostas/calcularNota` e
+`learn.service.ts::enviarEntrega/corrigirEntrega`.
+
+## RN050 — O aluno vê as questões apenas de atividade publicada, e o gabarito apenas após a correção da própria entrega
+
+As questões e as imagens de apoio são acessíveis à coordenação do Learn, ao professor da turma e ao aluno matriculado;
+para o aluno, somente quando a atividade está publicada ou encerrada (`403` em caso contrário). O indicador de
+alternativa correta é omitido da resposta enviada ao aluno até que a própria entrega esteja corrigida, de modo que o
+gabarito não pode ser obtido pela inspeção das requisições. O caminho do arquivo da imagem em disco nunca é exposto: a
+imagem é servida por rota autenticada, decifrada no momento da leitura.
+
+**Implementação**: `learn.controller.ts::listarQuestoes/imagemQuestao` (`isGestorOuProfessorDaTurma` e
+`exigirAtividadeAberta`) e `questoes.service.ts::listar/serializar`.

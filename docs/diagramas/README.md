@@ -74,3 +74,7 @@ alto, com texto ilegível.
   e do caso "matricular e cancelar matrículas" da gestão; "gerir contas externas" passou a "gerir contas do portal".
 - Revisão de 02/10/2026 (recuperação de senha do portal): `erd-boost` acrescido de `RedefinicaoSenhaBoost` e do
   vínculo opcional `BoostUsuario.usuarioId`; `contexto` atualizado para 65 tabelas.
+- Revisão de 02/10/2026 (questões do Learn): `erd-learn` acrescido de `QuestaoAtividade`, `AlternativaQuestao` e
+  `RespostaQuestao` e do vínculo opcional `AnexoEntrega.questaoId`; `erd-geral` acrescido da relação entre atividade
+  e questão; `estado-entrega` acrescido da correção automática; `ativ-atividade-2` acrescido do fluxo de correção
+  automática e por questão; `contexto` atualizado para 68 tabelas.

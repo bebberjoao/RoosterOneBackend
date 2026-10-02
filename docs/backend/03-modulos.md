@@ -134,20 +134,22 @@ específica da ação). Ver `docs/security/03-rbac.md`.
 @Module({
   imports: [PrismaModule, UsuariosModule, RoosterAcademyModule, NotificacoesModule],
   controllers: [LearnController],
-  providers: [LearnService, PermissionGuard],
+  providers: [LearnService, QuestoesService, PermissionGuard],
 })
 ```
 
-Controller único (`LearnController`) para atividades (rascunho, publicada, encerrada ou arquivada), entregas do
-aluno (envio, reenvio e correção com nota e parecer) e anexos de entrega (upload de até 15 MB). Importa
+Controller único (`LearnController`) para atividades (rascunho, publicada, encerrada ou arquivada), questões das
+atividades (`QuestoesService`: regras por tipo, imagem de apoio, bloqueio após a primeira entrega, pontuação das
+objetivas e cálculo da nota proporcional), entregas do aluno (envio, reenvio e correção com nota e parecer ou por
+questão) e anexos de entrega (upload de até 15 MB). Importa
 `RoosterAcademyModule` porque toda atividade referencia uma `Turma` do Academy; o Learn não possui turmas nem
 alunos próprios.
 
 Integração: `PATCH /atividades/:id/publicar` cria, uma única vez, um `ItemAvaliativo` no Academy com
 `origem: 'learn'` quando a atividade possui peso maior que zero; `PATCH /entregas/:id/corrigir` grava a nota em
 `Entrega.nota` e, na mesma transação, na `Nota` do item avaliativo vinculado. Desse modo, a média do aluno no
-Academy (`calcularMediaTurma`) incorpora as atividades do Learn sem duplicação de dados. Não há banco de questões
-nem questões de múltipla escolha (ver `docs/engineering/10-melhorias-futuras.md`).
+Academy (`calcularMediaTurma`) incorpora as atividades do Learn sem duplicação de dados. A atividade composta apenas
+por questões objetivas é corrigida no próprio envio, com a mesma propagação (RN049).
 
 ## RoosterBoostModule (`src/rooster-boost/rooster-boost.module.ts`)
 

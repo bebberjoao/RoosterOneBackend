@@ -47,6 +47,7 @@ Levantamento de todos os `@unique`, `@@unique`, `@@index` e chaves estrangeiras 
 | RegistroFrequencia | `[turmaId, alunoId, data]` | `(turma_id, aluno_id, data)` | Fundamenta o `upsert` da chamada em lote (`POST /turmas/:id/frequencia`): um único registro de presença por aluno, turma e data; o novo registro atualiza o existente. |
 | Nota | `[itemAvaliativoId, alunoId]` | `(item_avaliativo_id, aluno_id)` | Impede duas notas para o mesmo aluno no mesmo item avaliativo; o novo lançamento executa `upsert`. |
 | Entrega | `[atividadeId, alunoId]` | `(atividade_id, aluno_id)` | Cada aluno possui no máximo uma entrega por atividade; o reenvio atualiza o mesmo registro. |
+| RespostaQuestao | `[entregaId, questaoId]` | `(entrega_id, questao_id)` | Uma resposta por questão em cada entrega; o reenvio substitui o conjunto de respostas. |
 | CursoOrientadorBoost | `[cursoId, professorId]` | `(curso_id, professor_id)` | Impede o vínculo duplicado do mesmo orientador ao mesmo curso. |
 | ConversaBoost | `[cursoId, boostUsuarioId]` | `(curso_id, boost_usuario_id)` | Uma única conversa por aluno em cada curso. |
 | MatriculaBoost | `[boostUsuarioId, cursoId]` | `(boost_usuario_id, curso_id)` | Torna idempotente a matrícula no mesmo curso. |
@@ -68,6 +69,8 @@ Levantamento de todos os `@unique`, `@@unique`, `@@index` e chaves estrangeiras 
 | Reserva | `[serieId]` | `(serie_id)` | Consulta das reservas pertencentes à mesma série recorrente. |
 | Reserva | `[turmaId]` | `(turma_id)` | Consulta das reservas vinculadas a uma turma. |
 | Reserva | `[ambienteId, data]` | `(ambiente_id, data)` | Migration `20260930170607_reserva_ambiente_data_idx`. Atende à verificação de conflito de horário e à consulta de disponibilidade, ambas filtradas por ambiente e data. |
+| QuestaoAtividade | `[atividadeId]` | `(atividade_id)` | Migration `20261002170000_learn_questoes`. Listagem ordenada das questões de uma atividade. |
+| AlternativaQuestao | `[questaoId]` | `(questao_id)` | Mesma migration. Carga das alternativas de cada questão. |
 | RegistroFrequencia | `[alunoId]` | `(aluno_id)` | Consulta da frequência completa de um aluno (`GET /me/frequencia`). |
 | Cobranca | `[alunoId]` | `(aluno_id)` | `GET /financeiro/me/cobrancas` e demais listagens filtradas por aluno. |
 | Ticket | `[categoriaId]` | `(categoria_id)` | Migration `20260921182117_ticket_log_indexes`. `findTicketsForUser` filtra por `categoria: { setorId: { in: sectorIds } }` para usuários sem perfil de administrador, por meio desta coluna. |
@@ -99,6 +102,10 @@ Levantamento de todos os `@unique`, `@@unique`, `@@index` e chaves estrangeiras 
 | Nota.itemAvaliativoId / alunoId | ItemAvaliativo.id / Aluno.id | **Cascade** | A exclusão do item avaliativo ou do aluno remove as notas. |
 | Entrega.atividadeId / alunoId | Atividade.id / Aluno.id | **Cascade** | A exclusão da atividade ou do aluno remove as entregas. |
 | AnexoEntrega.entregaId | Entrega.id | **Cascade** | A exclusão da entrega remove seus anexos. |
+| QuestaoAtividade.atividadeId | Atividade.id | **Cascade** | A exclusão da atividade remove suas questões (as imagens de apoio em disco são apagadas pelo serviço). |
+| AlternativaQuestao.questaoId | QuestaoAtividade.id | **Cascade** | A exclusão da questão remove suas alternativas. |
+| RespostaQuestao.entregaId / questaoId | Entrega.id / QuestaoAtividade.id | **Cascade** | A exclusão da entrega ou da questão remove as respostas. |
+| AnexoEntrega.questaoId | QuestaoAtividade.id | **SetNull** | A exclusão da questão preserva o anexo, que passa a anexo geral da entrega. |
 | CursoOrientadorBoost.cursoId | CursoBoost.id | **Cascade** | A exclusão do curso remove os vínculos de orientadores. |
 | ConversaBoost.cursoId / boostUsuarioId | CursoBoost.id / BoostUsuario.id | **Cascade** | A exclusão do curso ou da conta do aluno remove as conversas. |
 | ModuloBoost.cursoId | CursoBoost.id | **Cascade** | A exclusão do curso remove seus módulos. |

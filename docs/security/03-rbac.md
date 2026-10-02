@@ -193,10 +193,10 @@ utilizado pelas rotas `/me/*` do `AcademyController`, pelas rotas do aluno do `L
 `/financeiro/me/*` do `FinanceController`. De forma análoga, `Rooster Learn` / `/learn/student` é utilizado pelo
 próprio `LearnController`: mais de um conjunto de permissões pode ser verificado pelo mesmo controller.
 
-A ação `editar-questoes` (`Rooster Learn`) consta do catálogo, mas **não corresponde a rota** em
-`learn.controller.ts`, pois o banco de questões de múltipla escolha do protótipo anterior não foi implementado (ver
-`docs/engineering/10-melhorias-futuras.md`). A permissão é mantida no seed por simetria com o catálogo do frontend,
-sem uso no backend.
+A ação `editar-questoes` (`Rooster Learn`) protege, desde 02/10/2026, a criação, a alteração, a exclusão, a
+reordenação e a imagem de apoio das questões das atividades (`learn.controller.ts`, verificação manual por
+`exigirDonoOuGestor`, que exige também o vínculo do professor com a turma). A migration
+`20261002170000_learn_questoes` concedeu a permissão a quem já possuía `learn.classes.criar-atividade`.
 
 Concessão nos conjuntos de demonstração do seed (`prisma/seed-dev.ts`; não constituem entidade do banco):
 

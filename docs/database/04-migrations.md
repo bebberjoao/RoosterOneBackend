@@ -1,6 +1,6 @@
 # Migrations — Rooster One
 
-Histórico incremental de `prisma/migrations/` (26 migrations), cada qual em uma pasta
+Histórico incremental de `prisma/migrations/` (27 migrations), cada qual em uma pasta
 `<timestamp>_<descricao>/migration.sql`. O provider registrado em `migration_lock.toml` é `postgresql`: todas as
 migrations foram escritas e aplicadas sobre PostgreSQL.
 
@@ -45,6 +45,7 @@ migrations foram escritas e aplicadas sobre PostgreSQL.
 | 24 | `20260930170607_reserva_ambiente_data_idx` | Cria o índice composto `reservas_ambiente_id_data_idx` em `reservas(ambiente_id, data)`, que atende à verificação de conflito de horário (`RoomsService.assertReservaDisponivel`) e à consulta de disponibilidade, ambas filtradas por ambiente e data. Sem alteração de dados. |
 | 25 | `20261002120000_boost_conta_institucional_matricula` | Boost: `boost_usuarios` recebe `usuario_id` (UUID, opcional, único, FK para `usuarios` com `ON DELETE SET NULL`), vínculo da conta do portal com a conta institucional (RN045). **Dados**: cria a permissão `boost.manage.matricular` e a concede a quem possui `boost.manage.gerenciar-cursos` (RN046), de forma idempotente |
 | 26 | `20261002150000_boost_redefinicao_senha` | Boost: cria `redefinicoes_senha_boost` (token de redefinição de senha da conta do portal, armazenado como hash SHA-256, com validade e uso único), com FK para `boost_usuarios` (`ON DELETE CASCADE`) e índice em `boost_usuario_id` (RN047) |
+| 27 | `20261002170000_learn_questoes` | Learn: cria `questoes_atividade` (tipo, enunciado, texto e imagem de apoio, pontos, obrigatoriedade e ordem), `alternativas_questao` e `respostas_questao` (`@@unique([entrega_id, questao_id])`), todas com `ON DELETE CASCADE`; `anexos_entrega` recebe `questao_id` (opcional, `ON DELETE SET NULL`), vínculo do arquivo com a questão do tipo envio de arquivo (RN048 e RN049). **Dados**: concede `learn.classes.editar-questoes` a quem possui `learn.classes.criar-atividade`, de forma idempotente |
 
 ## Observação histórica
 

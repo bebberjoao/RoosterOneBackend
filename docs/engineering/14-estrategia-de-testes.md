@@ -1,18 +1,18 @@
 # Estratégia de Testes e Matriz de Cobertura
 
-Situação em 01/10/2026. Este documento descreve as camadas de teste existentes (comandos, abrangência e
+Situação em 02/10/2026. Este documento descreve as camadas de teste existentes (comandos, abrangência e
 quantitativos) e, ao final, a matriz que associa cada teste ao requisito ou regra de negócio que verifica.
 
 ## Camadas
 
 | Camada | Localização | Comando | Quantidade |
 |---|---|---|---|
-| e2e de API (backend) | `test/*.e2e-spec.ts` | `npm run test:e2e` | 83 testes, 2 arquivos |
+| e2e de API (backend) | `test/*.e2e-spec.ts` | `npm run test:e2e` | 85 testes, 2 arquivos |
 | Unitário (backend) | `src/**/*.spec.ts` | `npm test` | 137 testes, 12 arquivos |
 | Unitário e de componente (frontend) | `src/**/*.test.{ts,tsx}` | `npm test` (repositório do frontend) | 81 testes, 7 arquivos |
 | Acessibilidade (frontend) | `src/components/shared/acessibilidade.test.tsx` | incluída em `npm test` | 12 dos 81 acima |
 
-Total: **301 testes**. No backend, `npm run test:all` executa os testes unitários e e2e em sequência. Todas as
+Total: **303 testes**. No backend, `npm run test:all` executa os testes unitários e e2e em sequência. Todas as
 camadas são executadas pelo CI a cada envio para `main` e a cada pull request (ver
 `docs/operations/05-cicd.md`).
 
@@ -120,6 +120,8 @@ teste automatizado estão indicadas, com o motivo.
 | RN024 | Inexistência de fechamento de período | **Sem teste**: trata-se da ausência de uma funcionalidade, sem comportamento a verificar |
 | RN025, RN026 | Publicação idempotente e atomicidade entre correção e nota | e2e: "Rooster Learn: publicar atividade gera item avaliativo; correção propaga nota para o Academy" |
 | RN027 | Prazo decidido pelo servidor; aluno de outra turma não entrega | e2e: "Rooster Learn: … aluno de outra turma não pode entregar" |
+| RN048, RN050 | Regras de alternativas por tipo, imagem de apoio verificada, bloqueio da edição após a entrega; questões ocultas antes da publicação e gabarito oculto até a correção | e2e: "Rooster Learn: questões objetivas são corrigidas no envio, sem expor o gabarito ao aluno, e bloqueiam a edição após a entrega" |
+| RN049 | Correção automática das objetivas (tudo ou nada) e nota proporcional aos pontos na correção por questão | e2e: o anterior e "Rooster Learn: questões discursivas e de arquivo são pontuadas pelo professor e a nota é proporcional aos pontos" |
 | RN028 | Cobrança sempre vinculada a aluno real | e2e: "Portal do aluno: só vê/baixa as próprias cobranças" |
 | RN029 | Lote de mensalidades idempotente, com desconto vigente | e2e: "Gerar mensalidades em lote é idempotente por competência e aplica desconto ativo automaticamente" |
 | RN030 | Status "vencido" derivado, nunca persistido | e2e: "Cobrança: criar, marcar como paga, negociar e cancelar mudam o status corretamente" |

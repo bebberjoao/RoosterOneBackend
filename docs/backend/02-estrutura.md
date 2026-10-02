@@ -83,6 +83,7 @@ src/
 │   ├── rooster-learn.module.ts
 │   ├── learn.controller.ts
 │   ├── learn.service.ts
+│   ├── questoes.service.ts           # questões, gabarito, pontuação e nota proporcional
 │   └── dto/learn.dto.ts
 │
 ├── rooster-boost/                    # área do instrutor

@@ -87,12 +87,16 @@ Atividades e entregas, integradas ao Academy (mesma migration).
 - CRUD de atividades (rascunho, publicada, encerrada ou arquivada) em turma do Academy.
 - Publicação de atividade: gera automaticamente item avaliativo no Academy (`origem: 'learn'`) quando a atividade
   possui peso, sem duplicação de dados, e notifica os alunos.
-- Envio e reenvio de entrega pelo aluno (texto livre e anexo), com controle de prazo e de atraso.
+- Questões da atividade (desde 02/10/2026): múltipla escolha com uma ou várias respostas, verdadeiro ou falso,
+  discursiva e envio de arquivo, com texto e imagem de apoio, valor em pontos e obrigatoriedade; edição bloqueada após
+  a primeira entrega.
+- Envio e reenvio de entrega pelo aluno (texto livre, respostas às questões e anexos), com controle de prazo e de
+  atraso.
+- Correção automática das questões objetivas no envio; correção por questão das discursivas e de envio de arquivo,
+  com nota proporcional aos pontos obtidos.
 - Correção de entrega (nota e parecer) pelo professor, com propagação da nota ao Academy na mesma transação e
   notificação ao aluno.
 - Anexos de entrega (envio e download, até 15 MB).
-- **Não inclui** banco de questões de múltipla escolha nem correção automática, por decisão de escopo (ver "Fora do
-  escopo").
 
 ### Rooster Boost (`src/rooster-boost/` e `src/rooster-boost-portal/`)
 
@@ -144,9 +148,10 @@ Learn receberam backend pela migration `20260917173343_academy_learn_base`, o Bo
 possui controller nem módulo NestJS próprio; suas rotas são atendidas pelo `AcademyController`, pelo
 `LearnController` e pelo `FinanceController`, sob o módulo de permissão `Rooster Student`.
 
-**Rooster Learn, por decisão de escopo**: banco de questões de múltipla escolha e correção automática (existentes no
-protótipo anterior do frontend). Toda atividade é resposta em texto livre com anexos, corrigida manualmente pelo
-professor. Ver `docs/engineering/10-melhorias-futuras.md`.
+**Rooster Learn, por decisão de escopo**: banco de questões reutilizáveis entre atividades (as questões pertencem a
+uma única atividade) e sorteio ou embaralhamento de questões. As questões por atividade, com correção automática das
+objetivas, anteriormente fora do escopo, foram implementadas em 02/10/2026 (RN048 a RN050). Ver
+`docs/engineering/10-melhorias-futuras.md`.
 
 **Rooster Boost, por decisão de escopo**: cobrança pelo curso e avaliação do curso por estrelas. O vídeo hospedado,
 anteriormente fora do escopo, foi implementado em setembro de 2026 (envio com cifragem em repouso e reprodução com

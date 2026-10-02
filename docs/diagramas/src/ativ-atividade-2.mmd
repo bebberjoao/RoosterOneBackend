@@ -2,7 +2,14 @@ flowchart TD
   A([Atividade publicada]) --> B{"Aluno enviou ate o prazo?"}
   B -->|Sim| C["Entrega registrada no prazo"]
   B -->|Nao| D["Entrega atrasada, ou recusada se a atividade nao permitir"]
-  C --> E["Professor corrige com nota e feedback"]
-  D --> E
+  C --> Q{"Atividade possui questoes?"}
+  D --> Q
+  Q -->|Nao| E["Professor corrige com nota e feedback"]
+  Q -->|Sim| H["Objetivas pontuadas no envio (tudo ou nada)"]
+  H --> I{"Todas as questoes sao objetivas?"}
+  I -->|Sim| J["Correcao automatica: nota proporcional aos pontos"]
+  I -->|Nao| K["Professor pontua discursivas e de arquivo; nota proporcional aos pontos"]
   E --> F["Nota propagada ao Academy na mesma transacao"]
-  F --> G([Aluno ve a nota; media da turma atualizada])
+  J --> F
+  K --> F
+  F --> G([Aluno ve a nota e, com questoes, o gabarito])

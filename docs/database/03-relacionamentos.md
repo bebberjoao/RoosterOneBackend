@@ -102,6 +102,11 @@ Todas as entidades do Learn referenciam entidades do Academy; o Learn não possu
 | Atividade → Entrega | 1:N | `Entrega.atividadeId` | Cascade |
 | Aluno (Academy) → Entrega | 1:N | `Entrega.alunoId` | Cascade |
 | Entrega → AnexoEntrega | 1:N | `AnexoEntrega.entregaId` | Cascade |
+| Atividade → QuestaoAtividade | 1:N | `QuestaoAtividade.atividadeId` | Cascade |
+| QuestaoAtividade → AlternativaQuestao | 1:N | `AlternativaQuestao.questaoId` | Cascade |
+| Entrega → RespostaQuestao | 1:N | `RespostaQuestao.entregaId` | Cascade |
+| QuestaoAtividade → RespostaQuestao | 1:N | `RespostaQuestao.questaoId` | Cascade |
+| QuestaoAtividade → AnexoEntrega | 1:N (opcional) | `AnexoEntrega.questaoId` | SetNull |
 | Atividade ↔ ItemAvaliativo (Academy) | 1:1 (opcional) | `ItemAvaliativo.atividadeId` (`@unique`) | SetNull |
 
 A última linha corresponde à integração Learn → Academy: ao publicar atividade com peso, o Learn cria um `ItemAvaliativo` no Academy que referencia a `Atividade` (`atividadeId`, único: no máximo um item avaliativo por atividade). `Entrega.corrigidoPorId` armazena identificador de `Usuario` sem `@relation` no Prisma (mesmo padrão citado acima).
@@ -231,6 +236,11 @@ erDiagram
     ATIVIDADE ||--o{ ENTREGA : "recebe"
     ALUNO ||--o{ ENTREGA : "envia"
     ENTREGA ||--o{ ANEXO_ENTREGA : "possui"
+    ATIVIDADE ||--o{ QUESTAO_ATIVIDADE : "contem"
+    QUESTAO_ATIVIDADE ||--o{ ALTERNATIVA_QUESTAO : "oferece"
+    ENTREGA ||--o{ RESPOSTA_QUESTAO : "responde"
+    QUESTAO_ATIVIDADE ||--o{ RESPOSTA_QUESTAO : "respondida em"
+    QUESTAO_ATIVIDADE |o--o{ ANEXO_ENTREGA : "arquivo da questao"
     ATIVIDADE ||--o| ITEM_AVALIATIVO : "gera (origem learn)"
 
     %% ===== Boost =====
@@ -668,7 +678,8 @@ Cada aresta do diagrama foi verificada contra `prisma/schema.prisma` (revisão d
   `Matricula`, `RegistroFrequencia`, `ItemAvaliativo`, `Nota` e `DocumentoAcademico`, incluindo as duas relações
   1:1 opcionais em `Usuario` (`professorAcademico` e `alunoAcademico`). `EventoCalendarioAcademico` não consta do
   diagrama, por não possuir chave estrangeira nem `@relation`.
-- **Learn**: 6 arestas, verificadas contra `Atividade`, `Entrega` e `AnexoEntrega`, incluindo a relação 1:1 opcional
+- **Learn**: 11 arestas, verificadas contra `Atividade`, `Entrega`, `AnexoEntrega`, `QuestaoAtividade`,
+  `AlternativaQuestao` e `RespostaQuestao`, incluindo a relação 1:1 opcional
   `Atividade ↔ ItemAvaliativo` (Learn → Academy), pela qual a atividade publicada passa a compor a nota no Academy
   sem duplicação de dados.
 - **Boost**: 15 arestas, verificadas contra `BoostUsuario`, `CursoBoost`, `CursoOrientadorBoost`, `ModuloBoost`,

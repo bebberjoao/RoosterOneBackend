@@ -1,20 +1,49 @@
 erDiagram
   Turma ||--o{ Atividade : recebe
   Professor ||--o{ Atividade : cria
+  Atividade ||--o{ QuestaoAtividade : contem
+  QuestaoAtividade ||--o{ AlternativaQuestao : oferece
   Atividade ||--o{ Entrega : respondida_por
   Aluno ||--o{ Entrega : envia
+  Entrega ||--o{ RespostaQuestao : responde
+  QuestaoAtividade ||--o{ RespostaQuestao : respondida_em
   Entrega ||--o{ AnexoEntrega : anexa
+  QuestaoAtividade |o--o{ AnexoEntrega : arquivo_da_questao
   Atividade ||--o| ItemAvaliativo : gera_ao_publicar
 
   Atividade {
     uuid id PK
     string status
     decimal peso
+    decimal notaMaxima
     datetime prazo
+  }
+  QuestaoAtividade {
+    uuid id PK
+    int ordem
+    string tipo
+    string enunciado
+    string textoApoio
+    string imagemCaminho
+    decimal pontos
+    bool obrigatoria
+  }
+  AlternativaQuestao {
+    uuid id PK
+    int ordem
+    string texto
+    bool correta
   }
   Entrega {
     uuid id PK
-    bool atrasada
+    string status
     decimal nota
     string feedback
+  }
+  RespostaQuestao {
+    uuid id PK
+    string alternativasIds
+    string texto
+    decimal pontuacao
+    bool corrigidaAutomaticamente
   }

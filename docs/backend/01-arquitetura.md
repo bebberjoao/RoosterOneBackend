@@ -6,7 +6,7 @@ Situação: descrição elaborada a partir da leitura de `src/` e `prisma/schema
 
 - **NestJS 11** (`@nestjs/common` e `@nestjs/core`; versão instalada 11.2.7) como framework de aplicação.
 - **Prisma 6** (`@prisma/client`; versão instalada 6.19.3) como ORM, sobre **PostgreSQL** (`prisma/schema.prisma`,
-  `datasource db { provider = "postgresql" }`), com **65 modelos**.
+  `datasource db { provider = "postgresql" }`), com **68 modelos**.
 - **@nestjs/jwt** para emissão e verificação de JWT. A verificação é realizada em `src/auth/jwt-auth.guard.ts`
   (`jwt.verifyAsync`), **sem Passport**; os pacotes `passport`, `passport-jwt` e `@nestjs/passport` foram removidos
   por não serem utilizados. Ver `09-autenticacao.md`.

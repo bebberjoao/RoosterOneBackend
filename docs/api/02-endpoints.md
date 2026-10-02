@@ -533,7 +533,20 @@ Notas de verificação manual:
 | GET | `/atividades/:id` | Bearer | manual — ver nota (8) | Busca atividade por id |
 | PATCH | `/atividades/:id` | Bearer | manual — ver nota (7), ação `criar-atividade` | Atualiza atividade |
 | PATCH | `/atividades/:id/publicar` | Bearer | manual — ver nota (7), ação `criar-atividade` | **Publica a atividade** (gera item avaliativo no Academy quando `peso > 0`; detalhado abaixo) e notifica os alunos matriculados |
-| DELETE | `/atividades/:id` | Bearer | manual — ver nota (7), ação `excluir` | Remove atividade |
+| DELETE | `/atividades/:id` | Bearer | manual — ver nota (7), ação `excluir` | Remove atividade, com as questões (em cascata) e as imagens de apoio em disco |
+
+### 6.1.1 Questões da atividade (desde 02/10/2026)
+
+| Método | Rota | Auth | Permissão exigida | Descrição |
+|---|---|---|---|---|
+| GET | `/atividades/:id/questoes` | Bearer | manual — ver nota (11) | Lista as questões, em ordem, com as alternativas; o indicador `correta` é omitido ao aluno até a correção da própria entrega (RN050) |
+| POST | `/atividades/:id/questoes` | Bearer | manual — ver nota (7), ação `editar-questoes` | Cria questão (`CreateQuestaoDto`: `tipo`, `enunciado`, `textoApoio?`, `pontos?`, `obrigatoria?`, `alternativas?`); regras por tipo (RN048); `409` quando a atividade já possui entregas |
+| PATCH | `/atividades/:id/questoes/ordem` | Bearer | manual — ver nota (7), ação `editar-questoes` | Reordena as questões (`{ ids }`, com todas as questões da atividade, cada uma uma única vez); permitido mesmo após entregas |
+| PATCH | `/questoes/:id` | Bearer | manual — ver nota (7), ação `editar-questoes` | Altera a questão; a troca de tipo ou o envio de `alternativas` regrava o conjunto de alternativas, validado contra o tipo final; `409` após entregas |
+| DELETE | `/questoes/:id` | Bearer | manual — ver nota (7), ação `editar-questoes` | Exclui a questão e renumera as demais; `409` após entregas |
+| POST | `/questoes/:id/imagem` | Bearer | manual — ver nota (7), ação `editar-questoes` | Define ou substitui a imagem de apoio (multipart, campo `arquivo`; JPEG, PNG, GIF ou WebP, até 5 MB; conteúdo verificado pela assinatura; gravação cifrada); `409` após entregas |
+| DELETE | `/questoes/:id/imagem` | Bearer | manual — ver nota (7), ação `editar-questoes` | Remove a imagem de apoio; `409` após entregas |
+| GET | `/questoes/:id/imagem` | Bearer | manual — ver nota (11) | Exibe a imagem de apoio (`Content-Disposition: inline`), decifrada no momento da leitura |
 
 ### 6.2 Entregas (correção do professor)
 
@@ -546,7 +559,7 @@ Notas de verificação manual:
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
-| POST | `/atividades/:id/entregas` | Bearer | Rooster Learn / `/learn/student` / `responder` | Envia ou reenvia a resposta do aluno autenticado; o reenvio invalida a correção anterior |
+| POST | `/atividades/:id/entregas` | Bearer | Rooster Learn / `/learn/student` / `responder` | Envia ou reenvia a resposta do aluno autenticado (`EnviarEntregaDto`: `texto?` e `respostas?`, lista de `{ questaoId, alternativasIds?, texto? }`); o reenvio invalida a correção anterior. Na atividade com questões, valida as obrigatórias e pontua as objetivas; se todas forem objetivas, a entrega retorna já corrigida (RN049). Devolve a entrega com `anexos` e `respostas` |
 | GET | `/atividades/:id/minha-entrega` | Bearer | Rooster Learn / `/learn/student` / `acessar` | Entrega do aluno autenticado para a atividade (`null` quando ainda não houve envio) |
 | GET | `/me/entregas` | Bearer | Rooster Learn / `/learn/student` / `acessar` | Todas as entregas (e correções) do aluno autenticado |
 | GET | `/me/atividades` | Bearer | Rooster Learn / `/learn/student` / `acessar` | Atividades publicadas/encerradas nas turmas em que o aluno autenticado está matriculado |
@@ -555,15 +568,16 @@ Notas de verificação manual:
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
-| POST | `/entregas/:id/anexos` | Bearer | Rooster Learn / `/learn/student` / `anexar` + manual — ver nota (9) | **Anexa um arquivo à própria entrega** (multipart, até 15 MB; mesmo padrão do Desk e do Academy) |
+| POST | `/entregas/:id/anexos` | Bearer | Rooster Learn / `/learn/student` / `anexar` + manual — ver nota (9) | **Anexa um arquivo à própria entrega** (multipart, até 15 MB; mesmo padrão do Desk e do Academy). O campo opcional `questaoId` vincula o arquivo à questão do tipo envio de arquivo da mesma atividade (`400` em caso contrário), substituindo o arquivo anterior da mesma questão |
 | GET | `/entregas/:id/anexos/:anexoId/arquivo` | Bearer | manual — ver nota (10) | Baixa o anexo de uma entrega |
 
 Notas de verificação manual:
 
-- **(7)** `exigirDonoOuGestor` (`learn.controller.ts`): autoriza incondicionalmente o usuário com `Rooster Learn / /learn/classes / gerenciar-turmas`; nos demais casos, somente o usuário que seja professor **e** responsável pela turma da atividade (`AcademyService.isTurmaDoProfessor`) **e** possua a ação específica (`criar-atividade`, `corrigir` ou `excluir`) em `/learn/classes`. Sem a combinação das condições, `403 ForbiddenException`.
+- **(7)** `exigirDonoOuGestor` (`learn.controller.ts`): autoriza incondicionalmente o usuário com `Rooster Learn / /learn/classes / gerenciar-turmas`; nos demais casos, somente o usuário que seja professor **e** responsável pela turma da atividade (`AcademyService.isTurmaDoProfessor`) **e** possua a ação específica (`criar-atividade`, `editar-questoes`, `corrigir` ou `excluir`) em `/learn/classes`. Sem a combinação das condições, `403 ForbiddenException`.
 - **(8)** `exigirEscopoTurma` (`learn.controller.ts`): mesma lógica de três camadas da nota (2) da seção 5 (gestão do Learn, professor responsável ou aluno matriculado), com implementação própria neste controller.
 - **(9)** `POST /entregas/:id/anexos`: além de `@RequirePermission`, o handler exige que a entrega pertença ao aluno autenticado (`LearnService.isEntregaDoAluno`); caso contrário, `403 ForbiddenException('Esta entrega não pertence ao aluno autenticado.')`.
 - **(10)** `GET /entregas/:id/anexos/:anexoId/arquivo`: autoriza o aluno autor da entrega (`isEntregaDoAluno`) **ou**, por meio de `exigirDonoOuGestor` com a ação `corrigir`, o professor responsável pela turma e a coordenação.
+- **(11)** `GET /atividades/:id/questoes` e `GET /questoes/:id/imagem`: `exigirEscopoTurma` (nota 8); para quem não é coordenação nem professor responsável (`isGestorOuProfessorDaTurma`), exige ainda atividade publicada ou encerrada (`403` em caso contrário). O gabarito é incluído para a coordenação e o professor responsável e, para o aluno, somente quando a própria entrega está corrigida.
 
 ---
 
@@ -1008,16 +1022,17 @@ attachment` gerado conforme a RFC 6266 (`filename*=UTF-8''...` para nomes não-A
 
 | Campo | Tipo | Obrigatório | Regras |
 |---|---|---|---|
-| `nota` | number | sim | `Min(0)`; validada, em tempo de execução, contra `Entrega.atividade.notaMaxima` (`400` quando excedida) |
+| `nota` | number | sim, na atividade sem questões | `Min(0)`; validada, em tempo de execução, contra `Entrega.atividade.notaMaxima` (`400` quando excedida). Ignorada na atividade com questões, cuja nota é calculada |
+| `pontuacoes` | `{ questaoId, pontuacao }[]` | na atividade com questões, para as questões ainda sem pontuação | `pontuacao` entre 0 e o valor da questão; as objetivas já pontuadas automaticamente podem ser revistas |
 | `feedback` | string | não | — |
 
-**Regras:** em uma única transação, atualiza a `Entrega` (`status: 'corrigida'`, `nota`, `feedback`, `corrigidoPorId` e `corrigidoEm`) e, quando a atividade possui `itemAvaliativo` vinculado (`origem: 'learn'`), executa `upsert` da `Nota` correspondente (`itemAvaliativoId` e `alunoId`) com o mesmo valor. Desse modo, a correção de uma entrega do Learn reflete-se em `GET /me/notas` do Academy sem chamada adicional do frontend. O aluno é notificado da correção.
+**Regras:** em uma única transação, atualiza a `Entrega` (`status: 'corrigida'`, `nota`, `feedback`, `corrigidoPorId` e `corrigidoEm`) e, quando a atividade possui `itemAvaliativo` vinculado (`origem: 'learn'`), executa `upsert` da `Nota` correspondente (`itemAvaliativoId` e `alunoId`) com o mesmo valor. Desse modo, a correção de uma entrega do Learn reflete-se em `GET /me/notas` do Academy sem chamada adicional do frontend. O aluno é notificado da correção. Na atividade com questões, a pontuação de cada questão é gravada em `respostas_questao` na mesma transação, e a nota é **(soma das pontuações ÷ total de pontos) × `notaMaxima`**, com duas casas decimais (RN049).
 
 **Erros:**
 
 | Status | Exceção | Causa |
 |---|---|---|
-| 400 | `BadRequestException` | `nota` maior que `notaMaxima` da atividade |
+| 400 | `BadRequestException` | `nota` ausente ou maior que `notaMaxima` da atividade (atividade sem questões); questão sem pontuação, pontuação acima do valor da questão ou questão de outra atividade (atividade com questões) |
 | 403 | `ForbiddenException` | O autor da correção não é o professor responsável pela turma nem integra a coordenação |
 | 404 | `NotFoundException` | `entregaId` não encontrado |
 

@@ -80,10 +80,13 @@ contém "—". Revisão de 01/10/2026, abrangendo os nove módulos.
 | Funcionalidade | Rota do frontend | Endpoint | Regra | Tabela(s) | Permissão |
 |---|---|---|---|---|---|
 | RF-L01 Criação e publicação de atividade | `/learn/classes`, `/learn/activities/:id` | `POST /atividades`, `PATCH /atividades/:id`, `PATCH /atividades/:id/publicar` | RN021, RN025 | `atividades`, `itens_avaliativos`, `notificacoes` | `learn.classes.criar-atividade` (professor responsável) ou gestão |
-| RF-L02 Envio e reenvio de entrega | `/learn/student`, `/student/activities` | `POST /atividades/:id/entregas` | RN027 | `entregas` | `learn.student.responder` |
-| RF-L03 Anexo de entrega | `/learn/student` | `POST /entregas/:id/anexos`, `GET /entregas/:id/anexos/:anexoId/arquivo` | — | `anexos_entrega` | `learn.student.anexar` (autor da entrega) |
-| RF-L04 Correção de entrega | `/learn/activities/:id` | `GET /atividades/:id/entregas`, `PATCH /entregas/:id/corrigir` | RN026 | `entregas`, `notas`, `notificacoes` | `learn.classes.corrigir` (professor responsável) ou gestão |
+| RF-L02 Envio e reenvio de entrega | `/learn/student`, `/student/activities` | `POST /atividades/:id/entregas` | RN027, RN049 | `entregas`, `respostas_questao` | `learn.student.responder` |
+| RF-L03 Anexo de entrega | `/learn/student`, `/student/activities` | `POST /entregas/:id/anexos`, `GET /entregas/:id/anexos/:anexoId/arquivo` | — | `anexos_entrega` | `learn.student.anexar` (autor da entrega) |
+| RF-L04 Correção de entrega | `/learn/activities/:id` | `GET /atividades/:id/entregas`, `PATCH /entregas/:id/corrigir` | RN026, RN049 | `entregas`, `respostas_questao`, `notas`, `notificacoes` | `learn.classes.corrigir` (professor responsável) ou gestão |
 | RF-L05 Atividades e entregas do aluno | `/learn/student`, `/student/activities` | `GET /me/atividades`, `GET /me/entregas`, `GET /atividades/:id/minha-entrega` | — | `atividades`, `entregas` | `learn.student.acessar` |
+| RF-L06 Questões da atividade | `/learn/activities/:id` (aba Questões) | `POST /atividades/:id/questoes`, `PATCH /atividades/:id/questoes/ordem`, `PATCH/DELETE /questoes/:id`, `POST/DELETE /questoes/:id/imagem` | RN021, RN048 | `questoes_atividade`, `alternativas_questao` | `learn.classes.editar-questoes` (professor responsável) ou gestão |
+| RF-L07 Correção automática e por questão | `/learn/student`, `/student/activities`, `/learn/activities/:id` (aba Correção) | `POST /atividades/:id/entregas`, `PATCH /entregas/:id/corrigir` | RN026, RN049 | `respostas_questao`, `entregas`, `notas` | `learn.student.responder`; `learn.classes.corrigir` |
+| RF-L08 Consulta das questões e do gabarito | `/learn/activities/:id`, `/learn/student`, `/student/activities` | `GET /atividades/:id/questoes`, `GET /questoes/:id/imagem` | RN050 | `questoes_atividade`, `alternativas_questao` | Gestão, professor responsável ou aluno matriculado |
 
 ## Rooster Student (portal do aluno)
 
@@ -134,5 +137,5 @@ contém "—". Revisão de 01/10/2026, abrangendo os nove módulos.
 | RF-F09 Portal financeiro do aluno | `/student/finance` | `GET /financeiro/me/cobrancas`, `/financeiro/me/desconto`, `/financeiro/me/cobrancas/:id/boleto`, `/financeiro/me/cobrancas/:id/nota-fiscal` | RN028 | `cobrancas`, `descontos_alunos`, `notas_fiscais` | `student.finance.acessar`, `baixar-boleto` |
 | RF-F11 Políticas de multa e juros | `/finance/policies` | `GET/POST/PATCH/DELETE /politicas-multa-juros` | RN043 | `politicas_multa_juros` | `finance.policies.*` |
 
-As funcionalidades declaradas fora do escopo implementado (RF-L06, RF-B15 e RF-F10) não possuem linha nesta matriz,
+As funcionalidades declaradas fora do escopo implementado (RF-B15 e RF-F10) não possuem linha nesta matriz,
 por não terem endpoint nem tabela correspondentes.

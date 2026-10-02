@@ -25,6 +25,20 @@ estão indicadas; as demais não alteram o banco de dados.
 
 ### Adicionado
 
+- **Questões nas atividades do Rooster Learn** (02/10/2026). **Exige migration** (`20261002170000_learn_questoes`).
+  A atividade passa a admitir questões de múltipla escolha com uma ou várias respostas, verdadeiro ou falso,
+  discursivas e de envio de arquivo, com enunciado, texto de apoio, imagem de apoio (JPEG, PNG, GIF ou WebP, até
+  5 MB, com verificação de conteúdo e cifragem em repouso, na pasta `LEARN_IMAGENS_DIR`), valor em pontos e
+  obrigatoriedade (`QuestoesService`; rotas `/atividades/:id/questoes`, `/atividades/:id/questoes/ordem` e
+  `/questoes/:id[/imagem]`). As questões não podem ser alteradas após a primeira entrega (`409`), e a reordenação
+  permanece permitida (RN048). As objetivas são pontuadas no envio (critério tudo ou nada); a atividade composta
+  apenas por objetivas é corrigida automaticamente, com propagação da nota ao Academy; nas demais, o professor
+  pontua cada questão, e a nota é a proporção dos pontos obtidos sobre o total, aplicada à nota máxima (RN049). O
+  gabarito é omitido ao aluno até a correção da própria entrega, e as questões, até a publicação da atividade
+  (RN050). `POST /entregas/:id/anexos` aceita `questaoId` para a questão de envio de arquivo. A migration concede
+  `learn.classes.editar-questoes` a quem possui `learn.classes.criar-atividade`; a permissão, antes sem rota,
+  passa a proteger a edição das questões. Cobertura: dois testes e2e. A exclusão de atividade passa a apagar as
+  imagens de apoio em disco.
 - **Recuperação de senha do aluno externo do Boost** (02/10/2026). **Exige migration**
   (`20261002150000_boost_redefinicao_senha`). O link "Esqueci minha senha", na opção "Aluno externo" da tela Entrar do
   portal, envia por e-mail link de redefinição de uso único e válido por 1 hora (`POST /boost/esqueci-senha` e
