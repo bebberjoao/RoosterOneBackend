@@ -6,6 +6,19 @@ de defeito pode reaparecer em código semelhante ainda não revisado.
 
 ## Pendente
 
+### Formatação e lint não verificados automaticamente
+
+O frontend possui ESLint com a regra `prettier/prettier` como erro, mas o código nunca foi formatado de modo
+uniforme pelo Prettier: `npx eslint src` aponta cerca de 8.300 ocorrências exclusivamente de formatação, e nenhum
+erro de outra natureza desde 05/10/2026. O lint não integra o pipeline de integração contínua (que executa tipagem,
+testes e build), e o backend não possui configuração de ESLint. A formatação em massa foi deliberadamente adiada, por
+alterar milhares de linhas sem efeito funcional.
+
+**Impacto**: estilo de código heterogêneo e diferenças de formatação misturadas às alterações funcionais.
+
+**Encaminhamento**: aplicar `npm run format` em commit exclusivo, incluir `npm run lint` no CI do frontend e
+configurar ESLint no backend.
+
 ### Frontend sem biblioteca de validação de formulário
 
 As bibliotecas `react-hook-form`, `zod` e `@hookform/resolvers`, bem como o componente que as utilizava
@@ -91,6 +104,22 @@ de acesso, cuja comprovação exige o fluxo completo (guard, controller, service
 e2e. A suíte unitária cobre lógica pura e ramos de erro de difícil reprodução por requisição.
 
 ## Corrigida durante o desenvolvimento (histórico)
+
+### Revisão de 05/10/2026
+
+Defeitos identificados na verificação final de alinhamento entre código e documentação e na captura das telas do
+Manual do Usuário:
+
+- **Telas bloqueadas por permissão de acesso inexistente no banco.** O frontend exige a ação `acessar` para a entrada
+  em toda tela do catálogo, mas sete telas (Reservar, Minhas reservas, Gerenciar reservas, Estrutura física,
+  Categorias, Atendentes e Patrimônio) não possuíam essa permissão no seed; o solicitante de reservas, por exemplo,
+  recebia "Acesso negado" na tela Reservar. Corrigido pela migration `20261005090000_permissoes_acesso_telas` e pelo
+  seed. Na mesma revisão, foram retiradas do catálogo do frontend cinco opções sem efeito em nenhuma tela ou rota
+  (`desk.tickets.registrar-solucao`, `desk.team.criar/editar/excluir` e `rooms.structure.gerar-periodos`), e a criação
+  de permissão sob demanda pela tela "Acessos e permissões" passou a vincular o módulo.
+- **Endpoint sem documentação.** `GET /turmas/:id/notas` (boletim da turma) não constava de `docs/api/02-endpoints.md`.
+- **Erros de lint.** Dois parâmetros tipados como `any` (telas de Frequência e de Notas) e dois comentários que
+  desativavam regra de plugin não instalado (`jsx-a11y`).
 
 ### Revisão de 01/10/2026
 

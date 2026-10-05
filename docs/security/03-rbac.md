@@ -193,6 +193,13 @@ utilizado pelas rotas `/me/*` do `AcademyController`, pelas rotas do aluno do `L
 `/financeiro/me/*` do `FinanceController`. De forma análoga, `Rooster Learn` / `/learn/student` é utilizado pelo
 próprio `LearnController`: mais de um conjunto de permissões pode ser verificado pelo mesmo controller.
 
+A ação `acessar` de cada tela é exigida pelo frontend para a entrada na tela (`RequireAccess`), além das ações
+específicas verificadas pelo backend. Até 05/10/2026, sete telas (Reservar, Minhas reservas, Gerenciar reservas e
+Estrutura física, do Rooms; Categorias e Atendentes, do Desk; e Patrimônio, do Assets) não possuíam essa permissão no
+catálogo do banco, e o usuário com as ações da tela, mas sem a permissão de acesso, recebia "Acesso negado" (por
+exemplo, o solicitante de reservas na tela Reservar). A migration `20261005090000_permissoes_acesso_telas` criou as
+sete permissões e as concedeu a quem já possuía ações das mesmas telas; o seed passou a incluí-las (149 permissões).
+
 A ação `editar-questoes` (`Rooster Learn`) protege, desde 02/10/2026, a criação, a alteração, a exclusão, a
 reordenação e a imagem de apoio das questões das atividades (`learn.controller.ts`, verificação manual por
 `exigirDonoOuGestor`, que exige também o vínculo do professor com a turma). A migration

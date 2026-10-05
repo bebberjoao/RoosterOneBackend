@@ -244,30 +244,37 @@ function permissionDefinitions(
     ['desk.tickets.anexar', 'Anexar arquivo', deskModulo, '/desk/tickets', 'anexar'],
     ['desk.tickets.nota-interna', 'Registrar nota interna', deskModulo, '/desk/tickets', 'nota-interna'],
     ['desk.tickets.ver-sla', 'Visualizar SLA', deskModulo, '/desk/tickets', 'ver-sla'],
+    ['desk.categories.acessar', 'Acessar categorias', deskModulo, '/desk/categories', 'acessar'],
     ['desk.categories.criar', 'Criar categoria', deskModulo, '/desk/categories', 'criar'],
     ['desk.categories.editar', 'Editar categoria', deskModulo, '/desk/categories', 'editar'],
     ['desk.categories.excluir', 'Excluir categoria', deskModulo, '/desk/categories', 'excluir'],
     ['desk.categories.subcategorias', 'Gerenciar subcategorias', deskModulo, '/desk/categories', 'subcategorias'],
+    ['desk.team.acessar', 'Acessar atendentes', deskModulo, '/desk/team', 'acessar'],
     ['desk.team.vincular-categoria', 'Vincular atendente a categoria', deskModulo, '/desk/team', 'vincular-categoria'],
 
     // Rooster Rooms
     ['rooms.dashboard.acessar', 'Acessar Rooster Rooms', roomsModulo, '/rooms', 'acessar'],
+    ['rooms.structure.acessar', 'Acessar estrutura física', roomsModulo, '/rooms/structure', 'acessar'],
     ['rooms.structure.criar', 'Criar estrutura física', roomsModulo, '/rooms/structure', 'criar'],
     ['rooms.structure.editar', 'Editar estrutura física', roomsModulo, '/rooms/structure', 'editar'],
     ['rooms.structure.excluir', 'Excluir estrutura física', roomsModulo, '/rooms/structure', 'excluir'],
+    ['rooms.book.acessar', 'Acessar reserva de ambientes', roomsModulo, '/rooms/book', 'acessar'],
     ['rooms.book.solicitar', 'Solicitar reserva', roomsModulo, '/rooms/book', 'solicitar'],
     ['rooms.book.solicitar-recorrente', 'Solicitar reserva recorrente', roomsModulo, '/rooms/book', 'solicitar-recorrente'],
     ['rooms.book.prazo-estendido', 'Reservar com prazo estendido (sem limite de 15 dias)', roomsModulo, '/rooms/book', 'prazo-estendido'],
+    ['rooms.manage.acessar', 'Acessar gestão de reservas', roomsModulo, '/rooms/manage', 'acessar'],
     ['rooms.manage.aprovar', 'Aprovar reserva', roomsModulo, '/rooms/manage', 'aprovar'],
     ['rooms.manage.responder', 'Responder solicitante (equipe)', roomsModulo, '/rooms/manage', 'responder'],
     ['rooms.manage.alterar-horario', 'Alterar horário (equipe)', roomsModulo, '/rooms/manage', 'alterar-horario'],
     ['rooms.manage.cancelar', 'Cancelar com motivo (equipe)', roomsModulo, '/rooms/manage', 'cancelar'],
+    ['rooms.reservations.acessar', 'Acessar minhas reservas', roomsModulo, '/rooms/reservations', 'acessar'],
     ['rooms.reservations.mensagem', 'Enviar mensagem na reserva própria', roomsModulo, '/rooms/reservations', 'mensagem'],
     ['rooms.reservations.alterar-horario', 'Solicitar alteração de horário', roomsModulo, '/rooms/reservations', 'alterar-horario'],
     ['rooms.reservations.cancelar', 'Cancelar reserva própria', roomsModulo, '/rooms/reservations', 'cancelar'],
 
     // Rooster Assets
     ['assets.dashboard.acessar', 'Acessar Rooster Assets', assetsModulo, '/assets', 'acessar'],
+    ['assets.inventory.acessar', 'Acessar patrimônio', assetsModulo, '/assets/inventory', 'acessar'],
     ['assets.inventory.criar', 'Criar patrimônio', assetsModulo, '/assets/inventory', 'criar'],
     ['assets.inventory.editar', 'Editar patrimônio', assetsModulo, '/assets/inventory', 'editar'],
     ['assets.inventory.excluir', 'Excluir patrimônio', assetsModulo, '/assets/inventory', 'excluir'],
@@ -385,6 +392,7 @@ const deskTicketOperationKeys = [
   'desk.tickets.reabrir', 'desk.tickets.transferir', 'desk.tickets.anexar', 'desk.tickets.nota-interna',
 ];
 const deskManagementKeys = [
+  'desk.categories.acessar', 'desk.team.acessar',
   'desk.categories.criar', 'desk.categories.editar', 'desk.categories.excluir',
   'desk.categories.subcategorias', 'desk.team.vincular-categoria',
 ];
@@ -392,8 +400,9 @@ const deskManagementKeys = [
 // (a permissão existe justamente para liberar/retirar isso), a equipe recebe por padrão.
 const deskSlaKeys = ['desk.tickets.ver-sla'];
 const roomsViewKeys = ['rooms.dashboard.acessar'];
-const roomsSelfServiceKeys = ['rooms.book.solicitar', 'rooms.reservations.mensagem', 'rooms.reservations.alterar-horario', 'rooms.reservations.cancelar'];
+const roomsSelfServiceKeys = ['rooms.book.acessar', 'rooms.reservations.acessar', 'rooms.book.solicitar', 'rooms.reservations.mensagem', 'rooms.reservations.alterar-horario', 'rooms.reservations.cancelar'];
 const roomsManagementKeys = [
+  'rooms.structure.acessar', 'rooms.manage.acessar',
   'rooms.structure.criar', 'rooms.structure.editar', 'rooms.structure.excluir',
   'rooms.manage.aprovar', 'rooms.manage.responder', 'rooms.manage.alterar-horario', 'rooms.manage.cancelar',
   // Prazo estendido / recorrência não são "gestão de sala" propriamente, mas ficam aqui (não em
@@ -402,7 +411,7 @@ const roomsManagementKeys = [
   'rooms.book.solicitar-recorrente', 'rooms.book.prazo-estendido',
 ];
 const assetsViewKeys = ['assets.dashboard.acessar'];
-const assetsOperationalKeys = ['assets.inventory.criar', 'assets.inventory.editar', 'assets.inventory.movimentar'];
+const assetsOperationalKeys = ['assets.inventory.acessar', 'assets.inventory.criar', 'assets.inventory.editar', 'assets.inventory.movimentar'];
 const assetsManagementKeys = ['assets.inventory.excluir', 'assets.inventory.gerenciar-categorias'];
 
 /** Coordenação acadêmica: gestão ampla do Academy + Learn (bypass de dono em turma alheia). */

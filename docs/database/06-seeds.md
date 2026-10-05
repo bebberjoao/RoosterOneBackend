@@ -17,7 +17,7 @@ acumular cópias. A execução exige, portanto, `FILE_ENCRYPTION_KEY` definida, 
 ### Módulos e permissões
 
 Nove registros de `Modulo` (Rooster Hub, Rooster Desk, Rooster Rooms, Rooster Assets, Rooster Academy, Rooster
-Learn, Rooster Student, Rooster Boost e Rooster Finance) e **142 permissões** (`Permissao`), cada qual identificada
+Learn, Rooster Student, Rooster Boost e Rooster Finance) e **149 permissões** (`Permissao`), cada qual identificada
 pela combinação `módulo + recurso (rota de tela) + ação` utilizada por `@RequirePermission` no backend e por
 `permission-catalog.ts` no frontend. O `Rooster Student` é módulo exclusivamente de permissão (sem controller ou
 tabela próprios), aplicado às rotas `/me/*` atendidas por `AcademyController`, `LearnController` e
@@ -29,7 +29,7 @@ catálogo de permissões.
 
 | Usuário | E-mail | Senha | Conjunto de permissões |
 |---|---|---|---|
-| Administrador Rooster | `admin@rooster.local` | `Admin123!` | Todas as 142 permissões. Possui também cadastro de professor (turma POO101-A) e de aluno (matriculado em ALG101-A e BD101-A), para a verificação das três perspectivas com uma única conta |
+| Administrador Rooster | `admin@rooster.local` | `Admin123!` | Todas as 149 permissões. Possui também cadastro de professor (turma POO101-A) e de aluno (matriculado em ALG101-A e BD101-A), para a verificação das três perspectivas com uma única conta |
 | Atendente Secretaria | `atendente.secretaria@rooster.local` | `Atendente123!` | Conjunto "atendente" (operação no Desk e leitura em Rooms e Assets), setor Secretaria Acadêmica |
 | Atendente Suporte | `atendente.suporte@rooster.local` | `Atendente123!` | Idem, setor Suporte de TI |
 | Atendente Coordenação | `atendente.coordenacao@rooster.local` | `Atendente123!` | Idem, setor Coordenação |

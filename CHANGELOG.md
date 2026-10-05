@@ -244,6 +244,13 @@ estão indicadas; as demais não alteram o banco de dados.
 
 ### Corrigido
 
+- **Telas do Rooms, do Desk e do Assets com "Acesso negado" para usuários autorizados** (05/10/2026). **Exige
+  migration** (`20261005090000_permissoes_acesso_telas`, somente dados). O frontend exige a ação `acessar` para a
+  entrada em cada tela, mas Reservar, Minhas reservas, Gerenciar reservas, Estrutura física, Categorias, Atendentes e
+  Patrimônio não tinham essa permissão no catálogo do banco: o solicitante de reservas não conseguia abrir a tela
+  Reservar. A migration cria as sete permissões e as concede a quem já possui ações das mesmas telas; o seed passa a
+  ter 149 permissões. No frontend, o catálogo deixa de oferecer cinco opções sem efeito, e a criação de permissão sob
+  demanda vincula o módulo. A documentação de `GET /turmas/:id/notas`, antes ausente, foi incluída.
 - **Calendário acadêmico inacessível a alunos e professores** (02/10/2026). `GET /eventos-calendario` e
   `GET /eventos-calendario/:id` exigiam `/academy/manage acessar`, permissão exclusiva da gestão acadêmica; o
   calendário do portal do aluno e o painel do aluno recebiam `403` e exibiam a agenda vazia. A leitura passou a ser

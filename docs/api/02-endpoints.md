@@ -477,6 +477,7 @@ Ordem de declaração: `GET /patrimonio-emprestimos-atrasados` e `PATCH /patrimo
 |---|---|---|---|---|
 | POST | `/turmas/:id/itens-avaliativos` | Bearer | manual — ver nota (3), ação `configurar-pesos` | Cria item avaliativo (nome, peso 0–1, nota máxima) |
 | GET | `/turmas/:id/itens-avaliativos` | Bearer | manual — ver nota (2) | Lista itens avaliativos da turma |
+| GET | `/turmas/:id/notas` | Bearer | manual — ver nota (3), ação `lancar-notas` | Boletim da turma: itens avaliativos com as notas de todos os alunos matriculados (tela de notas do professor). Restrito ao professor responsável e à coordenação; o aluno consulta apenas as próprias notas, em `GET /me/notas` (`403` nesta rota) |
 | PATCH | `/itens-avaliativos/:id` | Bearer | manual — ver nota (3), ação `configurar-pesos` | Atualiza item avaliativo |
 | DELETE | `/itens-avaliativos/:id` | Bearer | manual — ver nota (3), ação `configurar-pesos` | Remove item avaliativo; **recusado com `400 BadRequestException`** quando `origem === 'learn'` (a remoção deve ser feita pela exclusão ou despublicação da atividade correspondente no Learn) |
 | PATCH | `/itens-avaliativos/:id/notas` | Bearer | manual — ver nota (3), ação `lancar-notas` | Lança (ou atualiza) a nota de um aluno no item avaliativo; audita `nota_lancada` |
