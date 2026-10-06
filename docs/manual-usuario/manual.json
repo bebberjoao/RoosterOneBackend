@@ -1,0 +1,1744 @@
+{
+  "titulo": "Rooster One",
+  "subtitulo": "Manual do Usuário",
+  "descricao": "Guia de utilização do sistema, organizado por módulo e por tela.",
+  "data": "Outubro de 2026",
+  "blocos": [
+    {
+      "tipo": "h1",
+      "texto": "Apresentação do manual"
+    },
+    {
+      "tipo": "p",
+      "texto": "Este manual descreve, módulo a módulo e tela a tela, a utilização do Rooster One, sem recorrer a terminologia técnica, de modo que usuários sem experiência prévia com sistemas de gestão possam localizar as informações necessárias."
+    },
+    {
+      "tipo": "p",
+      "texto": "O capítulo \"Visão geral do Rooster One\" apresenta os módulos, os perfis de usuário e a forma como as informações circulam entre os módulos. Os capítulos seguintes correspondem, cada um, a um módulo, na mesma ordem em que figura no menu do sistema, e iniciam pela finalidade do módulo, pelos conceitos necessários à sua compreensão e pelo fluxo típico de uso. Para cada tela, são apresentados:"
+    },
+    {
+      "tipo": "marcadores",
+      "itens": [
+        "a finalidade da tela;",
+        "os usuários que normalmente a utilizam (o sistema exibe a cada usuário apenas as telas compatíveis com as permissões concedidas);",
+        "o procedimento de utilização, em etapas;",
+        "a origem e o destino das informações, isto é, os efeitos de cada operação e os usuários por ela afetados;",
+        "a imagem da tela, capturada do sistema em funcionamento com os dados de demonstração, acompanhada de legenda numerada."
+      ]
+    },
+    {
+      "tipo": "p",
+      "texto": "A leitura integral do manual não é necessária: o sumário permite o acesso direto ao módulo ou à tela de interesse. Ao final, constam as perguntas frequentes, o glossário, a relação dos usuários de demonstração e as instruções de instalação do sistema."
+    },
+    {
+      "tipo": "p",
+      "texto": "As imagens foram obtidas com usuários de demonstração de perfis distintos (administrador, professor e aluno), de modo que cada tela é apresentada como a visualiza o usuário que normalmente a utiliza. A disposição dos menus e dos botões pode variar conforme as permissões do usuário."
+    },
+    {
+      "tipo": "p",
+      "texto": "O conteúdo deste manual constitui também a base do assistente de dúvidas do sistema (capítulo 1), que responde a perguntas sobre a utilização das telas e, nas tarefas principais, conduz o usuário passo a passo na própria tela."
+    },
+    {
+      "tipo": "h1",
+      "texto": "Visão geral do Rooster One"
+    },
+    {
+      "tipo": "p",
+      "texto": "O Rooster One é um sistema de gestão institucional que reúne, em um único ambiente e com um único login, os processos administrativos e acadêmicos de uma instituição de ensino. É composto por nove módulos integrados, que compartilham o cadastro de pessoas e o controle de acesso."
+    },
+    {
+      "tipo": "h2",
+      "texto": "Módulos do sistema"
+    },
+    {
+      "tipo": "tabela",
+      "cabecalho": [
+        "Módulo",
+        "Finalidade",
+        "Usuários principais"
+      ],
+      "linhas": [
+        [
+          "Rooster Hub",
+          "Usuários, setores, permissões, auditoria e registro de erros.",
+          "Administradores"
+        ],
+        [
+          "Rooster Desk",
+          "Chamados de suporte, com setor responsável, prazo de atendimento (SLA) e conversa.",
+          "Todos (abertura); equipe de atendimento"
+        ],
+        [
+          "Rooster Rooms",
+          "Reserva de salas, laboratórios e auditórios, com aprovação.",
+          "Professores e funcionários; gestão de ambientes"
+        ],
+        [
+          "Rooster Assets",
+          "Patrimônio: cadastro, localização, movimentação, manutenção e empréstimo de bens.",
+          "Equipe de patrimônio"
+        ],
+        [
+          "Rooster Academy",
+          "Cursos, disciplinas, turmas, matrículas, frequência e notas.",
+          "Coordenação acadêmica e professores"
+        ],
+        [
+          "Rooster Learn",
+          "Atividades com questões, entregas dos alunos e correção.",
+          "Professores e alunos"
+        ],
+        [
+          "Rooster Student",
+          "Portal do aluno: disciplinas, notas, frequência, documentos e financeiro.",
+          "Alunos"
+        ],
+        [
+          "Rooster Boost",
+          "Cursos livres, com portal próprio, orientadores e certificado.",
+          "Alunos, público externo e gestão de cursos"
+        ],
+        [
+          "Rooster Finance",
+          "Cobranças, mensalidades, boletos, notas fiscais, descontos e relatórios.",
+          "Equipe financeira"
+        ]
+      ]
+    },
+    {
+      "tipo": "espaco"
+    },
+    {
+      "tipo": "h2",
+      "texto": "Perfis de usuário"
+    },
+    {
+      "tipo": "p",
+      "texto": "O sistema não atribui perfis fixos: cada pessoa recebe, no Rooster Hub, as permissões necessárias às suas atividades. Os perfis abaixo descrevem as combinações mais comuns e servem de referência para a leitura deste manual."
+    },
+    {
+      "tipo": "tabela",
+      "cabecalho": [
+        "Perfil",
+        "Atuação no sistema",
+        "Módulos mais utilizados"
+      ],
+      "linhas": [
+        [
+          "Administrador",
+          "Cadastra usuários e setores, concede permissões e acompanha a auditoria.",
+          "Hub (e, conforme as permissões, todos os demais)"
+        ],
+        [
+          "Coordenação acadêmica",
+          "Organiza cursos, turmas e matrículas e acompanha as turmas.",
+          "Academy, Learn, Boost"
+        ],
+        [
+          "Professor",
+          "Registra frequência e notas, cria e corrige atividades, reserva salas e orienta cursos livres.",
+          "Academy, Learn, Rooms, Boost"
+        ],
+        [
+          "Coordenação de suporte e atendentes",
+          "Atende chamados, configura categorias e prazos.",
+          "Desk"
+        ],
+        [
+          "Gestão de ambientes",
+          "Mantém a estrutura física e decide sobre as reservas.",
+          "Rooms"
+        ],
+        [
+          "Equipe de patrimônio",
+          "Cadastra e movimenta bens e controla empréstimos.",
+          "Assets"
+        ],
+        [
+          "Equipe financeira",
+          "Gera mensalidades, registra pagamentos e emite documentos.",
+          "Finance"
+        ],
+        [
+          "Aluno",
+          "Consulta a vida acadêmica, responde atividades e realiza cursos livres.",
+          "Student, Learn, Boost"
+        ],
+        [
+          "Aluno externo",
+          "Pessoa sem vínculo com a instituição, que realiza cursos livres.",
+          "Somente o portal do Boost"
+        ]
+      ]
+    },
+    {
+      "tipo": "espaco"
+    },
+    {
+      "tipo": "h2",
+      "texto": "Integração entre os módulos"
+    },
+    {
+      "tipo": "p",
+      "texto": "As informações registradas em um módulo são aproveitadas pelos demais, sem novo lançamento:"
+    },
+    {
+      "tipo": "marcadores",
+      "itens": [
+        "O cadastro de pessoas é único (Rooster Hub): professores e alunos do Academy são usuários do Hub com vínculo acadêmico, e o mesmo login dá acesso ao portal do Boost.",
+        "A atividade do Rooster Learn publicada com peso torna-se item avaliativo no Academy, e a nota da correção, inclusive a calculada automaticamente, integra a média do aluno.",
+        "Notas, frequência, atividades, documentos e cobranças são reunidos no Rooster Student, sempre restritos ao próprio aluno.",
+        "A reserva de sala no Rooms pode ser vinculada à turma do Academy; as cobranças do Finance referem-se aos alunos do Academy.",
+        "O setor do usuário (Hub) determina os chamados que lhe são exibidos no Desk.",
+        "Os eventos relevantes de todos os módulos (resposta em chamado, decisão de reserva, nota lançada, atividade publicada ou corrigida, cobrança) geram aviso na central de notificações."
+      ]
+    },
+    {
+      "tipo": "h2",
+      "texto": "Convenções da interface"
+    },
+    {
+      "tipo": "marcadores",
+      "itens": [
+        "Barra superior: busca global (atalho Ctrl+K), notificações (sino), alternância entre tema claro e escuro, configurações e encerramento da sessão.",
+        "Listagens: campo de busca e filtros acima da tabela; o resultado é atualizado à medida que os critérios são informados.",
+        "Formatos: datas no padrão dd/mm/aaaa, horários no formato de 24 horas e valores em reais, com vírgula decimal (por exemplo, R$ 1.250,00).",
+        "Confirmações: o resultado de cada operação é informado por aviso no canto da tela; exclusões e cancelamentos exigem confirmação.",
+        "Permissões: botões e telas não autorizados não são exibidos; a ausência de uma opção indica falta de permissão, e não falha do sistema."
+      ]
+    },
+    {
+      "tipo": "capitulo",
+      "numero": 1,
+      "titulo": "Primeiros passos",
+      "introducao": [
+        "Este capítulo trata dos elementos comuns a todo o sistema: acesso, recuperação de senha, página inicial, menu de navegação, notificações, assistente de dúvidas, configurações e encerramento da sessão."
+      ],
+      "conceitos": [],
+      "fluxo": [],
+      "telas": [
+        {
+          "titulo": "Acesso ao sistema (login)",
+          "rota": "Tela inicial de login",
+          "quemUsa": "Todos os usuários cadastrados.",
+          "oQueE": "Primeira tela exibida ao acessar o endereço do sistema. O acesso é realizado com o e-mail e a senha cadastrados para o usuário.",
+          "passos": [
+            "Informar o e-mail cadastrado no campo correspondente.",
+            "Informar a senha.",
+            "Selecionar \"Entrar\".",
+            "Com os dados corretos, o sistema exibe a página inicial, com o menu dos módulos a que o usuário tem acesso."
+          ],
+          "deOndeVem": "O cadastro (e-mail, senha e módulos acessíveis) é realizado pelo administrador do sistema, no Rooster Hub. O usuário sem conta deve solicitar o cadastro ao administrador. A sessão é renovada automaticamente durante o uso, sem necessidade de novo login a cada período. Abaixo do formulário, o link \"acessar o Rooster Boost\" conduz ao portal de cursos livres (capítulo 9).",
+          "legenda": "Tela de login do Rooster One: logotipo, campo de e-mail, campo de senha, botão \"Entrar\" e link \"Esqueci minha senha\"."
+        },
+        {
+          "titulo": "Recuperação de senha",
+          "rota": "Link \"Esqueci minha senha\", na tela de login",
+          "quemUsa": "Usuários que não se recordam da senha.",
+          "oQueE": "Procedimento seguro de definição de nova senha, sem intervenção do administrador.",
+          "passos": [
+            "Na tela de login, selecionar \"Esqueci minha senha\".",
+            "Informar o e-mail da conta e confirmar.",
+            "O sistema exibe mensagem informando que, se o e-mail estiver cadastrado, um link foi enviado. Por segurança, a mensagem é a mesma em qualquer caso, inclusive quando o e-mail informado não existe.",
+            "Acessar o link recebido por e-mail (válido por 1 hora e de uso único)."
+          ],
+          "deOndeVem": "O link de redefinição é gerado e controlado pelo sistema, com validade curta por segurança; expirado o prazo, o procedimento deve ser repetido.",
+          "legenda": "Tela de recuperação de senha: campo de e-mail, botão de confirmação e mensagem informativa sobre o envio do link."
+        },
+        {
+          "titulo": "Definição da nova senha",
+          "rota": "/redefinir-senha (link recebido por e-mail)",
+          "quemUsa": "Usuários que solicitaram a recuperação de senha.",
+          "oQueE": "Tela aberta pelo link recebido por e-mail, para a definição da nova senha.",
+          "passos": [
+            "Informar a nova senha (mínimo de 8 caracteres) e repeti-la no campo de confirmação.",
+            "Confirmar; o sistema informa o resultado e conduz à tela de login.",
+            "Realizar o login com a nova senha."
+          ],
+          "deOndeVem": "O link já utilizado ou expirado é recusado, com a orientação de repetir a solicitação. A troca de senha encerra as sessões abertas em outros dispositivos.",
+          "legenda": "Tela de definição de nova senha, com os campos de senha e de confirmação."
+        },
+        {
+          "titulo": "Página inicial",
+          "rota": "/",
+          "quemUsa": "Todos os usuários.",
+          "oQueE": "Tela exibida após o login, com atalhos para os módulos autorizados ao usuário e os avisos recentes.",
+          "deOndeVem": "Os atalhos exibidos dependem das permissões do usuário; os avisos provêm da central de notificações.",
+          "legenda": "Página inicial do Rooster One, com os atalhos dos módulos disponíveis ao usuário."
+        },
+        {
+          "titulo": "Menu lateral",
+          "rota": "Barra lateral, presente em todas as telas",
+          "quemUsa": "Todos os usuários; o conteúdo varia conforme as permissões de cada um.",
+          "oQueE": "Meio de navegação entre os módulos e as telas do sistema. São exibidos apenas os módulos e as telas autorizados ao usuário; a ausência de um módulo indica falta de permissão, a ser solicitada ao administrador no Rooster Hub.",
+          "bullets": [
+            "A seleção do nome de um módulo exibe as respectivas telas.",
+            "O módulo em uso permanece destacado.",
+            "O botão no canto superior esquerdo recolhe e expande o menu; em telas menores (celular ou tablet), o menu é aberto por esse mesmo botão."
+          ],
+          "deOndeVem": "O conteúdo do menu é determinado pelas permissões concedidas ao usuário no Rooster Hub e não é configurável pelo próprio usuário.",
+          "legenda": "Menu lateral aberto, com a relação de módulos disponíveis ao usuário e o módulo atual destacado."
+        },
+        {
+          "titulo": "Notificações",
+          "rota": "/notifications (ícone de sino na barra superior)",
+          "quemUsa": "Todos os usuários.",
+          "oQueE": "Central de avisos sobre eventos relacionados ao usuário: resposta em chamado, atribuição de chamado, nota lançada, atividade publicada ou corrigida, decisão sobre reserva, cobrança, entre outros.",
+          "passos": [
+            "Selecionar o ícone de sino na barra superior para visualizar os avisos recentes; o número sobre o ícone indica os avisos não lidos.",
+            "Selecionar um aviso para acessar diretamente a tela do assunto (por exemplo, o aviso de chamado respondido abre o respectivo chamado).",
+            "Utilizar a opção de marcação como lido, individualmente ou para todos os avisos."
+          ],
+          "deOndeVem": "Cada aviso é gerado por outro módulo e reunido nesta central, o que dispensa a consulta a cada módulo. A lista é atualizada periodicamente.",
+          "legenda": "Central de notificações, com os avisos recentes e os não lidos em destaque."
+        },
+        {
+          "titulo": "Assistente de dúvidas",
+          "rota": "Botão do assistente, no canto inferior direito",
+          "quemUsa": "Todos os usuários.",
+          "oQueE": "Assistente que esclarece dúvidas sobre a utilização do sistema com base neste manual. A dúvida é escrita em linguagem comum (por exemplo, \"como abro um chamado?\"), e a resposta indica o módulo e a tela correspondentes, o procedimento e, nas tarefas principais, a opção de acompanhamento guiado na própria tela (roteiro guiado). O assistente trata exclusivamente da utilização do sistema: não consulta informações registradas, como notas, cobranças ou chamados, nem executa operações.",
+          "passos": [
+            "Selecionar o botão do assistente, no canto inferior direito de qualquer tela, e escrever a dúvida no campo \"Sua dúvida\"; a tecla Enter envia a pergunta.",
+            "Consultar a resposta, que apresenta o módulo, a tela, os usuários, o resumo e o procedimento; a opção \"Mais detalhes\" exibe as observações da tela.",
+            "Selecionar \"Abrir a tela\" para acessar diretamente a tela indicada, ou um dos \"Assuntos relacionados\" para consultar tema próximo.",
+            "Nas tarefas principais, selecionar \"Mostrar na tela\" para iniciar o roteiro guiado: a tela é escurecida e somente o campo do passo permanece em destaque, acompanhado de legenda que informa o que fazer e a finalidade do campo.",
+            "Executar a ação indicada em cada passo: nos passos de clique, o roteiro avança automaticamente; nos de preenchimento ou de consulta, avança pelo botão \"Próximo\". O botão \"Anterior\" retorna ao passo anterior, quando possível, e a tecla Esc ou o botão de fechar encerram o roteiro a qualquer momento."
+          ],
+          "bullets": [
+            "Tarefas com roteiro guiado: abrir chamado; acompanhar e responder chamado; reservar sala ou ambiente; aprovar ou cancelar reservas; cadastrar usuário; conceder permissões; registrar frequência; lançar notas; criar e publicar atividade; cadastrar questões; corrigir entregas; responder atividade (aluno); gerar mensalidades; registrar pagamento; cadastrar item de patrimônio.",
+            "O roteiro guiado é oferecido somente para as tarefas que o usuário tem permissão para executar; nas demais, a resposta orienta a solicitar a permissão ao administrador.",
+            "Durante o roteiro, apenas o elemento destacado responde ao clique. Quando o elemento não está visível (por exemplo, lista sem itens), a legenda informa o motivo, e o roteiro prossegue assim que o elemento aparece.",
+            "Dúvidas fora do escopo do sistema não são respondidas; para problemas no funcionamento do sistema, deve ser aberto um chamado no Rooster Desk."
+          ],
+          "deOndeVem": "As respostas são extraídas deste manual e dos guias do sistema. Toda operação realizada durante o roteiro guiado é executada pelo próprio usuário, com as mesmas permissões e validações de sempre; encerrar o roteiro não desfaz nem altera informações.",
+          "legenda": "Assistente de dúvidas aberto, com a resposta à pergunta \"como abro um chamado?\" e as opções \"Mostrar na tela\" e \"Abrir a tela\".",
+          "extras": [
+            {
+              "imagem": "assistente-roteiro",
+              "legenda": "Roteiro guiado em execução: tela escurecida, campo do passo em destaque e legenda com a instrução e a finalidade do campo."
+            }
+          ]
+        },
+        {
+          "titulo": "Encerramento da sessão",
+          "rota": "Ícone de saída, na barra superior",
+          "quemUsa": "Todos os usuários.",
+          "oQueE": "Encerra a sessão no dispositivo em uso, procedimento recomendado em computadores compartilhados.",
+          "passos": [
+            "Selecionar o ícone de saída, no canto direito da barra superior.",
+            "No acesso seguinte, será necessário informar novamente o e-mail e a senha."
+          ],
+          "deOndeVem": "Não há, na versão atual, troca da própria senha com a sessão ativa; utiliza-se o procedimento de recuperação de senha, disponível a qualquer momento, inclusive quando a senha atual é conhecida.",
+          "legenda": "Barra superior do sistema: busca global, notificações, tema, configurações, identificação do usuário e ícone de saída, à direita."
+        },
+        {
+          "titulo": "Configurações",
+          "rota": "/settings",
+          "quemUsa": "Todos os usuários (tema); a seção \"E-mail\" é exibida apenas aos administradores.",
+          "oQueE": "Preferências gerais. A preferência efetivamente funcional é o tema (claro ou escuro); os demais cartões da tela (identidade da instituição, módulos contratados e segurança) são informativos.",
+          "passos": [
+            "Utilizar o interruptor \"Tema escuro\" para alternar a aparência; a preferência é armazenada no dispositivo e no navegador em uso."
+          ],
+          "bullets": [
+            "Seção \"E-mail\" (administradores): exibe se o envio de e-mail, utilizado, por exemplo, na recuperação de senha, está configurado, o servidor e o remetente em uso, e oferece o botão \"Enviar e-mail de teste\" para a verificação do envio."
+          ],
+          "deOndeVem": "O estado do e-mail reflete a configuração realizada pela equipe técnica no servidor; esta tela não altera a configuração, apenas a exibe e permite testá-la.",
+          "legenda": "Tela de Configurações: cartão de Aparência (tema escuro) e, para administradores, cartão \"E-mail (SMTP)\" com o estado da configuração e o botão de envio de teste."
+        }
+      ]
+    },
+    {
+      "tipo": "capitulo",
+      "numero": 2,
+      "titulo": "Rooster Hub — Usuários e permissões",
+      "introducao": [
+        "O Rooster Hub é o módulo de controle de acesso: define quem pode utilizar o sistema e o que cada usuário pode realizar. É utilizado, em regra, apenas pelos administradores; professores, alunos e atendentes normalmente não o visualizam no menu.",
+        "Sempre que uma tela de outro módulo exige permissão não concedida ao usuário, a concessão deve ser realizada neste módulo."
+      ],
+      "conceitos": [
+        [
+          "Usuário",
+          "pessoa com login no sistema (e-mail e senha). Professores e alunos do Academy são usuários do Hub com vínculo acadêmico."
+        ],
+        [
+          "Setor",
+          "agrupamento de usuários por área de atuação, utilizado para direcionar chamados."
+        ],
+        [
+          "Permissão",
+          "autorização para uma ação específica em uma tela de um módulo (por exemplo, acessar, criar, aprovar ou excluir). As permissões são concedidas diretamente a cada usuário, sem perfis fixos."
+        ],
+        [
+          "Administrador",
+          "usuário com a permissão \"Gerenciar permissões\". O sistema impede que a instituição fique sem administrador."
+        ],
+        [
+          "Auditoria",
+          "registro automático das ações relevantes (login, alterações de cadastro, decisões e operações financeiras), com autor e data."
+        ]
+      ],
+      "fluxo": [
+        "Cadastrar o usuário em \"Usuários\".",
+        "Vincular o usuário ao setor correspondente em \"Setores\".",
+        "Conceder as permissões necessárias em \"Acessos e permissões\".",
+        "Quando aplicável, vincular o usuário como professor ou aluno no Rooster Academy (capítulo 6).",
+        "Acompanhar as ações realizadas pelo relatório de auditoria."
+      ],
+      "telas": [
+        {
+          "titulo": "Painel",
+          "rota": "/hub",
+          "quemUsa": "Administradores.",
+          "oQueE": "Visão geral do módulo: quantidades de usuários, permissões concedidas, setores e sessões ativas, atalhos para as telas do módulo e atividade recente.",
+          "deOndeVem": "Os números consolidam os cadastros das demais telas do módulo, e a atividade recente provém do registro de auditoria.",
+          "legenda": "Tela inicial do Rooster Hub, com cartões de resumo, atalhos e atividade recente."
+        },
+        {
+          "titulo": "Usuários",
+          "rota": "/hub/usuarios",
+          "quemUsa": "Administradores.",
+          "oQueE": "Cadastro das pessoas autorizadas a utilizar o sistema.",
+          "passos": [
+            "Criação: selecionar \"Novo\", informar nome, e-mail e senha inicial (mínimo de 8 caracteres) e salvar.",
+            "Edição: selecionar o ícone de edição na linha do usuário, alterar os dados necessários e salvar.",
+            "Redefinição de senha: utilizar a opção de redefinição na linha do usuário; as sessões abertas do usuário são encerradas, e a nova senha deve ser comunicada por canal separado.",
+            "Desativação: recomenda-se desativar o usuário, em vez de excluí-lo; o usuário deixa de acessar o sistema, e seu histórico (chamados, notas, reservas etc.) é preservado."
+          ],
+          "deOndeVem": "O usuário recém-criado não possui permissões; os setores e as permissões necessários devem ser concedidos nas telas correspondentes. O sistema não permite excluir, desativar nem retirar a permissão de administrador do último administrador ativo.",
+          "legenda": "Tela de Usuários, com a relação de pessoas cadastradas (nome, e-mail, situação e último login) e o botão \"Novo\"."
+        },
+        {
+          "titulo": "Setores",
+          "rota": "/hub/setores",
+          "quemUsa": "Administradores.",
+          "oQueE": "Os setores agrupam pessoas por área (por exemplo, Secretaria Acadêmica, Suporte de TI e Coordenação) e determinam, entre outros aspectos, a equipe responsável por cada chamado de suporte.",
+          "passos": [
+            "Criação: selecionar \"Novo\", informar nome e descrição e salvar.",
+            "Vínculo de pessoas: utilizar a opção de gerenciamento de usuários do setor para incluir ou remover integrantes."
+          ],
+          "deOndeVem": "O setor do usuário é utilizado pelo Rooster Desk para determinar os chamados que lhe são exibidos para atendimento.",
+          "legenda": "Tela de Setores, com os setores cadastrados, a quantidade de usuários vinculados e a situação de cada um."
+        },
+        {
+          "titulo": "Acessos e permissões",
+          "rota": "/hub/acessos",
+          "quemUsa": "Administradores.",
+          "oQueE": "Tela de definição, para cada usuário, do que pode ser visualizado e realizado em cada módulo, e de consulta aos registros de auditoria e de erros.",
+          "passos": [
+            "Selecionar o usuário na coluna \"1. Usuário\" (a busca localiza pelo nome ou pelo e-mail).",
+            "Na coluna \"2. Permissões\", marcar ou desmarcar as ações de cada tela de cada módulo (por exemplo, \"Rooster Desk → Chamados → Encerrar\").",
+            "Selecionar \"Salvar permissões\"; a alteração vale a partir do próximo acesso do usuário à tela correspondente."
+          ],
+          "bullets": [
+            "Relatório de auditoria: histórico das ações relevantes realizadas no sistema, com o autor, a ação e a data, exportável em CSV.",
+            "Relatório de erros: falhas técnicas registradas automaticamente pelo servidor, destinadas à investigação pelo suporte técnico, exportável em CSV."
+          ],
+          "deOndeVem": "Cada permissão concedida libera ou oculta um botão, uma tela ou um menu inteiro em qualquer módulo, constituindo o elemento central do controle de acesso do Rooster One. A permissão \"Gerenciar permissões\" confere a condição de administrador e deve ser concedida com cautela.",
+          "legenda": "Tela de Acessos e permissões, com usuário selecionado e as permissões organizadas por módulo, tela e ação."
+        }
+      ]
+    },
+    {
+      "tipo": "capitulo",
+      "numero": 3,
+      "titulo": "Rooster Desk — Chamados de suporte",
+      "introducao": [
+        "O Rooster Desk é o canal oficial de solicitação de suporte na instituição, para questões de acesso, sistemas ou infraestrutura (rede, salas e equipamentos). É também o canal de suporte ao próprio Rooster One.",
+        "O módulo possui duas perspectivas: a do solicitante, que abre o chamado e acompanha o atendimento, e a da equipe de atendimento, que responde, transfere e encerra."
+      ],
+      "conceitos": [
+        [
+          "Chamado",
+          "solicitação registrada por um usuário, identificada por código (por exemplo, TCK-0001)."
+        ],
+        [
+          "Categoria e subcategoria",
+          "classificação do chamado, que define o setor responsável e o prazo de atendimento."
+        ],
+        [
+          "SLA",
+          "prazo esperado de atendimento, em horas, definido pela categoria ou pela subcategoria."
+        ],
+        [
+          "Status",
+          "situação do chamado: aberto, em atendimento, pendente, resolvido ou encerrado."
+        ],
+        [
+          "Prioridade",
+          "baixa, média, alta ou crítica, definida pela equipe de atendimento."
+        ],
+        [
+          "Nota interna",
+          "mensagem visível apenas à equipe de atendimento."
+        ]
+      ],
+      "fluxo": [
+        "O solicitante abre o chamado, escolhendo a categoria e a subcategoria.",
+        "O chamado é exibido à equipe do setor responsável, que o assume.",
+        "A equipe e o solicitante trocam mensagens até a solução; cada resposta gera notificação.",
+        "A equipe encerra o chamado, que pode ser reaberto se o problema persistir."
+      ],
+      "telas": [
+        {
+          "titulo": "Painel",
+          "rota": "/desk",
+          "quemUsa": "Usuários com acesso ao módulo.",
+          "oQueE": "Resumo dos chamados por status (abertos, em atendimento, pendentes e resolvidos), últimos chamados, chamados críticos e, para usuários autorizados, o relatório de cumprimento do prazo de atendimento (SLA).",
+          "legenda": "Tela inicial do Rooster Desk, com cartões de resumo por status, últimos chamados e chamados críticos."
+        },
+        {
+          "titulo": "Chamados",
+          "rota": "/desk/tickets",
+          "quemUsa": "Solicitantes e equipe de atendimento.",
+          "oQueE": "Relação dos chamados abertos pelo usuário (solicitante) ou sob responsabilidade do seu setor (atendente), com filtros por status, categoria e prioridade.",
+          "passos": [
+            "Abertura: selecionar \"Novo chamado\", escolher a categoria e a subcategoria (que definem automaticamente o setor responsável e o prazo esperado de resposta), informar o título, descrever a solicitação e, se necessário, anexar arquivo (captura de tela, documento ou foto, com até 10 MB).",
+            "Acompanhamento: selecionar o chamado na lista para abrir o detalhe (seção seguinte)."
+          ],
+          "deOndeVem": "A categoria escolhida na abertura determina o setor de destino e o prazo esperado de resposta, definidos pela coordenação do suporte.",
+          "legenda": "Tela de Chamados, com os cartões de contagem por status, os filtros e a relação de chamados."
+        },
+        {
+          "titulo": "Detalhe do chamado",
+          "rota": "/desk/tickets/:id",
+          "quemUsa": "Solicitante do chamado e equipe de atendimento.",
+          "oQueE": "Conversa e situação de um chamado.",
+          "passos": [
+            "Consultar o status, a prioridade, a categoria, o técnico responsável e o prazo de atendimento.",
+            "Trocar mensagens com o atendimento, com anexos; as mensagens são atualizadas em tempo real, e cada resposta gera notificação."
+          ],
+          "bullets": [
+            "Equipe de atendimento: assumir o chamado, alterar status e prioridade, registrar nota interna (visível apenas à equipe, e não ao solicitante), transferir a outro atendente (o atendente designado é notificado), encerrar e, se necessário, reabrir."
+          ],
+          "deOndeVem": "As alterações de status, prioridade, categoria e técnico são registradas no histórico do chamado, exibido na mesma tela.",
+          "legenda": "Tela de detalhe de chamado: identificação, status, dados do atendimento e conversa entre solicitante e equipe."
+        },
+        {
+          "titulo": "Categorias",
+          "rota": "/desk/categories",
+          "quemUsa": "Coordenação do suporte.",
+          "oQueE": "Cadastro dos tipos de chamado (por exemplo, \"Acesso e Contas\", \"Sistemas Acadêmicos\" e \"Infraestrutura\").",
+          "passos": [
+            "Selecionar \"Nova categoria\", informar o nome, o setor responsável e o prazo de atendimento esperado (SLA) e salvar.",
+            "Abrir a categoria para cadastrar as subcategorias (seção seguinte)."
+          ],
+          "deOndeVem": "Esta tela determina o direcionamento dos chamados na abertura; as alterações afetam o comportamento de abertura para todos os usuários.",
+          "legenda": "Tela de Categorias, com as categorias cadastradas, o setor responsável, o SLA médio e a quantidade de subcategorias."
+        },
+        {
+          "titulo": "Subcategorias de uma categoria",
+          "rota": "/desk/categories/:id",
+          "quemUsa": "Coordenação do suporte.",
+          "oQueE": "Detalhamento de uma categoria em subcategorias (por exemplo, \"Redefinição de senha\" em \"Acesso e Contas\"), cada uma com prazo de atendimento próprio.",
+          "passos": [
+            "Incluir, editar ou desativar as subcategorias.",
+            "Definir o SLA de cada subcategoria, quando diferente do padrão da categoria."
+          ],
+          "legenda": "Tela de uma categoria, com as subcategorias e o prazo de atendimento de cada uma."
+        },
+        {
+          "titulo": "Atendentes",
+          "rota": "/desk/team",
+          "quemUsa": "Coordenação do suporte.",
+          "oQueE": "Vincula atendentes às subcategorias de chamado, definindo os responsáveis por cada tipo de solicitação, e exibe as permissões de atendimento de cada um.",
+          "deOndeVem": "Os chamados de cada tipo são exibidos na fila de atendimento dos integrantes do setor responsável e dos atendentes vinculados.",
+          "legenda": "Tela de Atendentes, com a equipe de suporte, o setor de cada atendente e as subcategorias vinculadas."
+        }
+      ]
+    },
+    {
+      "tipo": "capitulo",
+      "numero": 4,
+      "titulo": "Rooster Rooms — Reserva de ambientes",
+      "introducao": [
+        "O Rooster Rooms destina-se à reserva dos espaços físicos da instituição: auditórios, salas de aula, laboratórios e salas de reunião. Toda reserva é solicitada pelo usuário e analisada pela equipe de gestão dos ambientes."
+      ],
+      "conceitos": [
+        [
+          "Ambiente",
+          "espaço reservável, pertencente a um bloco de um campus, com tipo, capacidade e horário de funcionamento."
+        ],
+        [
+          "Reserva",
+          "pedido de uso de um ambiente em data e horário determinados, identificado por código."
+        ],
+        [
+          "Situação da reserva",
+          "em análise (aguarda decisão), confirmada (aprovada), em andamento, finalizada ou cancelada."
+        ],
+        [
+          "Reserva recorrente",
+          "série de reservas repetidas (diária, semanal ou mensal), criada de uma só vez; exige permissão própria."
+        ],
+        [
+          "Antecedência",
+          "prazo máximo, a partir da data atual, para a solicitação: 15 dias, ou até 1 ano com permissão de prazo estendido."
+        ]
+      ],
+      "fluxo": [
+        "A equipe de gestão cadastra a estrutura física (campus, blocos e ambientes).",
+        "O usuário solicita a reserva em \"Reservar\".",
+        "A equipe analisa o pedido em \"Gerenciar reservas\" e aprova, responde ou cancela, com motivo.",
+        "O solicitante é notificado e acompanha o pedido em \"Minhas reservas\"."
+      ],
+      "telas": [
+        {
+          "titulo": "Painel",
+          "rota": "/rooms",
+          "quemUsa": "Usuários com acesso ao módulo.",
+          "oQueE": "Resumo da ocupação: próximas reservas, agenda do dia, reservas em análise e ambientes indisponíveis.",
+          "legenda": "Tela inicial do Rooster Rooms, com o resumo de ocupação, as próximas reservas e a agenda do dia."
+        },
+        {
+          "titulo": "Reservar",
+          "rota": "/rooms/book",
+          "quemUsa": "Usuários autorizados a solicitar reservas.",
+          "oQueE": "Solicitação de uso de ambiente em data e horário determinados.",
+          "passos": [
+            "Selecionar o ambiente na lista (a busca localiza pelo nome ou pelo código) e consultar, no calendário, os horários ocupados do dia.",
+            "Informar data, horário de início e de término, quantidade de participantes e finalidade (aula, reunião, evento etc.). Em reserva de aula, o professor pode vincular a turma correspondente.",
+            "Para reserva recorrente (por exemplo, a mesma aula semanal), utilizar o campo \"Repetição\" e definir a data final, se o usuário possuir essa permissão.",
+            "Selecionar \"Enviar solicitação\"; o pedido é encaminhado à equipe de gestão do ambiente."
+          ],
+          "deOndeVem": "A antecedência máxima é de 15 dias, salvo permissão de prazo estendido. O sistema recusa solicitações acima da capacidade do ambiente, fora do horário de funcionamento ou em conflito com outra reserva.",
+          "legenda": "Tela de Reservar, com a lista de ambientes, o calendário de disponibilidade e o formulário de solicitação."
+        },
+        {
+          "titulo": "Minhas reservas",
+          "rota": "/rooms/reservations",
+          "quemUsa": "Solicitantes.",
+          "oQueE": "Acompanhamento das reservas solicitadas pelo usuário, com contagem por situação.",
+          "bullets": [
+            "Consulta da situação (em análise, confirmada, em andamento, finalizada ou cancelada).",
+            "Abertura da reserva para trocar mensagens com a equipe responsável e solicitar alterações (seção seguinte).",
+            "Cancelamento de reserva própria, com indicação do motivo."
+          ],
+          "deOndeVem": "A situação é alterada pela equipe de gestão do ambiente, e o solicitante é notificado a cada decisão.",
+          "legenda": "Tela de Minhas reservas, com as reservas do usuário e a situação de cada uma."
+        },
+        {
+          "titulo": "Detalhe da reserva",
+          "rota": "/rooms/reservations/:id",
+          "quemUsa": "Solicitante e equipe de gestão dos ambientes.",
+          "oQueE": "Dados completos da reserva (ambiente, data, horário, finalidade e turma vinculada), conversa com a equipe e histórico de alterações.",
+          "legenda": "Tela de detalhe de reserva, com os dados da reserva, a conversa e o histórico."
+        },
+        {
+          "titulo": "Gerenciar reservas",
+          "rota": "/rooms/manage",
+          "quemUsa": "Equipe de gestão dos ambientes.",
+          "oQueE": "Análise das solicitações de reserva.",
+          "passos": [
+            "Localizar o pedido, com filtros por situação, busca e data (dia específico ou período).",
+            "Selecionar \"Aprovar\" para confirmar a reserva em análise.",
+            "Selecionar \"Responder\" para enviar mensagem ao solicitante antes da decisão.",
+            "Selecionar \"Cancelar\" para recusar ou cancelar a reserva, informando o motivo, exibido ao solicitante."
+          ],
+          "deOndeVem": "A reserva aprovada bloqueia o horário do ambiente, impedindo nova reserva do mesmo espaço no mesmo período.",
+          "legenda": "Tela de Gerenciar reservas, com as solicitações, os filtros e os botões \"Aprovar\", \"Responder\" e \"Cancelar\"."
+        },
+        {
+          "titulo": "Estrutura física",
+          "rota": "/rooms/structure",
+          "quemUsa": "Equipe de gestão dos ambientes.",
+          "oQueE": "Cadastro de campi, blocos e ambientes disponíveis para reserva, com tipo, capacidade, dias e horários de funcionamento e situação.",
+          "passos": [
+            "Cadastrar o campus; abrir o campus para cadastrar os blocos e, em cada bloco, os ambientes.",
+            "Informar, para cada ambiente, o tipo (sala, laboratório, auditório etc.), a capacidade, os dias e o horário de funcionamento.",
+            "Alterar a situação para \"manutenção\" ou \"bloqueado\" para impedir novas reservas temporariamente."
+          ],
+          "deOndeVem": "A tela \"Reservar\" utiliza este cadastro para oferecer os ambientes e validar capacidade e funcionamento.",
+          "legenda": "Tela de Estrutura física, com a navegação campus → bloco → ambientes."
+        }
+      ]
+    },
+    {
+      "tipo": "capitulo",
+      "numero": 5,
+      "titulo": "Rooster Assets — Controle de patrimônio",
+      "introducao": [
+        "O Rooster Assets controla os bens da instituição: computadores, projetores, mobiliário e demais equipamentos, com localização, responsável, estado de conservação e histórico de movimentações."
+      ],
+      "conceitos": [
+        [
+          "Item de patrimônio",
+          "bem identificado por código, com categoria, valor, setor, localização e estado de conservação."
+        ],
+        [
+          "Situação",
+          "disponível, em uso, emprestado, em manutenção ou baixado (retirado do patrimônio)."
+        ],
+        [
+          "Movimentação",
+          "registro de mudança de setor ou de sala, empréstimo, devolução ou envio para manutenção."
+        ],
+        [
+          "Empréstimo",
+          "retirada temporária do item por um responsável, com prazo de devolução; vencido o prazo, o empréstimo passa a constar como atrasado."
+        ]
+      ],
+      "fluxo": [
+        "Cadastrar as categorias e os setores de patrimônio.",
+        "Cadastrar os itens.",
+        "Registrar cada movimentação, empréstimo e devolução.",
+        "Acompanhar, no painel, os empréstimos em atraso e o valor do patrimônio."
+      ],
+      "telas": [
+        {
+          "titulo": "Painel",
+          "rota": "/assets",
+          "quemUsa": "Equipe responsável pelo patrimônio.",
+          "oQueE": "Resumo dos itens por situação (disponíveis, emprestados, em manutenção, inativos e empréstimos em atraso), últimos itens cadastrados, movimentações recentes e valor do patrimônio por categoria, com a opção de registrar a devolução de empréstimo.",
+          "legenda": "Tela inicial do Rooster Assets, com os cartões de resumo, os últimos itens, as movimentações recentes e o valor por categoria."
+        },
+        {
+          "titulo": "Patrimônio",
+          "rota": "/assets/inventory",
+          "quemUsa": "Equipe responsável pelo patrimônio.",
+          "oQueE": "Cadastro e acompanhamento de cada item, organizado por categoria (por exemplo, Informática, Mobiliário e Audiovisual).",
+          "passos": [
+            "Selecionar a categoria para listar os itens.",
+            "Cadastro: selecionar \"Novo item\", informar nome, categoria, marca e modelo, número de série, valor de aquisição, setor, localização e estado de conservação, e salvar.",
+            "Movimentação (mudança de setor ou de sala, ou envio para manutenção): abrir o item e utilizar \"Registrar movimentação\".",
+            "Empréstimo: registrar o responsável pela retirada e o prazo de devolução; na devolução, registrá-la."
+          ],
+          "deOndeVem": "Cada item mantém o histórico completo de movimentações (localizações, responsáveis e manutenções). O item baixado não pode ser movimentado. Os empréstimos com prazo vencido passam a constar automaticamente do painel.",
+          "legenda": "Tela de Patrimônio, com as categorias de bens e a quantidade de itens e o valor de cada uma."
+        }
+      ]
+    },
+    {
+      "tipo": "capitulo",
+      "numero": 6,
+      "titulo": "Rooster Academy — Gestão acadêmica",
+      "introducao": [
+        "O Rooster Academy organiza a vida acadêmica: cursos, disciplinas, turmas, matrículas, frequência e notas. É utilizado pela coordenação, que organiza a estrutura, e pelos professores, que registram frequência e avaliações. As informações do aluno estão reunidas no Rooster Student (capítulo 8)."
+      ],
+      "conceitos": [
+        [
+          "Curso",
+          "programa de formação (por exemplo, Engenharia de Software), ao qual o aluno está vinculado."
+        ],
+        [
+          "Disciplina",
+          "componente curricular do curso, com carga horária."
+        ],
+        [
+          "Período letivo",
+          "semestre ou ano letivo (por exemplo, 2026.2), com datas de início e de término."
+        ],
+        [
+          "Turma",
+          "oferta de uma disciplina em um período, com professor, horário e vagas."
+        ],
+        [
+          "Matrícula",
+          "inclusão do aluno em uma turma."
+        ],
+        [
+          "Item avaliativo",
+          "avaliação da turma (prova, trabalho ou atividade do Learn), com peso e nota máxima."
+        ],
+        [
+          "Média",
+          "média ponderada dos itens com nota lançada."
+        ]
+      ],
+      "fluxo": [
+        "A coordenação cadastra cursos, disciplinas e o período letivo.",
+        "A coordenação vincula professores e alunos (usuários do Hub) e cria as turmas.",
+        "A coordenação matricula os alunos nas turmas.",
+        "O professor registra a frequência e lança as notas; as atividades do Learn complementam as notas.",
+        "O aluno acompanha tudo pelo Rooster Student."
+      ],
+      "telas": [
+        {
+          "titulo": "Painel",
+          "rota": "/academy",
+          "quemUsa": "Coordenação e professores.",
+          "oQueE": "Para a coordenação, resumo institucional (disciplinas, turmas, professores, alunos, frequência e documentos) com gráficos por turno e por curso; para o professor, painel restrito às turmas que leciona. O botão \"Calendário acadêmico\" abre as datas do período.",
+          "legenda": "Tela inicial do Rooster Academy, com o período letivo vigente, os indicadores e os gráficos."
+        },
+        {
+          "titulo": "Gestão acadêmica",
+          "rota": "/academy/manage",
+          "quemUsa": "Coordenação acadêmica.",
+          "oQueE": "Organização da estrutura do período letivo, em abas: Disciplinas, Turmas, Professores, Alunos e Calendário.",
+          "bullets": [
+            "Disciplinas: catálogo do que a instituição oferece, com curso, carga horária e documentos (planos de ensino e ementas).",
+            "Turmas: oferta efetiva de uma disciplina em um período letivo, com professor, turno, sala, horário e quantidade de vagas.",
+            "Professores e Alunos: vínculo de pessoa já cadastrada no Rooster Hub à função de professor ou de aluno (com registro acadêmico e curso); não se cria novo login.",
+            "Matrícula: inclusão de aluno em turma, respeitado o número de vagas.",
+            "Calendário: datas relevantes do período (início do semestre, provas, feriados e eventos), exibidas a professores e alunos."
+          ],
+          "deOndeVem": "A turma depende do cadastro prévio da disciplina, do período letivo e do professor. O aluno somente aparece nas telas de frequência e de notas de uma turma após a matrícula.",
+          "legenda": "Tela de Gestão acadêmica, aba Disciplinas, com as disciplinas, o curso, a carga horária e a quantidade de turmas.",
+          "extras": [
+            {
+              "imagem": "academy-manage-turmas",
+              "legenda": "Gestão acadêmica, aba Turmas: turmas do período, com disciplina, professor, turno e vagas."
+            },
+            {
+              "imagem": "academy-manage-alunos",
+              "legenda": "Gestão acadêmica, aba Alunos: alunos vinculados, com registro acadêmico, curso e situação."
+            },
+            {
+              "imagem": "academy-manage-calendario",
+              "legenda": "Gestão acadêmica, aba Calendário: eventos do calendário acadêmico."
+            }
+          ]
+        },
+        {
+          "titulo": "Frequência",
+          "rota": "/academy/attendance",
+          "quemUsa": "Professores (nas próprias turmas) e coordenação.",
+          "oQueE": "Registro da presença dos alunos em cada aula.",
+          "passos": [
+            "Selecionar a turma; são exibidos os alunos e as chamadas anteriores.",
+            "Informar a data da aula e registrar presença, falta, atraso ou falta justificada para cada aluno matriculado.",
+            "Salvar; o registro fica disponível ao aluno no Rooster Student."
+          ],
+          "deOndeVem": "O professor registra a frequência apenas das turmas que leciona, ainda que possua a permissão; a coordenação pode registrar em qualquer turma. A frequência abaixo de 75% é destacada ao aluno como risco de reprovação, sem reprovação automática.",
+          "legenda": "Tela de Frequência (Chamada), com as turmas do professor e a frequência média de cada uma."
+        },
+        {
+          "titulo": "Notas",
+          "rota": "/academy/grades",
+          "quemUsa": "Professores (nas próprias turmas) e coordenação.",
+          "oQueE": "Lançamento das notas dos alunos, com o peso de cada avaliação na média final.",
+          "passos": [
+            "Selecionar a turma.",
+            "Configurar os itens avaliativos da turma (por exemplo, \"Prova 1\", com peso 0,6) e a nota máxima de cada um.",
+            "Lançar a nota de cada aluno em cada item; o aluno é notificado do lançamento.",
+            "A média é calculada automaticamente, ponderada pelos pesos dos itens com nota lançada (itens sem nota não são considerados)."
+          ],
+          "deOndeVem": "A atividade do Rooster Learn publicada com peso aparece nesta tela como item avaliativo, e a nota atribuída na correção da atividade (capítulo 7) integra automaticamente a média, sem novo lançamento.",
+          "legenda": "Tela de Notas, com as turmas do professor, a quantidade de alunos e de componentes de avaliação."
+        }
+      ]
+    },
+    {
+      "tipo": "capitulo",
+      "numero": 7,
+      "titulo": "Rooster Learn — Atividades e entregas",
+      "introducao": [
+        "O Rooster Learn permite aos professores criar atividades (provas, listas, trabalhos, questionários e materiais) para as turmas do Rooster Academy e aos alunos enviar as respectivas respostas.",
+        "A atividade pode conter questões de múltipla escolha (com uma ou várias respostas corretas), de verdadeiro ou falso, discursivas e de envio de arquivo, cada uma com texto e imagem de apoio opcionais. As questões objetivas são corrigidas automaticamente no envio; as discursivas e as de envio de arquivo são pontuadas pelo professor. A atividade sem questões é respondida em texto livre, com anexos."
+      ],
+      "conceitos": [
+        [
+          "Atividade",
+          "tarefa da turma (prova, lista, trabalho, questionário ou material), com prazo, peso e nota máxima."
+        ],
+        [
+          "Situação da atividade",
+          "rascunho (visível apenas ao professor), publicada, encerrada ou arquivada."
+        ],
+        [
+          "Questão",
+          "item da atividade, de um dos tipos: múltipla escolha com uma resposta, múltipla escolha com várias respostas, verdadeiro ou falso, discursiva ou envio de arquivo."
+        ],
+        [
+          "Gabarito",
+          "alternativas corretas das questões objetivas; oculto ao aluno até a correção da própria entrega."
+        ],
+        [
+          "Entrega",
+          "resposta do aluno à atividade; situação: enviada, atrasada, reenvio ou corrigida."
+        ],
+        [
+          "Correção automática",
+          "pontuação das questões objetivas no envio, com pontuação integral apenas quando todas as alternativas corretas, e somente elas, são marcadas."
+        ]
+      ],
+      "fluxo": [
+        "O professor cria a atividade na turma e cadastra as questões.",
+        "O professor publica a atividade; os alunos são notificados.",
+        "O aluno responde e envia; as questões objetivas são pontuadas automaticamente.",
+        "O professor pontua as questões discursivas e de envio de arquivo e salva a correção.",
+        "A nota é propagada ao Academy, e o aluno consulta a nota, o feedback e o gabarito."
+      ],
+      "telas": [
+        {
+          "titulo": "Painel",
+          "rota": "/learn",
+          "quemUsa": "Professores, coordenação e alunos.",
+          "oQueE": "Para o professor e a coordenação, resumo das atividades publicadas, das entregas recebidas e das turmas, com a relação de atividades (prazo, situação e entregas) e as abas Turmas e Relatórios; para o aluno, resumo das próprias atividades.",
+          "legenda": "Tela inicial do Rooster Learn, com os indicadores e a relação de atividades."
+        },
+        {
+          "titulo": "Turmas e atividades",
+          "rota": "/learn/classes",
+          "quemUsa": "Professores (nas próprias turmas) e coordenação.",
+          "oQueE": "Seleção da turma e gestão das atividades.",
+          "passos": [
+            "Selecionar a turma.",
+            "Criar a atividade: título, tipo (prova, lista, trabalho, questionário ou material), descrição, prazo de entrega, peso, nota máxima e se admite entrega após o prazo.",
+            "Abrir a atividade e, se desejado, cadastrar as questões na aba Questões (seção seguinte).",
+            "Publicar a atividade quando concluída; a partir da publicação, ela é exibida aos alunos da turma, que são notificados."
+          ],
+          "bullets": [
+            "A atividade criada por engano pode ser excluída; as questões e as imagens de apoio são excluídas com ela."
+          ],
+          "deOndeVem": "A publicação de atividade com peso maior que zero gera item avaliativo na tela de Notas do Academy (capítulo 6), e a nota da correção é incorporada automaticamente, sem novo lançamento. A atividade com peso zero não compõe a média.",
+          "legenda": "Tela de Turmas e atividades, com as turmas do professor."
+        },
+        {
+          "titulo": "Detalhe da atividade: questões e correção",
+          "rota": "/learn/activities/:id",
+          "quemUsa": "Professores (nas próprias turmas) e coordenação.",
+          "oQueE": "Detalhe da atividade, com as abas Descrição, Questões, Entregas, Correção, Notas, Feedback e Histórico.",
+          "passos": [
+            "Na aba Questões, selecionar \"Adicionar questão\" e escolher o tipo: múltipla escolha (uma resposta), múltipla escolha (várias respostas), verdadeiro ou falso, discursiva ou envio de arquivo.",
+            "Informar o enunciado, o texto de apoio (opcional), a imagem de apoio (opcional; JPEG, PNG, GIF ou WebP, até 5 MB), o valor em pontos e se a resposta é obrigatória.",
+            "Nas questões objetivas, cadastrar as alternativas e marcar a correta (ou as corretas, na múltipla escolha com várias respostas). Salvar.",
+            "Reordenar as questões pelas setas, editar pelo ícone de lápis, trocar ou remover a imagem de apoio e excluir pelo ícone de lixeira.",
+            "Na aba Correção, selecionar a entrega: cada resposta é exibida com o gabarito; as questões objetivas já chegam pontuadas e podem ser revistas, e as discursivas e de envio de arquivo recebem a pontuação do professor. A nota calculada é exibida antes de salvar. Informar, se desejado, o feedback e selecionar \"Salvar correção\"."
+          ],
+          "bullets": [
+            "Após a primeira entrega, as questões não podem ser alteradas nem excluídas, para não invalidar as respostas enviadas; a reordenação permanece disponível.",
+            "Quando todas as questões são objetivas, a entrega já chega corrigida, com nota calculada automaticamente; a correção pode ser revista na aba Correção.",
+            "A nota é calculada como (pontos obtidos ÷ total de pontos) × nota máxima. Exemplo: 4,5 de 6 pontos, em atividade de nota máxima 10, resultam em nota 7,5.",
+            "Na atividade sem questões, a aba Correção apresenta a resposta em texto e os anexos, e o professor informa diretamente a nota."
+          ],
+          "deOndeVem": "A nota calculada é propagada ao Academy (capítulo 6) da mesma forma que a nota lançada diretamente, e o aluno é notificado da correção.",
+          "legenda": "Aba Questões do detalhe da atividade, com questão de múltipla escolha acompanhada de texto e imagem de apoio e alternativa correta destacada.",
+          "extras": [
+            {
+              "imagem": "learn-correcao",
+              "legenda": "Aba Correção: respostas do aluno com o gabarito, pontuação por questão e nota calculada."
+            }
+          ]
+        },
+        {
+          "titulo": "Atividades do aluno",
+          "rota": "/learn/student",
+          "quemUsa": "Alunos.",
+          "oQueE": "Consulta das atividades das turmas do aluno, organizadas por matéria, e envio das respostas.",
+          "passos": [
+            "Selecionar a matéria; são exibidos os indicadores de desempenho e as abas \"A fazer\" e \"Realizadas\".",
+            "Selecionar \"Responder\" na atividade desejada.",
+            "Responder: na atividade com questões, marcar a alternativa (ou as alternativas) das questões objetivas, redigir as discursivas e anexar o arquivo das questões de envio de arquivo; na atividade sem questões, redigir a resposta e, se necessário, anexar arquivo. As questões obrigatórias sem resposta são destacadas e impedem o envio.",
+            "Selecionar \"Enviar resposta\". Após o prazo, o envio é aceito como atrasado, se a atividade o permitir, ou recusado, em caso contrário. O reenvio substitui a resposta anterior e invalida eventual correção.",
+            "Após a correção, a nota e o feedback do professor são exibidos na aba \"Realizadas\"; em \"Ver entrega\", cada questão é apresentada com a resposta dada, a pontuação obtida e o gabarito. Na atividade composta apenas por questões objetivas, a nota é exibida logo após o envio."
+          ],
+          "deOndeVem": "A entrega é encaminhada à fila de correção do professor da turma; após a correção, a nota integra automaticamente a média do aluno, exibida também no Rooster Student. O gabarito somente é exibido depois da correção da própria entrega.",
+          "legenda": "Tela de atividades do aluno, com os indicadores da matéria e as atividades a fazer.",
+          "extras": [
+            {
+              "imagem": "learn-aluno-responder",
+              "legenda": "Formulário de resposta do aluno preenchido: alternativa marcada, questão de verdadeiro ou falso, resposta discursiva e o botão \"Enviar resposta\"."
+            },
+            {
+              "imagem": "learn-aluno-revisao",
+              "legenda": "Revisão da entrega corrigida: resposta dada, pontuação obtida e gabarito de cada questão."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "tipo": "capitulo",
+      "numero": 8,
+      "titulo": "Rooster Student — Portal do aluno",
+      "introducao": [
+        "O Rooster Student reúne as informações da vida acadêmica do aluno, provenientes de diferentes módulos (Academy, Learn e Finance), sempre restritas aos dados do próprio aluno. As telas são acessadas pelo menu lateral ou pelas abas exibidas abaixo da identificação do aluno."
+      ],
+      "conceitos": [],
+      "fluxo": [
+        "O aluno acessa o sistema com o próprio login e é direcionado ao portal.",
+        "Consulta disciplinas, frequência, notas e o calendário.",
+        "Responde às atividades publicadas e acompanha a correção.",
+        "Baixa documentos e boletos e acompanha a situação financeira."
+      ],
+      "telas": [
+        {
+          "titulo": "Painel",
+          "rota": "/student",
+          "quemUsa": "Alunos.",
+          "oQueE": "Resumo pessoal: disciplinas, média geral, frequência média, valores em aberto, alerta de frequência, próximas atividades e avisos importantes.",
+          "legenda": "Tela inicial do portal do aluno, com os indicadores, o alerta de frequência, as próximas atividades e os avisos."
+        },
+        {
+          "titulo": "Perfil acadêmico",
+          "rota": "/student/profile",
+          "quemUsa": "Alunos.",
+          "oQueE": "Dados cadastrais e vínculo acadêmico do aluno: curso, semestre, registro acadêmico, modalidade e situação. Os dados são mantidos pela secretaria; o cartão \"Contato\" é informativo, pois a atualização do contato pessoal pelo próprio aluno ainda não é registrada pelo sistema.",
+          "legenda": "Tela de Perfil acadêmico, com a identificação, o contato e o vínculo acadêmico."
+        },
+        {
+          "titulo": "Disciplinas",
+          "rota": "/student/disciplines",
+          "quemUsa": "Alunos.",
+          "oQueE": "Disciplinas e turmas em que o aluno está matriculado no período atual, com professor, horário, sala, frequência e média, e atalhos para as atividades e as notas de cada disciplina.",
+          "legenda": "Tela de Disciplinas, com as turmas do aluno no período letivo atual."
+        },
+        {
+          "titulo": "Atividades",
+          "rota": "/student/activities",
+          "quemUsa": "Alunos.",
+          "oQueE": "Relação das atividades do Rooster Learn, com filtros por situação e disciplina, nota e feedback do professor.",
+          "deOndeVem": "O formulário de resposta, inclusive das questões, e a revisão da entrega são os mesmos do capítulo 7 (Rooster Learn), apresentados no portal para evitar a troca de módulo.",
+          "legenda": "Tela de Atividades do portal do aluno, com as atividades pendentes, entregues e corrigidas."
+        },
+        {
+          "titulo": "Notas e desempenho",
+          "rota": "/student/grades",
+          "quemUsa": "Alunos.",
+          "oQueE": "Notas de cada disciplina e média calculada, conforme lançadas pelo professor, inclusive as notas de atividades corrigidas no Rooster Learn.",
+          "legenda": "Tela de Notas e desempenho, com os indicadores e a média por disciplina."
+        },
+        {
+          "titulo": "Frequência",
+          "rota": "/student/attendance",
+          "quemUsa": "Alunos.",
+          "oQueE": "Presenças, faltas e percentual de frequência em cada disciplina, com destaque das disciplinas abaixo do mínimo de 75% e os registros recentes.",
+          "legenda": "Tela de Frequência do aluno, com o alerta de risco por falta e a frequência por disciplina."
+        },
+        {
+          "titulo": "Histórico",
+          "rota": "/student/history",
+          "quemUsa": "Alunos.",
+          "oQueE": "Histórico acadêmico consolidado (disciplinas cursadas, médias e situação), coeficiente de rendimento e média por período letivo.",
+          "legenda": "Tela de Histórico acadêmico, com o coeficiente de rendimento e a média por período."
+        },
+        {
+          "titulo": "Calendário",
+          "rota": "/student/calendar",
+          "quemUsa": "Alunos.",
+          "oQueE": "Agenda mensal com as datas do calendário acadêmico (provas, feriados e eventos), os prazos de entrega das atividades e os vencimentos das cobranças, com filtros por tipo e a grade semanal do aluno.",
+          "legenda": "Tela de Calendário acadêmico, com o mês, os próximos compromissos e a grade do aluno."
+        },
+        {
+          "titulo": "Documentos",
+          "rota": "/student/documents",
+          "quemUsa": "Alunos.",
+          "oQueE": "Central de documentos: documentos institucionais (por exemplo, regulamentos) e documentos das disciplinas em que o aluno está matriculado (por exemplo, planos de ensino e ementas).",
+          "passos": [
+            "Localizar o documento pela busca ou pelo filtro de origem (institucional ou disciplina).",
+            "Selecionar \"Baixar\" para salvar o arquivo."
+          ],
+          "deOndeVem": "Os documentos são disponibilizados pela coordenação e pelos professores na gestão acadêmica do Rooster Academy; documentos de disciplinas não cursadas pelo aluno não são exibidos.",
+          "legenda": "Tela de Documentos, com a relação de documentos (nome, tipo, origem, data e tamanho) e o botão de download."
+        },
+        {
+          "titulo": "Financeiro",
+          "rota": "/student/finance",
+          "quemUsa": "Alunos.",
+          "oQueE": "Situação financeira do aluno: valores em aberto, vencidos e pagos no ano, desconto vigente, próximo vencimento, histórico de pagamentos e relação de cobranças.",
+          "passos": [
+            "Utilizar \"Baixar boleto\" para obter o boleto da cobrança em aberto e \"Copiar código PIX\" para pagamento por PIX.",
+            "Baixar a nota fiscal da cobrança, quando emitida."
+          ],
+          "deOndeVem": "As informações provêm do Rooster Finance (capítulo 10), restritas às cobranças do próprio aluno.",
+          "legenda": "Tela de Financeiro do aluno, com os indicadores, o próximo vencimento e o histórico de pagamentos."
+        },
+        {
+          "titulo": "Notificações",
+          "rota": "/student/notifications",
+          "quemUsa": "Alunos.",
+          "oQueE": "Mesma central de avisos do capítulo 1, apresentada no portal do aluno.",
+          "legenda": "Tela de Notificações do portal do aluno."
+        },
+        {
+          "titulo": "Cursos livres (Boost)",
+          "rota": "Item \"Cursos livres (Boost)\" do menu",
+          "quemUsa": "Alunos.",
+          "oQueE": "Atalho para o portal do Rooster Boost (capítulo 9), em que o aluno realiza os cursos livres. O acesso ao portal é feito com o mesmo e-mail e a mesma senha do Rooster One, pela opção \"Aluno da instituição\".",
+          "legenda": "Menu do Rooster Student, com o item \"Cursos livres (Boost)\" ao final."
+        }
+      ]
+    },
+    {
+      "tipo": "capitulo",
+      "numero": 9,
+      "titulo": "Rooster Boost — Cursos livres",
+      "introducao": [
+        "O Rooster Boost é uma plataforma de cursos livres destinada aos alunos e funcionários da instituição e também ao público externo. Os alunos da instituição acessam o portal com o mesmo login do Rooster One, sem cadastro adicional; o aluno externo utiliza conta própria do portal, criada no cadastro público ou pela administração.",
+        "O módulo divide-se em duas partes: o portal do aluno, em que se realizam os cursos e se conversa com os orientadores, e a gestão, no sistema principal, utilizada por quem administra os cursos, matricula alunos e orienta. O portal é acessado pelo endereço /boost-portal, pelo link \"acessar o Rooster Boost\" da tela de login, pelo item \"Cursos livres (Boost)\" do menu do Rooster Student ou pelo item \"Portal do aluno\" do menu do Rooster Boost."
+      ],
+      "conceitos": [
+        [
+          "Curso livre",
+          "curso extracurricular, organizado em módulos e aulas, com carga horária e, opcionalmente, certificado."
+        ],
+        [
+          "Situação do curso",
+          "rascunho (em montagem), publicado (no catálogo) ou arquivado."
+        ],
+        [
+          "Conta do portal",
+          "acesso ao portal do Boost: institucional (mesmo login do Rooster One) ou externa (login próprio)."
+        ],
+        [
+          "Matrícula",
+          "vínculo do aluno ao curso; situação ativa, concluída ou cancelada."
+        ],
+        [
+          "Orientador",
+          "professor vinculado ao curso, que responde às dúvidas dos alunos."
+        ],
+        [
+          "Certificado",
+          "documento emitido automaticamente na conclusão do curso, com código de verificação público."
+        ]
+      ],
+      "fluxo": [
+        "A gestão cria o curso, monta módulos e aulas, configura o certificado e vincula os orientadores.",
+        "A gestão publica o curso, que passa a constar do catálogo.",
+        "O aluno se matricula pelo catálogo, ou é matriculado pela gestão.",
+        "O aluno assiste às aulas e conversa com os orientadores.",
+        "Concluídas as aulas, o certificado é emitido e pode ser verificado por qualquer pessoa."
+      ],
+      "telas": [
+        {
+          "titulo": "Catálogo de cursos (portal público)",
+          "rota": "/boost-portal",
+          "quemUsa": "Qualquer pessoa, inclusive sem cadastro.",
+          "oQueE": "Relação dos cursos publicados, disponíveis para matrícula, com busca e filtro por categoria.",
+          "legenda": "Página inicial do portal do Boost, com os cursos disponíveis em cartões (título, categoria, carga horária e nível)."
+        },
+        {
+          "titulo": "Cadastro",
+          "rota": "/boost-portal/cadastro",
+          "quemUsa": "Pessoas externas à instituição, sem conta no portal.",
+          "oQueE": "Criação de conta própria do portal, com nome, e-mail e senha (mínimo de 8 caracteres).",
+          "passos": [
+            "Informar nome, e-mail e senha.",
+            "Selecionar \"Criar conta\"; a conta pode ser utilizada imediatamente para o login."
+          ],
+          "deOndeVem": "O cadastro destina-se ao público externo. O aluno da instituição não precisa cadastrar-se: acessa o portal com a conta institucional, na opção \"Aluno da instituição\" da tela Entrar.",
+          "legenda": "Tela de Cadastro do Boost, com os campos de nome, e-mail e senha."
+        },
+        {
+          "titulo": "Entrar",
+          "rota": "/boost-portal/entrar",
+          "quemUsa": "Alunos da instituição e alunos externos.",
+          "oQueE": "Login do portal, com duas opções de acesso.",
+          "passos": [
+            "Aluno da instituição: selecionar \"Aluno da instituição\" e informar o mesmo e-mail e a mesma senha do Rooster One. No primeiro acesso, a conta do portal é criada automaticamente.",
+            "Aluno externo: selecionar \"Aluno externo\" e informar o e-mail e a senha da conta do portal.",
+            "Selecionar \"Entrar\"; o sistema exibe o painel com os cursos do aluno."
+          ],
+          "deOndeVem": "O aluno da instituição que esquecer a senha deve recuperá-la na tela de login do Rooster One (capítulo 1); o aluno externo utiliza o link \"Esqueci minha senha\", exibido na opção \"Aluno externo\". A conta institucional desativada no Rooster Hub perde também o acesso ao portal.",
+          "legenda": "Tela Entrar do portal do Boost, com as opções \"Aluno da instituição\" e \"Aluno externo\"."
+        },
+        {
+          "titulo": "Recuperação de senha do aluno externo",
+          "rota": "/boost-portal/esqueci-senha",
+          "quemUsa": "Alunos externos.",
+          "oQueE": "Solicitação do link de definição de nova senha da conta do portal, sem intervenção da administração.",
+          "passos": [
+            "Na tela Entrar, selecionar \"Aluno externo\" e, em seguida, \"Esqueci minha senha\".",
+            "Informar o e-mail da conta e selecionar \"Enviar link de redefinição\". Por segurança, a mensagem de confirmação é a mesma em qualquer caso, inclusive quando o e-mail não está cadastrado.",
+            "Acessar o link recebido por e-mail (válido por 1 hora e de uso único). Um novo pedido invalida os links anteriores."
+          ],
+          "deOndeVem": "O aluno da instituição não utiliza esta tela: a senha do portal é a mesma do Rooster One. Se o e-mail informado pertencer a conta institucional, a mensagem recebida orienta a recuperação da senha no sistema da instituição.",
+          "legenda": "Tela de recuperação de senha do portal do Boost, com o campo de e-mail e o botão \"Enviar link de redefinição\"."
+        },
+        {
+          "titulo": "Definição da nova senha do aluno externo",
+          "rota": "/boost-portal/redefinir-senha",
+          "quemUsa": "Alunos externos.",
+          "oQueE": "Tela aberta pelo link recebido por e-mail.",
+          "passos": [
+            "Informar e confirmar a nova senha (mínimo de 8 caracteres) e selecionar \"Redefinir senha\".",
+            "Selecionar \"Entrar com a nova senha\"."
+          ],
+          "deOndeVem": "O link expirado, já utilizado ou inválido é recusado, com a orientação de solicitar novo link.",
+          "legenda": "Tela de definição da nova senha do portal do Boost."
+        },
+        {
+          "titulo": "Página do curso e matrícula",
+          "rota": "/boost-portal/cursos/:slug",
+          "quemUsa": "Visitantes e alunos cadastrados no Boost.",
+          "oQueE": "Detalhes do curso: descrição, carga horária, nível, orientadores, módulos e títulos das aulas.",
+          "passos": [
+            "Consultar o conteúdo programático.",
+            "Selecionar \"Matricular-se gratuitamente\" (requer login; o visitante é conduzido à tela Entrar)."
+          ],
+          "legenda": "Página de curso, com a descrição, os módulos, as aulas e o botão de matrícula."
+        },
+        {
+          "titulo": "Meus cursos",
+          "rota": "/boost-portal/painel",
+          "quemUsa": "Alunos matriculados no Boost.",
+          "oQueE": "Painel do aluno no portal, com os cursos em que está matriculado, o progresso de cada um e o certificado dos cursos concluídos.",
+          "passos": [
+            "Selecionar \"Continuar\" no curso desejado para abrir as aulas (seção seguinte)."
+          ],
+          "legenda": "Painel do aluno no portal do Boost, com o curso em andamento e o progresso."
+        },
+        {
+          "titulo": "Aulas do curso",
+          "rota": "/boost-portal/painel/:matriculaId",
+          "quemUsa": "Alunos matriculados no Boost.",
+          "oQueE": "Área em que o aluno assiste às aulas (vídeo ou texto), obtém materiais de apoio, conversa com os orientadores e acompanha o progresso no curso.",
+          "passos": [
+            "Selecionar a aula na relação de módulos e aulas.",
+            "Assistir à aula; nas aulas em vídeo hospedado, a reprodução é retomada do ponto em que foi interrompida, e a aula é concluída automaticamente ao atingir 90% assistidos. As demais aulas são concluídas pelo botão \"Marcar como concluída\".",
+            "Baixar os materiais de apoio disponibilizados.",
+            "Enviar dúvidas aos orientadores do curso pela conversa do curso.",
+            "Ao concluir todas as aulas, o certificado é emitido automaticamente, quando o curso o prevê, sem solicitação nem aprovação."
+          ],
+          "deOndeVem": "O texto do certificado (com o nome do aluno, o curso, a carga horária e a data) é definido pela gestão do curso, e o código impresso permite a verificação pública.",
+          "legenda": "Tela de aulas do curso no portal do Boost, com a relação de módulos e aulas, o conteúdo da aula e o progresso."
+        },
+        {
+          "titulo": "Verificação de certificado",
+          "rota": "/boost-portal/verificar",
+          "quemUsa": "Qualquer pessoa, inclusive sem cadastro (por exemplo, empregadores).",
+          "oQueE": "Conferência da autenticidade de certificado do Boost pelo código nele impresso.",
+          "passos": [
+            "Informar o código do certificado e selecionar \"Conferir\".",
+            "Consultar o resultado: certificado autêntico (com nome do aluno, curso, carga horária e data) ou não encontrado."
+          ],
+          "deOndeVem": "A falha de comunicação com o servidor é informada separadamente e não significa certificado inválido.",
+          "legenda": "Tela de verificação de certificado, com o código informado e o resultado \"Certificado autêntico\"."
+        },
+        {
+          "titulo": "Cursos (gestão)",
+          "rota": "/boost",
+          "quemUsa": "Gestão do Boost (no sistema principal).",
+          "oQueE": "Relação de todos os cursos, com indicadores (cursos, publicados, alunos matriculados e cursos com certificado) e o botão \"Novo curso\".",
+          "deOndeVem": "Não há responsável exclusivo por curso: o usuário com permissão de gestão atua sobre todos os cursos. A retirada de publicação remove o curso do catálogo e impede novas matrículas, preservando o acesso dos alunos já matriculados.",
+          "legenda": "Tela de Cursos (gestão), com os indicadores e os cursos e suas situações."
+        },
+        {
+          "titulo": "Gestão de um curso",
+          "rota": "/boost/manage/:id",
+          "quemUsa": "Gestão do Boost.",
+          "oQueE": "Montagem e acompanhamento do curso, nas abas Detalhes, Conteúdo, Certificado, Orientadores e Alunos.",
+          "passos": [
+            "Detalhes: título, descrição, categoria, carga horária, nível, capa e situação (rascunho, publicado ou arquivado).",
+            "Conteúdo: criar os módulos e, em cada um, as aulas, definindo o formato (texto, vídeo enviado ao sistema, até 2 GB, ou link externo) e incluindo materiais de apoio (até 25 MB).",
+            "Certificado: ativar a emissão e definir o texto impresso.",
+            "Orientadores: vincular os professores responsáveis pelas dúvidas dos alunos do curso.",
+            "Alunos: acompanhar o progresso dos matriculados e, com a permissão de matrícula, selecionar \"Matricular aluno\", buscar o aluno da instituição ou o aluno externo pelo nome ou pelo e-mail e selecionar \"Matricular\". A matrícula ativa pode ser cancelada pela opção \"Cancelar matrícula\".",
+            "Publicar o curso quando concluído, alterando a situação para \"Publicado\"; somente então ele é exibido no catálogo público."
+          ],
+          "deOndeVem": "Os orientadores visualizam apenas as conversas dos cursos a que estão vinculados. O aluno da instituição matriculado pela gestão acessa o curso no portal com a conta institucional; a matrícula cancelada pode ser refeita, e a matrícula concluída não pode ser cancelada.",
+          "legenda": "Tela de gestão de curso, aba Detalhes, com os dados do curso.",
+          "extras": [
+            {
+              "imagem": "boost-manage-conteudo",
+              "legenda": "Gestão de curso, aba Conteúdo: módulos, aulas e materiais de apoio."
+            },
+            {
+              "imagem": "boost-manage-alunos",
+              "legenda": "Gestão de curso, aba Alunos: matrículas, progresso e o botão \"Matricular aluno\"."
+            }
+          ]
+        },
+        {
+          "titulo": "Conversas com alunos",
+          "rota": "/boost/conversas",
+          "quemUsa": "Orientadores.",
+          "oQueE": "Resposta às dúvidas dos alunos dos cursos em que o usuário é orientador, com indicação das mensagens não lidas e atualização em tempo real.",
+          "passos": [
+            "Selecionar a conversa na lista, à esquerda.",
+            "Redigir a resposta e selecionar \"Enviar\"."
+          ],
+          "legenda": "Tela de Conversas, com as conversas por aluno e curso e o histórico de mensagens da conversa selecionada."
+        },
+        {
+          "titulo": "Alunos do portal",
+          "rota": "/boost/students",
+          "quemUsa": "Administradores.",
+          "oQueE": "Cadastro das contas de acesso ao portal: alunos externos e contas de alunos da instituição, criadas automaticamente no primeiro acesso.",
+          "passos": [
+            "Cadastro: selecionar \"Novo aluno externo\", informar nome e e-mail e, opcionalmente, a senha inicial (mínimo de 8 caracteres), e salvar. Sem senha informada, o sistema gera senha temporária, exibida uma única vez, a ser repassada ao aluno por canal seguro.",
+            "Edição: selecionar \"Editar\" para alterar nome ou e-mail do aluno externo.",
+            "Redefinição de senha: selecionar \"Redefinir senha\"; a nova senha temporária é exibida uma única vez.",
+            "Desativação: selecionar \"Desativar\"; a conta deixa de acessar o portal e pode ser reativada.",
+            "Exclusão: disponível apenas para conta sem matrícula; a conta com matrícula deve ser desativada, para preservar o histórico."
+          ],
+          "deOndeVem": "As contas de alunos da instituição são identificadas como \"Institucional\" e não oferecem edição nem redefinição de senha, pois nome, e-mail e senha são os do Rooster One, mantidos no Rooster Hub.",
+          "legenda": "Tela Alunos do portal, com as contas (nome, e-mail, tipo, matrículas, cadastro e situação) e o botão \"Novo aluno externo\"."
+        }
+      ]
+    },
+    {
+      "tipo": "capitulo",
+      "numero": 10,
+      "titulo": "Rooster Finance — Financeiro",
+      "introducao": [
+        "O Rooster Finance controla as cobranças da instituição: mensalidades, produtos, serviços e taxas. É utilizado pela equipe financeira; as informações do aluno são acessadas pelo Rooster Student (capítulo 8).",
+        "Boleto, PIX e nota fiscal são documentos internos do sistema, sem integração com instituição financeira e sem validade fiscal."
+      ],
+      "conceitos": [
+        [
+          "Cobrança",
+          "valor devido por um aluno, de um dos tipos: mensalidade, produto, serviço ou taxa."
+        ],
+        [
+          "Situação da cobrança",
+          "em aberto, vencida (em aberto após o vencimento), paga, negociada ou cancelada."
+        ],
+        [
+          "Competência",
+          "mês e ano a que se refere a mensalidade."
+        ],
+        [
+          "Desconto ou bolsa",
+          "redução aplicada às mensalidades do aluno, percentual ou em valor fixo, com vigência."
+        ],
+        [
+          "Política de multa e juros",
+          "regra de acréscimo por atraso: multa percentual, juros diários e dias de carência."
+        ]
+      ],
+      "fluxo": [
+        "Cadastrar os serviços (por exemplo, a mensalidade), os produtos, as políticas de multa e juros e os descontos.",
+        "Gerar as mensalidades da competência em lote; lançar cobranças avulsas quando necessário.",
+        "Emitir boletos; o aluno os obtém também pelo portal.",
+        "Registrar os pagamentos e, quando necessário, renegociar ou cancelar cobranças.",
+        "Emitir notas fiscais e acompanhar os relatórios e a inadimplência."
+      ],
+      "telas": [
+        {
+          "titulo": "Painel",
+          "rota": "/finance",
+          "quemUsa": "Equipe financeira.",
+          "oQueE": "Resumo financeiro do ano: receita prevista e recebida, cobranças em aberto, boletos vencidos, inadimplentes, receita por mês, mensalidades recentes, últimos pagamentos, próximos vencimentos e alertas de estoque baixo.",
+          "legenda": "Tela inicial do Rooster Finance, com os indicadores, o gráfico de receita por mês e as mensalidades recentes."
+        },
+        {
+          "titulo": "Cobranças",
+          "rota": "/finance/charges",
+          "quemUsa": "Equipe financeira.",
+          "oQueE": "Todas as cobranças geradas para os alunos, de qualquer tipo (mensalidade, produto, serviço ou taxa), com filtros por tipo e situação.",
+          "bullets": [
+            "Criação de cobrança avulsa (\"Nova cobrança\").",
+            "Registro de pagamento, com valor, data e forma de pagamento.",
+            "Renegociação de cobrança (novo valor e vencimento, com motivo).",
+            "Cancelamento, com indicação do motivo.",
+            "Exportação da relação em CSV."
+          ],
+          "deOndeVem": "Toda cobrança está vinculada a aluno cadastrado no Rooster Academy. O pagamento, a renegociação e o cancelamento são notificados ao aluno e registrados em auditoria.",
+          "legenda": "Tela de Cobranças, com as cobranças (aluno, tipo, descrição, vencimento, valor e situação) e os filtros."
+        },
+        {
+          "titulo": "Mensalidades",
+          "rota": "/finance/tuitions",
+          "quemUsa": "Equipe financeira.",
+          "oQueE": "Geração das mensalidades de todos os alunos de uma só vez, por competência, e consulta das mensalidades geradas.",
+          "passos": [
+            "Selecionar \"Gerar em lote\" e informar a competência (mês e ano).",
+            "O sistema cria a mensalidade de cada aluno com matrícula ativa, aplicando automaticamente o desconto ou a bolsa vigente.",
+            "A nova geração da mesma competência não duplica cobranças, pois o sistema identifica as já existentes."
+          ],
+          "deOndeVem": "O valor provém do serviço de mensalidade cadastrado (tela Serviços) e do desconto vigente do aluno (tela Descontos).",
+          "legenda": "Tela de Mensalidades, com as mensalidades por competência, os descontos aplicados, os juros e a situação."
+        },
+        {
+          "titulo": "Boletos",
+          "rota": "/finance/boletos",
+          "quemUsa": "Equipe financeira; o aluno obtém o próprio boleto pelo Rooster Student.",
+          "oQueE": "Emissão do boleto e do código PIX de uma cobrança e download do boleto emitido.",
+          "passos": [
+            "Localizar a cobrança e emitir o boleto.",
+            "Baixar o boleto emitido; o aluno pode baixá-lo e utilizar o código PIX no próprio portal."
+          ],
+          "legenda": "Tela de Boletos, com as cobranças, o número do boleto e o botão de download."
+        },
+        {
+          "titulo": "Produtos",
+          "rota": "/finance/products",
+          "quemUsa": "Equipe financeira.",
+          "oQueE": "Cadastro dos itens comercializados ao aluno (por exemplo, apostilas e uniformes), com preço, estoque e estoque mínimo; o estoque abaixo do mínimo é destacado.",
+          "legenda": "Tela de Produtos, com os produtos cadastrados, preço e estoque."
+        },
+        {
+          "titulo": "Serviços",
+          "rota": "/finance/services",
+          "quemUsa": "Equipe financeira.",
+          "oQueE": "Cadastro dos serviços cobrados (por exemplo, mensalidade e segunda via de documento), com valor, frequência (única, mensal, semestral ou anual) e política de multa e juros.",
+          "legenda": "Tela de Serviços, com os serviços cadastrados e o valor atual."
+        },
+        {
+          "titulo": "Notas fiscais",
+          "rota": "/finance/nfe",
+          "quemUsa": "Equipe financeira.",
+          "oQueE": "Emissão de nota fiscal interna para cobrança de serviço (NFS) ou de produto (NFP).",
+          "passos": [
+            "Selecionar \"Emitir nota\" e escolher a cobrança.",
+            "Baixar o PDF ou exportar o arquivo XML da nota."
+          ],
+          "legenda": "Tela de Notas fiscais, com as abas de serviços e produtos e o botão \"Emitir nota\"."
+        },
+        {
+          "titulo": "Relatórios",
+          "rota": "/finance/reports",
+          "quemUsa": "Equipe financeira e gestão.",
+          "oQueE": "Relatórios de receita mensal, valores pendentes, fluxo de caixa e inadimplência, calculados a partir das cobranças registradas.",
+          "passos": [
+            "Utilizar \"Exportar CSV\" para salvar os dados."
+          ],
+          "legenda": "Tela de Relatórios, com os indicadores e os gráficos de receita e de pendências."
+        },
+        {
+          "titulo": "Descontos",
+          "rota": "/finance/discounts",
+          "quemUsa": "Equipe financeira.",
+          "oQueE": "Cadastro de descontos e bolsas (bolsa integral ou parcial, desconto percentual ou fixo, convênio e promoção), com vigência, e sua atribuição a alunos.",
+          "deOndeVem": "O desconto atribuído ao aluno é aplicado automaticamente na geração das mensalidades.",
+          "legenda": "Tela de Descontos, com os descontos cadastrados, o valor e os beneficiários."
+        },
+        {
+          "titulo": "Políticas de multa e juros",
+          "rota": "/finance/policies",
+          "quemUsa": "Equipe financeira.",
+          "oQueE": "Regras de multa e juros por atraso, aplicáveis a serviço (por exemplo, a todas as mensalidades) ou a cobrança específica.",
+          "deOndeVem": "A cobrança vencida tem multa e juros calculados automaticamente conforme a política vinculada; valores informados manualmente na cobrança prevalecem sobre a política. Política em uso não pode ser excluída.",
+          "legenda": "Tela de Políticas de multa e juros, com as políticas (percentual de multa, juros diários e dias de carência)."
+        }
+      ]
+    },
+    {
+      "tipo": "h1",
+      "texto": "11. Perguntas frequentes"
+    },
+    {
+      "tipo": "h3",
+      "texto": "Orientação sobre a utilização de uma tela ou tarefa"
+    },
+    {
+      "tipo": "p",
+      "texto": "Utilizar o assistente de dúvidas (capítulo 1), pelo botão no canto inferior direito, descrevendo a tarefa em linguagem comum; nas tarefas principais, a opção \"Mostrar na tela\" conduz a execução passo a passo. Para problemas no funcionamento do sistema, deve ser aberto um chamado no Rooster Desk."
+    },
+    {
+      "tipo": "h3",
+      "texto": "Procedimento em caso de esquecimento da senha"
+    },
+    {
+      "tipo": "p",
+      "texto": "Utilizar o link \"Esqueci minha senha\", na tela de login (capítulo 1), que envia ao e-mail cadastrado um link para a definição de nova senha. Se a mensagem não for recebida em alguns minutos, recomenda-se verificar a pasta de spam antes de repetir a solicitação. No portal do Boost, o aluno da instituição utiliza o mesmo procedimento, e o aluno externo, o link da opção \"Aluno externo\"."
+    },
+    {
+      "tipo": "h3",
+      "texto": "Ausência de módulo ou tela no menu"
+    },
+    {
+      "tipo": "p",
+      "texto": "A ausência decorre, em regra, da falta de permissão, e não de falha técnica: o menu exibe apenas o que as permissões do usuário autorizam. O acesso deve ser solicitado ao administrador do sistema (Rooster Hub), com a indicação da necessidade."
+    },
+    {
+      "tipo": "h3",
+      "texto": "Chamado sem resposta"
+    },
+    {
+      "tipo": "p",
+      "texto": "Cada categoria de chamado possui prazo esperado de resposta (SLA). Ultrapassado o prazo, é possível enviar mensagem no próprio chamado solicitando informação sobre o andamento."
+    },
+    {
+      "tipo": "h3",
+      "texto": "Reserva de ambiente em análise"
+    },
+    {
+      "tipo": "p",
+      "texto": "As reservas não são confirmadas automaticamente: dependem de aprovação da equipe de gestão dos ambientes. O andamento pode ser acompanhado em \"Minhas reservas\", inclusive com o envio de mensagem à equipe."
+    },
+    {
+      "tipo": "h3",
+      "texto": "Atividade não exibida ao aluno"
+    },
+    {
+      "tipo": "p",
+      "texto": "O aluno visualiza apenas as atividades publicadas das turmas em que está matriculado. A atividade em rascunho deve ser publicada pelo professor, e a matrícula do aluno deve ser conferida pela coordenação no Rooster Academy."
+    },
+    {
+      "tipo": "h3",
+      "texto": "Nota do Rooster Learn ausente no boletim"
+    },
+    {
+      "tipo": "p",
+      "texto": "Somente a atividade publicada com peso maior que zero compõe a média no Rooster Academy. A nota é propagada no momento da correção; entrega reenviada pelo aluno invalida a correção anterior e deve ser corrigida novamente."
+    },
+    {
+      "tipo": "h3",
+      "texto": "Questões da atividade bloqueadas para edição"
+    },
+    {
+      "tipo": "p",
+      "texto": "Após a primeira entrega, as questões não podem ser alteradas, para preservar as respostas já enviadas. Para corrigir uma questão, recomenda-se criar nova atividade, ou ajustar a pontuação na correção."
+    },
+    {
+      "tipo": "h3",
+      "texto": "Divergência em nota ou frequência"
+    },
+    {
+      "tipo": "p",
+      "texto": "O professor da disciplina, responsável pelo lançamento dessas informações, deve ser procurado. Persistindo a divergência, recomenda-se abrir chamado no Rooster Desk, na categoria \"Sistemas Acadêmicos\"."
+    },
+    {
+      "tipo": "h3",
+      "texto": "Ausência de notificações"
+    },
+    {
+      "tipo": "p",
+      "texto": "Os avisos permanecem disponíveis no ícone de sino da barra superior, mesmo sem alerta visual no momento do evento. Persistindo a ausência, recomenda-se abrir chamado relatando a situação."
+    },
+    {
+      "tipo": "h3",
+      "texto": "Suporte sobre o próprio sistema"
+    },
+    {
+      "tipo": "p",
+      "texto": "O canal oficial de suporte, inclusive para dúvidas sobre a utilização do Rooster One, é a abertura de chamado no Rooster Desk (capítulo 3)."
+    },
+    {
+      "tipo": "h1",
+      "texto": "Apêndice A — Glossário"
+    },
+    {
+      "tipo": "tabela",
+      "cabecalho": [
+        "Termo",
+        "Significado"
+      ],
+      "linhas": [
+        [
+          "Anexo",
+          "arquivo enviado junto a um chamado, entrega ou mensagem."
+        ],
+        [
+          "Assistente de dúvidas",
+          "recurso do sistema que responde a perguntas sobre a utilização das telas, com base neste manual."
+        ],
+        [
+          "Auditoria",
+          "registro automático das ações relevantes realizadas no sistema, com autor e data."
+        ],
+        [
+          "Bolsa",
+          "desconto concedido ao aluno nas mensalidades, integral ou parcial."
+        ],
+        [
+          "Certificado",
+          "documento de conclusão de curso livre do Boost, com código de verificação."
+        ],
+        [
+          "Competência",
+          "mês e ano de referência de uma mensalidade."
+        ],
+        [
+          "CSV",
+          "formato de planilha simples, aberto por programas como o Excel."
+        ],
+        [
+          "Entrega",
+          "resposta do aluno a uma atividade do Rooster Learn."
+        ],
+        [
+          "Gabarito",
+          "resposta correta das questões objetivas."
+        ],
+        [
+          "Item avaliativo",
+          "avaliação de uma turma, com peso e nota máxima, que compõe a média."
+        ],
+        [
+          "Matrícula",
+          "vínculo do aluno a uma turma (Academy) ou a um curso livre (Boost)."
+        ],
+        [
+          "Notificação",
+          "aviso exibido na central de notificações sobre evento relacionado ao usuário."
+        ],
+        [
+          "Período letivo",
+          "semestre ou ano letivo."
+        ],
+        [
+          "Permissão",
+          "autorização para uma ação em uma tela de um módulo."
+        ],
+        [
+          "PIX",
+          "código de pagamento instantâneo exibido junto ao boleto (simulado, de uso interno)."
+        ],
+        [
+          "Portal do Boost",
+          "área pública de cursos livres, acessada pelo endereço /boost-portal."
+        ],
+        [
+          "Roteiro guiado",
+          "condução passo a passo de uma tarefa na própria tela, com o campo do passo em destaque e legenda explicativa."
+        ],
+        [
+          "Setor",
+          "agrupamento de usuários por área de atuação."
+        ],
+        [
+          "SLA",
+          "prazo esperado de atendimento de um chamado."
+        ],
+        [
+          "Turma",
+          "oferta de uma disciplina em um período letivo, com professor e alunos matriculados."
+        ]
+      ]
+    },
+    {
+      "tipo": "espaco"
+    },
+    {
+      "tipo": "h1",
+      "texto": "Apêndice B — Usuários de demonstração"
+    },
+    {
+      "tipo": "p",
+      "texto": "O ambiente de demonstração e de avaliação do Rooster One é carregado com dados fictícios e com os usuários abaixo, um para cada perfil, que permitem percorrer todas as telas descritas neste manual. Esses usuários e senhas existem apenas nesse ambiente e não devem ser utilizados em ambiente de produção."
+    },
+    {
+      "tipo": "tabela",
+      "cabecalho": [
+        "Perfil",
+        "E-mail",
+        "Senha"
+      ],
+      "linhas": [
+        [
+          "Administrador (acesso a todos os módulos)",
+          "admin@rooster.local",
+          "Admin123!"
+        ],
+        [
+          "Coordenação acadêmica (Academy, Learn e Boost)",
+          "coordenacao.academica@rooster.local",
+          "Coordenador123!"
+        ],
+        [
+          "Coordenação de suporte (Desk)",
+          "coordenador.suporte@rooster.local",
+          "Coordenador123!"
+        ],
+        [
+          "Atendente (Desk)",
+          "bruno.atendente@rooster.local",
+          "Senha123"
+        ],
+        [
+          "Solicitante (Desk e Rooms)",
+          "ana.solicitante@rooster.local",
+          "Senha123"
+        ],
+        [
+          "Professor (turma ALG101-A; orientador no Boost)",
+          "ricardo.lima@rooster.local",
+          "Professor123!"
+        ],
+        [
+          "Aluno (turma ALG101-A; matriculado no Boost)",
+          "joao.pereira@rooster.local",
+          "Aluno123!"
+        ],
+        [
+          "Equipe financeira (Finance)",
+          "financeiro@rooster.local",
+          "Financeiro123!"
+        ],
+        [
+          "Aluno externo do portal do Boost",
+          "camila.externa@example.com",
+          "Boost123!"
+        ]
+      ]
+    },
+    {
+      "tipo": "espaco"
+    },
+    {
+      "tipo": "p",
+      "texto": "O aluno João Pereira acessa o portal do Boost pela opção \"Aluno da instituição\", com o mesmo e-mail e a mesma senha. O certificado de demonstração CERT-2026-0001 pode ser conferido na tela de verificação de certificado do portal."
+    },
+    {
+      "tipo": "h1",
+      "texto": "Apêndice C — Instalação e inicialização do sistema"
+    },
+    {
+      "tipo": "p",
+      "texto": "Esta seção destina-se a quem instala o Rooster One em um computador com Windows. A instalação é feita por um instalador com menu, que prepara tudo o que o sistema necessita e o deixa configurado para iniciar automaticamente sempre que o computador é ligado."
+    },
+    {
+      "tipo": "h3",
+      "texto": "Instalação"
+    },
+    {
+      "tipo": "etapas",
+      "itens": [
+        "Copiar as pastas do sistema (RoosterOneBackend e RoosterOneFrontEnd) para a mesma pasta do computador.",
+        "Abrir a pasta RoosterOneBackend, depois scripts e instalador, e executar INSTALAR.bat com duplo clique.",
+        "Confirmar a solicitação de permissão de administrador do Windows.",
+        "No menu, escolher a opção 1 (\"Instalação completa\"). O instalador instala, quando necessário, o Node.js e o banco de dados PostgreSQL, cria o banco, compila o sistema e registra o início automático. A primeira instalação leva de 10 a 20 minutos, conforme a internet e o computador.",
+        "Responder \"s\" à pergunta sobre os dados de demonstração, para carregar os usuários e as informações de exemplo do Apêndice B, ou \"n\", para iniciar com o sistema vazio.",
+        "Ao final, o navegador é aberto na tela de login, e o atalho \"Rooster One\" é criado na área de trabalho."
+      ]
+    },
+    {
+      "tipo": "p",
+      "texto": "Instalação sem internet: basta baixar o instalador do PostgreSQL para Windows (arquivo postgresql-...-windows-x64.exe, do site da EDB) e, se o computador não tiver o Node.js, o instalador do Node.js (arquivo node-...-x64.msi), e colocá-los, sem renomear, na pasta scriptsinstaladorinstaladores. O instalador os utiliza automaticamente, sem nenhuma tela adicional; a opção 5 do menu confirma quais arquivos serão usados."
+    },
+    {
+      "tipo": "h3",
+      "texto": "Uso diário"
+    },
+    {
+      "tipo": "p",
+      "texto": "Após a instalação, nenhum procedimento é necessário: o sistema inicia junto com o Windows. Para acessá-lo, utiliza-se o atalho \"Rooster One\" da área de trabalho ou o endereço http://localhost:8080 no navegador."
+    },
+    {
+      "tipo": "h3",
+      "texto": "Opções do menu do instalador"
+    },
+    {
+      "tipo": "tabela",
+      "cabecalho": [
+        "Opção",
+        "Finalidade"
+      ],
+      "linhas": [
+        [
+          "1. Instalação completa",
+          "Instala ou atualiza o sistema; pode ser repetida sem perda de dados."
+        ],
+        [
+          "2. Iniciar o sistema",
+          "Inicia o sistema e abre o navegador."
+        ],
+        [
+          "3. Parar o sistema",
+          "Encerra o sistema até o próximo início (ou até a opção 2)."
+        ],
+        [
+          "4. Ver situação",
+          "Indica se o banco de dados, a API e o site estão funcionando."
+        ],
+        [
+          "5. Verificar pré-requisitos",
+          "Confere o computador sem alterar nada."
+        ],
+        [
+          "6. Fazer backup",
+          "Copia o banco de dados e os arquivos enviados para a pasta backups."
+        ],
+        [
+          "7. Restaurar dados de demonstração",
+          "Apaga todos os dados e recarrega os dados de exemplo (exige digitar APAGAR)."
+        ],
+        [
+          "8. Desinstalar",
+          "Remove o início automático e o atalho; opcionalmente, exclui o banco de dados."
+        ]
+      ]
+    },
+    {
+      "tipo": "espaco"
+    },
+    {
+      "tipo": "p",
+      "texto": "Recomenda-se realizar o backup periodicamente e guardar, junto com ele, uma cópia do arquivo .env da pasta RoosterOneBackend, que contém a chave necessária à leitura dos arquivos enviados ao sistema."
+    }
+  ]
+}

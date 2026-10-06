@@ -20,7 +20,9 @@
     "test:watch": "jest --config ./jest-unit.json --watch",
     "audit": "npm audit --omit=dev",
     "test:all": "npm test && npm run test:e2e",
-    "load-test": "node scripts/load-test.mjs"
+    "load-test": "node scripts/load-test.mjs",
+    "manual": "node docs/manual-usuario/gerar-manual.js",
+    "assistente:base": "node scripts/assistente/gerar-base.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -57,6 +59,7 @@
     "@types/pdfkit": "^0.17.6",
     "@types/supertest": "^2.0.16",
     "cross-env": "^10.1.0",
+    "docx": "^9.8.1",
     "jest": "^29.7.0",
     "jest-environment-node": "^29.7.0",
     "prisma": "^6.0.0",

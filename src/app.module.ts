@@ -8,6 +8,7 @@ import { RoosterLearnModule } from './rooster-learn/rooster-learn.module';
 import { RoosterBoostModule } from './rooster-boost/rooster-boost.module';
 import { RoosterBoostPortalModule } from './rooster-boost-portal/rooster-boost-portal.module';
 import { RoosterFinanceModule } from './rooster-finance/rooster-finance.module';
+import { AssistenteModule } from './assistente/assistente.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -30,6 +31,7 @@ import { PrismaModule } from './roster-hub/shared/prisma.module';
     RoosterBoostModule,
     RoosterBoostPortalModule,
     RoosterFinanceModule,
+    AssistenteModule,
   ],
   controllers: [AppController],
   providers: [AppService],

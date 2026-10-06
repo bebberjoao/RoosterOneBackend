@@ -1299,6 +1299,48 @@ describe('Full API e2e tests', () => {
       .expect(400);
   });
 
+  describe('Assistente de dúvidas', () => {
+    it('responde com o manual e o roteiro guiado, direciona pelo perfil e exige autenticação', async () => {
+      const servidor = app.getHttpServer();
+      await request(servidor).post('/v1/assistente/perguntas').send({ pergunta: 'como abro um chamado?' }).expect(401);
+
+      const aluno = await criarUsuarioComPermissoes('Aluno Assistente', 'aluno.assistente@example.com', [
+        ['Rooster Student', '/student/grades', 'acessar'],
+      ]);
+      await request(servidor).post('/v1/assistente/perguntas').set('Authorization', aluno.header).send({ pergunta: '' }).expect(400);
+
+      const chamado = await request(servidor).post('/v1/assistente/perguntas').set('Authorization', aluno.header)
+        .send({ pergunta: 'Como abro um chamado?', rotaAtual: '/student' }).expect(201);
+      expect(chamado.body.tipo).toBe('resposta');
+      expect(chamado.body.entrada.rota).toBe('/desk/tickets');
+      expect(chamado.body.roteiro.id).toBe('abrir-chamado');
+
+      // Permissões criadas pelo helper usam o nome "Módulo:recurso:ação"; o direcionamento usa a convenção do catálogo.
+      const permissao = await prisma.permissao.create({ data: { nome: 'student.grades.acessar', recurso: '/student/grades', acao: 'acessar' } });
+      await prisma.usuarioPermissao.create({ data: { usuarioId: aluno.usuario.id, permissaoId: permissao.id } });
+      const notas = await request(servidor).post('/v1/assistente/perguntas').set('Authorization', aluno.header)
+        .send({ pergunta: 'onde vejo minhas notas' }).expect(201);
+      expect(notas.body.entrada.id).toBe('student-grades');
+
+      const fora = await request(servidor).post('/v1/assistente/perguntas').set('Authorization', aluno.header)
+        .send({ pergunta: 'qual a capital da França' }).expect(201);
+      expect(fora.body.tipo).toBe('nao-encontrado');
+
+      // Sugestões e roteiros: somente as tarefas cuja permissão o usuário possui.
+      expect(chamado.body.roteiro.permitido).toBe(false);
+      const criar = await prisma.permissao.create({ data: { nome: 'desk.tickets.criar', recurso: '/desk/tickets', acao: 'criar' } });
+      await prisma.usuarioPermissao.create({ data: { usuarioId: aluno.usuario.id, permissaoId: criar.id } });
+      const sugestoes = await request(servidor).get('/v1/assistente/sugestoes').set('Authorization', aluno.header).expect(200);
+      expect(sugestoes.body.map((x: { id: string }) => x.id)).toEqual(['abrir-chamado']);
+      const roteiro = await request(servidor).get('/v1/assistente/roteiros/abrir-chamado').set('Authorization', aluno.header).expect(200);
+      expect(roteiro.body.entrada.id).toBe('desk-tickets');
+      expect(roteiro.body.roteiro.permitido).toBe(true);
+      const entrada = await request(servidor).get('/v1/assistente/entradas/rooms-book').set('Authorization', aluno.header).expect(200);
+      expect(entrada.body.roteiro).toEqual({ id: 'reservar-ambiente', titulo: expect.any(String), permitido: false });
+      await request(servidor).get('/v1/assistente/entradas/inexistente').set('Authorization', aluno.header).expect(404);
+    });
+  });
+
   describe('Rooster Hub — Configurações (status/teste de e-mail)', () => {
     it('GET /configuracoes/email exige permissão (403 para quem não é admin)', async () => {
       const { header } = await criarUsuarioComPermissoes('Sem Acesso Config', 'sem-acesso-config@example.com', [

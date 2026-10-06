@@ -24,3 +24,6 @@ scripts/instalador/*.exe
 scripts/instalador/*.msi
 /postgresql-*.exe
 /node-*.msi
+
+# Manual do Usuário gerado (npm run manual); a fonte é docs/manual-usuario/manual.json
+docs/manual-usuario/*.docx
