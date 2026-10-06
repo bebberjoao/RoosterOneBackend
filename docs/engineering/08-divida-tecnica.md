@@ -19,6 +19,17 @@ alterar milhares de linhas sem efeito funcional.
 **Encaminhamento**: aplicar `npm run format` em commit exclusivo, incluir `npm run lint` no CI do frontend e
 configurar ESLint no backend.
 
+### Base de conhecimento do assistente gerada manualmente
+
+O assistente de dúvidas responde a partir de `src/assistente/base-conhecimento.ts`, gerado de
+`docs/manual-usuario/manual.json` e de `docs/user-guides/` por `npm run assistente:base`. A geração não é
+verificada no CI: uma alteração do manual sem a regeneração da base deixa o assistente com o texto anterior. Os
+identificadores dos 15 roteiros guiados também são mantidos em dois lugares (`src/assistente/roteiros.ts`, no
+backend, e `src/components/rooster/assistente/roteiros.ts`, no frontend); o teste `roteiros.test.ts` do frontend
+compara a lista com uma cópia da lista do backend e verifica que todo elemento citado nos passos existe no código das
+telas, mas a cópia precisa ser atualizada à mão. Correção sugerida: etapa de CI que regenere a base e falhe quando
+houver diferença.
+
 ### Frontend sem biblioteca de validação de formulário
 
 As bibliotecas `react-hook-form`, `zod` e `@hookform/resolvers`, bem como o componente que as utilizava
@@ -104,6 +115,20 @@ de acesso, cuja comprovação exige o fluxo completo (guard, controller, service
 e2e. A suíte unitária cobre lógica pura e ramos de erro de difícil reprodução por requisição.
 
 ## Corrigida durante o desenvolvimento (histórico)
+
+### Revisão de 06/10/2026
+
+Defeitos identificados na implementação e na verificação em navegador do assistente de dúvidas:
+
+- **Sugestões de tarefas sem relação com as permissões.** O chat oferecia a todos os usuários os 15 roteiros (o aluno
+  via, por exemplo, "Gerar as mensalidades do mês"). Cada roteiro passou a declarar a permissão exigida, e as
+  sugestões e o botão "Mostrar na tela" passaram a respeitá-la (RN052).
+- **Sinônimo genérico no motor de linguagem.** O verbo "usar" era tratado como sinônimo de "reservar" (ajuste para
+  "usar o auditório"), o que levava "quero ajuda para usar o sistema" à tela Minhas reservas. O sinônimo foi
+  removido, e perguntas sobre o próprio assistente ("o que você faz?", "como uso o assistente?") passaram a ter
+  resposta e teste próprios.
+- **Passo de roteiro sem item para clicar.** Em lista vazia (por exemplo, atividade sem entregas), o passo aguardava
+  um clique impossível; o elemento sem item acionável passou a ser tratado como ausente, com a orientação do passo.
 
 ### Revisão de 05/10/2026
 

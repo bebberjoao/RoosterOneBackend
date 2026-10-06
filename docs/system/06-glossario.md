@@ -6,9 +6,11 @@
 | **Administrador** | Usuário que possui a permissão `Rooster Hub` / `/hub/acessos` / `gerenciar-permissoes`; não constitui atributo nem papel. O sistema impede a ausência de administrador ativo. |
 | **Ambiente** | Espaço físico reservável no Rooster Rooms (sala, laboratório, auditório etc.), vinculado a um bloco e a um campus. |
 | **Anexo** | Arquivo enviado e vinculado a um chamado do Desk (`AnexoTicket`) ou a uma entrega do Learn (`AnexoEntrega`), gravado cifrado em disco. |
+| **Assistente de dúvidas** | Recurso de ajuda ao usuário (`src/assistente/`) que responde a perguntas sobre o uso do sistema exclusivamente com o conteúdo do Manual do Usuário e dos guias, por motor de linguagem local, e indica o roteiro guiado das tarefas principais (RN051). |
 | **Atendente** | Usuário do Hub vinculado a um setor, que pode ser designado técnico de um chamado do Desk. |
 | **Auditoria** | Registro automático de eventos de segurança e de operações sensíveis (`LogAuditoria`), com o autor da ação, como login, alterações de usuários e permissões, redefinição de senha, notas e cobranças. Não se confunde com o histórico de entidade de negócio. |
 | **Backend** | API REST em NestJS, Prisma e PostgreSQL (`RoosterOneBackend-main`). |
+| **Base de conhecimento** | Conjunto de entradas do assistente de dúvidas (`src/assistente/base-conhecimento.ts`), gerado a partir do Manual do Usuário e dos guias por `npm run assistente:base`. |
 | **BoostUsuario** | Conta de aluno externo do portal do Boost, com autenticação própria e sem relação com `Usuario` do Hub. |
 | **Certificado** | Documento em PDF emitido automaticamente na conclusão de curso do Boost que emite certificado, com código de verificação pública. |
 | **Chamado (ticket)** | Registro de solicitação de suporte no Rooster Desk, com protocolo, categoria, prioridade, status, conversa e histórico. |
@@ -31,6 +33,7 @@
 | **Recurso** | No contexto de permissão, a rota da tela do frontend (por exemplo, `/desk/tickets`) que integra a chave da permissão. |
 | **Refresh token** | Token de longa duração (30 dias), armazenado no servidor apenas como hash, utilizado para obter novo access token sem nova autenticação; rotacionado a cada uso e revogado no logout, na troca de senha e na desativação do usuário. |
 | **Reserva** | Solicitação de uso de um ambiente em data e horário determinados, no Rooster Rooms, que pode integrar uma série recorrente. |
+| **Roteiro guiado** | Condução passo a passo de uma tarefa na própria interface, com a tela escurecida, o elemento do passo em destaque e legenda com a instrução e a finalidade do campo; oferecido apenas a quem possui a permissão da tarefa (RN052). |
 | **Série (de reservas)** | Conjunto de reservas recorrentes (diárias, semanais ou mensais) geradas em conjunto e vinculadas por `serieId`, passíveis de cancelamento em bloco. |
 | **Sessão (`Sessao`)** | Registro de sessão de refresh token, criado no login e revogado na renovação, no logout, na troca de senha e na desativação do usuário. |
 | **Setor** | Unidade organizacional (por exemplo, "Suporte de TI") utilizada para vincular usuários e restringir a visibilidade de chamados e categorias por equipe. |

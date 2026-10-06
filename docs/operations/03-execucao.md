@@ -47,6 +47,9 @@ npm run dev
 | Repositório | Comando | Efeito |
 |---|---|---|
 | Backend | `npm test` | Executa a suíte de testes unitários. |
+| Backend | `npm run manual [arquivo de saída]` | Gera o Manual do Usuário em Word a partir de `docs/manual-usuario/manual.json` (padrão: `docs/manual-usuario/Rooster-One-Manual-do-Usuario.docx`, não versionado); o sumário é atualizado ao abrir o documento no Word. |
+| Backend | `npm run assistente:base` | Regenera a base de conhecimento do assistente de dúvidas (`src/assistente/base-conhecimento.ts`) a partir do manual e dos guias; executar após alterar `manual.json` ou `docs/user-guides/`. |
+| Backend | `node docs/manual-usuario/capturar-telas.mjs [telas]` | Recaptura as telas do manual com o sistema em execução sobre o banco de demonstração; requer `npm install --no-save playwright` e `npx playwright install chromium`. |
 | Backend | `npm run test:e2e` | Executa a suíte end-to-end contra um banco SQLite isolado (`prisma/dev-test.db`), com `DATABASE_URL`, `JWT_SECRET` e `FILE_ENCRYPTION_KEY` redefinidos por `cross-env`; não utiliza o PostgreSQL de desenvolvimento. |
 | Frontend | `npm test` | Executa a suíte de testes do frontend (Vitest). |
 | Frontend | `npm run lint` | Executa o ESLint sobre o projeto. |

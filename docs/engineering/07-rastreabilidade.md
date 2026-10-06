@@ -3,7 +3,7 @@
 Cada linha associa uma funcionalidade (`docs/system/03-funcionalidades.md`) à rota de tela do frontend, ao endpoint
 da API, à regra de negócio (`docs/system/04-regras-de-negocio.md`), às tabelas envolvidas e à permissão exigida.
 Constam apenas associações com evidência direta no código; na ausência de endpoint ou tabela confirmados, a célula
-contém "—". Revisão de 01/10/2026, abrangendo os nove módulos.
+contém "—". Revisão de 01/10/2026, abrangendo os nove módulos; o assistente de dúvidas foi acrescentado em 06/10/2026.
 
 ## Rooster Hub
 
@@ -136,6 +136,15 @@ contém "—". Revisão de 01/10/2026, abrangendo os nove módulos.
 | RF-F08 Relatórios e painel | `/finance`, `/finance/reports` | `GET /financeiro/dashboard`, `GET /financeiro/relatorios/*` | RN030 | `cobrancas`, `produtos_financeiros` | `finance.dashboard.acessar`, `finance.reports.*` |
 | RF-F09 Portal financeiro do aluno | `/student/finance` | `GET /financeiro/me/cobrancas`, `/financeiro/me/desconto`, `/financeiro/me/cobrancas/:id/boleto`, `/financeiro/me/cobrancas/:id/nota-fiscal` | RN028 | `cobrancas`, `descontos_alunos`, `notas_fiscais` | `student.finance.acessar`, `baixar-boleto` |
 | RF-F11 Políticas de multa e juros | `/finance/policies` | `GET/POST/PATCH/DELETE /politicas-multa-juros` | RN043 | `politicas_multa_juros` | `finance.policies.*` |
+
+## Assistente de dúvidas
+
+| Funcionalidade | Rota do frontend | Endpoint | Regra | Tabela(s) | Permissão |
+|---|---|---|---|---|---|
+| RF-AS01 Consulta ao assistente | Botão do assistente, em todas as telas autenticadas (`AssistenteChat`) | `POST /assistente/perguntas` | RN051 | `usuarios_permissoes`, `permissoes` (somente leitura das permissões do próprio usuário) | Apenas JWT |
+| RF-AS02 Sugestões e assuntos | Chat do assistente | `GET /assistente/sugestoes`, `/assistente/entradas/:id`, `/assistente/roteiros/:id` | RN051, RN052 | Idem | Apenas JWT |
+| RF-AS03 Roteiro guiado | Telas das 15 tarefas (por exemplo, `/desk/tickets`, `/rooms/book`, `/learn/activities/:id`) | — (executado no frontend) | RN052 | — | Permissão da tarefa (por exemplo, `desk.tickets.criar`) |
+| RF-AS04 Base de conhecimento | — | — (`npm run assistente:base`) | RN051 | — | — |
 
 As funcionalidades declaradas fora do escopo implementado (RF-B15 e RF-F10) não possuem linha nesta matriz,
 por não terem endpoint nem tabela correspondentes.

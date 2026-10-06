@@ -47,6 +47,23 @@ Procedimentos para a extensão do backend conforme os padrões existentes (ver
    deve ser cifrada por `escreverDocumentoEncriptado` (`src/common/file-encryption.util.ts`).
 4. No download, utilizar `response.attachment(nome)` e `lerDocumentoDescriptografado`.
 
+## Inclusão de roteiro guiado no assistente de dúvidas
+
+1. **Backend** (`src/assistente/roteiros.ts`): acrescentar o roteiro em `ROTEIROS`, com `id`, `titulo`, a
+   `entrada` do manual que ele explica, a `permissao` exigida (chave `modulo.tela.acao`) e de 10 a 20 frases de
+   exemplo, escritas como o usuário perguntaria.
+2. **Frontend** (`src/components/rooster/assistente/roteiros.ts`): acrescentar as etapas com o mesmo `id`. Cada passo
+   indica o `alvo` (valor do atributo `data-tour`), a `acao` (`clicar`, `preencher` ou `observar`), o título, o
+   texto e o porquê; o primeiro passo informa a `rota` da tela.
+3. **Telas**: marcar os elementos com a propriedade `tour` de `Btn`, `Field` e `SectionCard` ou com o atributo
+   `data-tour`; as abas do `TabBar` já recebem `aba-<valor>`, e o cadastro genérico do Hub, `crud-novo`,
+   `crud-salvar` e `campo-<nome>`.
+4. **Testes**: atualizar a lista espelhada em `roteiros.test.ts` (frontend) e executar `npm test` nos dois
+   repositórios; o teste do backend exige que a calibração continue em 100%.
+
+Após alterar o Manual do Usuário, executar `npm run assistente:base` e o teste do assistente
+(`npx jest --config jest-unit.json src/assistente`), pois a mudança de texto altera o vocabulário da classificação.
+
 ## Execução da suíte e2e após alteração do schema
 
 ```bash

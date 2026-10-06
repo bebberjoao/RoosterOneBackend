@@ -118,5 +118,7 @@ flowchart LR
 ```
 
 Apesar da denominação histórica do diretório `mock-api`, os services de todos os módulos comunicam-se com a API do
-backend. O portal do Boost possui cliente e sessão próprios (`src/services/boost-portal/`), em razão da autenticação
+backend. O assistente de dúvidas reúne as duas pontas: o chat e o motor dos roteiros guiados residem no frontend
+(`src/components/rooster/assistente/`, com estado na raiz da aplicação, para sobreviver à troca de módulo), e a
+classificação da pergunta, no backend (`src/assistente/`), sobre a base de conhecimento gerada do Manual do Usuário. O portal do Boost possui cliente e sessão próprios (`src/services/boost-portal/`), em razão da autenticação
 independente. Detalhes em `docs/frontend/` no repositório do frontend.

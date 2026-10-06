@@ -103,6 +103,13 @@ responsabilidades; a relação rota a rota encontra-se em `docs/api/02-endpoints
   única verificação manual é `exigirLeituraCobrancas`, que aceita `acessar` em `/finance/charges`,
   `/finance/tuitions` ou `/finance`; as duas primeiras telas são visões distintas do mesmo recurso `Cobranca`.
 
+## Assistente de dúvidas
+
+- **`AssistenteController`** (base `/assistente`): pergunta (`POST /perguntas`), sugestões, resposta por assunto e
+  por roteiro. Não aplica `PermissionGuard` nem `@RequirePermission`, pois o conteúdo é o manual, acessível a
+  qualquer usuário autenticado; o método privado `permissoesDo` lê os nomes das permissões do usuário do token, que
+  orientam a escolha entre assuntos parecidos e restringem os roteiros oferecidos (RN051 e RN052).
+
 ## Padrão comum aos controllers de negócio
 
 - `@UseGuards(PermissionGuard)` no nível do controller (o `JwtAuthGuard` já é global).

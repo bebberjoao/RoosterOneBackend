@@ -2,7 +2,7 @@
 
 Guia sintético das funcionalidades do Rooster One para o uso cotidiano, sem detalhamento técnico. O procedimento
 completo, tela a tela, consta do Manual do Usuário (documento Word que acompanha o projeto, ilustrado com a
-captura de cada uma das 62 telas descritas, obtida do sistema em funcionamento com usuários de demonstração). As funcionalidades
+captura de cada uma das 70 telas descritas, obtida do sistema em funcionamento com usuários de demonstração). As funcionalidades
 disponíveis dependem das permissões concedidas pelo administrador a cada conta; a ausência de determinadas telas no
 menu é, portanto, esperada.
 
@@ -16,6 +16,19 @@ encerradas.
 A central de notificações, acessível pelo ícone da barra superior, reúne os avisos destinados ao usuário (respostas
 de chamado e de reserva, notas lançadas, atividades publicadas ou corrigidas e cobranças); a seleção de uma
 notificação conduz à tela correspondente.
+
+## Assistente de dúvidas
+
+O botão do assistente, no canto inferior direito de todas as telas, abre um chat em que a dúvida sobre o uso do
+sistema é escrita em linguagem comum (por exemplo, "como abro um chamado?" ou "onde vejo minhas notas?"). A resposta
+reproduz o trecho correspondente do Manual do Usuário, com a tela e o procedimento, e oferece "Abrir a tela" e os
+assuntos relacionados. Nas tarefas principais (abrir e responder chamado, reservar ambiente, aprovar reserva,
+cadastrar usuário, conceder permissões, registrar frequência, lançar notas, criar atividade, cadastrar questões,
+corrigir entregas, responder atividade, gerar mensalidades, registrar pagamento e cadastrar patrimônio), a opção
+"Mostrar na tela" inicia o roteiro guiado: a tela é escurecida, apenas o campo do passo permanece em destaque, e uma
+legenda explica o que fazer e por que o campo existe. O roteiro é oferecido apenas para as tarefas que o usuário tem
+permissão para executar e pode ser encerrado a qualquer momento pela tecla Esc. O assistente não consulta informações
+registradas (notas, cobranças, chamados) nem executa operações.
 
 ## Rooster Desk — chamados de suporte
 

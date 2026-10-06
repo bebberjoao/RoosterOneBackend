@@ -7,7 +7,7 @@ associados (revisão de 01/10/2026).
 
 Módulo raiz. Importa `AuthModule`, `PrismaModule`, `RoosterHubModule`, `RoosterDeskModule`, `RoosterRoomsModule`,
 `RoosterAssetsModule`, `RoosterAcademyModule`, `RoosterLearnModule`, `RoosterBoostModule`,
-`RoosterBoostPortalModule` e `RoosterFinanceModule`. Declara `AppController` e `AppService`, responsáveis por
+`RoosterBoostPortalModule`, `RoosterFinanceModule` e `AssistenteModule`. Declara `AppController` e `AppService`, responsáveis por
 `GET /` e `GET /health`.
 
 ## AuthModule (`src/auth/auth.module.ts`)
@@ -222,6 +222,22 @@ são **documentos internos, sem integração externa** (sem intermediador de pag
 O status `vencido` de uma `Cobranca` não é persistido: é sempre derivado de `vencimento` anterior à data corrente no
 momento da leitura (`FinanceService.statusEfetivo`), o que impede a divergência entre o rótulo exibido e o dado
 registrado.
+
+## AssistenteModule (`src/assistente/assistente.module.ts`)
+
+```ts
+@Module({
+  imports: [PrismaModule],
+  controllers: [AssistenteController],
+  providers: [AssistenteService],
+})
+```
+
+Introduzido em 06/10/2026. Não possui tabelas: a base de conhecimento é um módulo TypeScript gerado a partir do
+Manual do Usuário (`base-conhecimento.ts`), carregado em memória com o índice de similaridade na criação do
+`AssistenteService` (cerca de 130 entradas e 15 roteiros; a classificação de uma pergunta leva da ordem de 1 a 2 ms).
+O `PrismaModule` é importado apenas para que o controller leia os nomes das permissões do usuário autenticado
+(RN051 e RN052). Não depende de serviço externo nem de modelo neural.
 
 ## MailModule (`src/mail/mail.module.ts`)
 

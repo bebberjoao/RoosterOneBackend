@@ -133,6 +133,20 @@ Cobranças vinculadas a alunos do Academy, introduzido pela migration `202609211
 - Portal do aluno (`/financeiro/me/*`, permissão `Rooster Student`): cobranças, desconto vigente, boleto e nota
   fiscal, sempre restritos ao usuário autenticado pelo JWT.
 
+### Assistente de dúvidas (`src/assistente/`), transversal aos módulos
+
+Recurso de ajuda ao usuário, acrescentado em 06/10/2026, sem migration e sem tabelas próprias.
+
+- Respostas a dúvidas de uso em linguagem natural, extraídas exclusivamente do Manual do Usuário e dos guias
+  (`docs/manual-usuario/manual.json` e `docs/user-guides/`), por motor de linguagem local e leve (normalização,
+  radicais, sinônimos do domínio, correção de digitação e similaridade TF-IDF), sem serviço externo nem modelo
+  neural (RN051).
+- Indicação da tela correspondente e, em 15 tarefas principais, do roteiro guiado, executado pelo frontend sobre a
+  própria interface (tela escurecida, destaque do campo e legenda com a instrução e a finalidade), oferecido apenas a
+  quem possui a permissão da tarefa (RN052).
+- **Fora do escopo do assistente**, por definição: consulta a dados de negócio (notas, cobranças, chamados),
+  execução de operações e assuntos alheios ao sistema.
+
 ## Parcialmente no escopo
 
 - **Anexo, histórico e avaliação de chamado por rotas genéricas** (`/anexos-tickets`, `/historico-tickets` e

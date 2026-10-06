@@ -105,6 +105,8 @@ autorização, validações, tratamento de erros e guia do desenvolvedor.
 
 - [Guia do Usuário](user-guides/01-guia-do-usuario.md)
 - [Guia do Administrador](user-guides/02-guia-do-administrador.md)
+- Manual do Usuário: conteúdo em [manual-usuario/manual.json](manual-usuario/manual.json), gerado em Word por
+  `npm run manual` e utilizado também como base de conhecimento do assistente de dúvidas (`npm run assistente:base`)
 
 ## Documento consolidado
 

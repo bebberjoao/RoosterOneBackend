@@ -806,6 +806,22 @@ Nota de verificação manual:
 
 ---
 
+## 9. Assistente de dúvidas — `AssistenteController` (`src/assistente/assistente.controller.ts`), base `/assistente`
+
+Introduzido em 06/10/2026. Responde exclusivamente com o conteúdo do Manual do Usuário e dos guias (RN051) e indica
+os roteiros guiados das tarefas que o usuário pode executar (RN052). Não utiliza `@RequirePermission`: qualquer
+usuário autenticado consulta o assistente, que não acessa dados de negócio; as permissões do próprio usuário são
+lidas apenas para orientar a resposta.
+
+| Método | Rota | Auth | Permissão exigida | Descrição |
+|---|---|---|---|---|
+| POST | `/assistente/perguntas` | Bearer | — (nenhuma; apenas JWT) | Responde à dúvida `{ pergunta, rotaAtual? }` com o trecho do manual, os assuntos relacionados e o roteiro guiado (ver detalhamento) |
+| GET | `/assistente/sugestoes` | Bearer | — (nenhuma; apenas JWT) | Tarefas com roteiro guiado cuja permissão o usuário possui (`[{ id, titulo }]`) |
+| GET | `/assistente/entradas/:id` | Bearer | — (nenhuma; apenas JWT) | Resposta a partir de um assunto da base de conhecimento (assunto relacionado escolhido no chat); `404` para identificador inexistente |
+| GET | `/assistente/roteiros/:id` | Bearer | — (nenhuma; apenas JWT) | Resposta a partir de um roteiro guiado (sugestão escolhida no chat); `404` para identificador inexistente |
+
+---
+
 ## Detalhamento dos endpoints principais
 
 ### POST /auth/login, POST /auth/redefinir-senha
@@ -1057,3 +1073,52 @@ de 32 bits) e é convertido para `Number` antes da resposta (`serializeDocumento
 ### POST /auth/redefinir-senha
 
 Ver `03-autenticacao.md`.
+
+### POST /assistente/perguntas — dúvida ao assistente
+
+Corpo: `pergunta` (texto de 1 a 300 caracteres) e `rotaAtual` (opcional; rota da tela em que o usuário está,
+iniciada por `/`, utilizada para dar leve preferência aos assuntos do mesmo módulo). A classificação é local
+(`motor-linguagem.ts`): normalização, remoção de palavras vazias, redução a radicais, sinônimos do domínio, correção
+de digitação e similaridade TF-IDF com as entradas da base e com as frases de exemplo de cada roteiro.
+
+```json
+{ "pergunta": "como abro um chamado?", "rotaAtual": "/" }
+```
+
+Resposta `201` com assunto reconhecido (`passos` abreviados):
+
+```json
+{
+  "tipo": "resposta",
+  "entrada": {
+    "id": "desk-tickets",
+    "modulo": "Rooster Desk",
+    "titulo": "Chamados",
+    "rota": "/desk/tickets",
+    "quemUsa": "Solicitantes e equipe de atendimento.",
+    "resumo": "Relação dos chamados abertos pelo usuário (solicitante) ou sob responsabilidade do seu setor (atendente), com filtros por status, categoria e prioridade.",
+    "passos": ["Abertura: selecionar \"Novo chamado\", escolher a categoria e …", "Acompanhamento: …"],
+    "observacoes": [],
+    "efeitos": "A categoria escolhida na abertura determina o setor de destino e o prazo esperado de resposta, definidos pela coordenação do suporte."
+  },
+  "roteiro": { "id": "abrir-chamado", "titulo": "Abrir um chamado de suporte", "permitido": true },
+  "relacionadas": [],
+  "confianca": 1.638
+}
+```
+
+- `entrada.rota` é `null` para telas com parâmetro (por exemplo, o detalhe de um chamado).
+- `roteiro.permitido` é `false` quando o usuário não possui a permissão da tarefa; o frontend, nesse caso, não
+  oferece o roteiro e orienta a solicitá-la (RN052).
+- `confianca` é a pontuação de similaridade da melhor entrada, já multiplicada pelos fatores de preferência
+  (exemplo praticamente idêntico, módulo atual e permissões); serve ao diagnóstico e não é probabilidade, podendo
+  exceder 1.
+
+Demais tipos de resposta, também com `201`: `saudacao` (cumprimento ou pergunta sobre o próprio assistente, como "o
+que você faz?"), `agradecimento` e `nao-encontrado` (fora do escopo), todos no formato
+`{ tipo, mensagem, sugestoes: [{ id, titulo }] }`, com sugestões restritas às tarefas permitidas ao usuário.
+
+| Status | Exceção | Causa |
+|---|---|---|
+| 400 | `BadRequestException` (`ValidationPipe`) | `pergunta` vazia, não textual ou com mais de 300 caracteres; `rotaAtual` sem `/` inicial ou com mais de 200 caracteres |
+| 401 | `UnauthorizedException` | Token ausente, inválido ou expirado |

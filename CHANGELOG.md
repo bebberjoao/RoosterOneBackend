@@ -25,6 +25,22 @@ estão indicadas; as demais não alteram o banco de dados.
 
 ### Adicionado
 
+- **Assistente de dúvidas com roteiros guiados** (06/10/2026). Não exige migration. Novo módulo `src/assistente/`
+  (`AssistenteModule`), com as rotas `POST /assistente/perguntas`, `GET /assistente/sugestoes`,
+  `GET /assistente/entradas/:id` e `GET /assistente/roteiros/:id`, disponíveis a qualquer usuário autenticado. O
+  assistente responde exclusivamente com trechos do Manual do Usuário e dos guias (RN051), por motor de linguagem
+  local e leve (`motor-linguagem.ts`: normalização, radicais, sinônimos do domínio, correção de digitação e
+  similaridade TF-IDF), sem serviço externo nem modelo neural (ADR-008); recusa assuntos fora do escopo; responde a
+  cumprimentos e a perguntas sobre si; e prefere, entre assuntos parecidos, as telas a que o usuário tem acesso. Para 15
+  tarefas principais, indica o roteiro guiado executado pelo frontend sobre a própria interface, oferecido apenas a
+  quem possui a permissão da tarefa (`roteiro.permitido`; RN052). O conteúdo do manual passou a residir em
+  `docs/manual-usuario/manual.json`, fonte única do documento Word (`npm run manual`, `gerar-manual.js`) e da base de
+  conhecimento (`npm run assistente:base`, `scripts/assistente/gerar-base.js`, que exclui as senhas de demonstração);
+  as capturas de tela foram incorporadas ao repositório (`docs/manual-usuario/imagens/`), com o script de captura
+  automatizada (`capturar-telas.mjs`), e o manual recebeu a seção "Assistente de dúvidas", a pergunta frequente
+  correspondente e dois termos do glossário. Cobertura: 18 testes unitários (incluindo a precisão em três conjuntos de
+  perguntas: calibração 100%, validação 100% e teste cego 88%) e um teste e2e. Dependência de desenvolvimento
+  `docx`, para a geração do manual.
 - **Instalador para Windows** (06/10/2026). `scripts/instalador/INSTALAR.bat` abre, com elevação de administrador, um
   menu que instala Node.js LTS e PostgreSQL (pelo `winget` ou por instaladores locais, para uso sem internet), cria o
   usuário e o banco com senha aleatória, gera o `.env` com `JWT_SECRET` e `FILE_ENCRYPTION_KEY` aleatórios (sem

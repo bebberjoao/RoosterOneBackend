@@ -32,6 +32,16 @@ correspondentes à sua função.
 - **Relatórios**: na mesma tela, os usuários com as permissões correspondentes consultam e exportam em CSV o
   relatório de auditoria (com o autor de cada ação) e o relatório de erros do servidor.
 
+## Assistente de dúvidas e roteiros guiados
+
+- O assistente está disponível a todos os usuários, sem permissão específica, e responde com o conteúdo do Manual do
+  Usuário. O roteiro guiado de cada tarefa, porém, é oferecido somente a quem possui a permissão da tarefa (por
+  exemplo, "Rooster Desk / Chamados / Abrir chamado" para o roteiro de abertura de chamado); a concessão da permissão
+  em Acessos e permissões libera também o roteiro.
+- O conteúdo das respostas acompanha o Manual do Usuário. Após a alteração do manual
+  (`docs/manual-usuario/manual.json`), a equipe técnica regenera o documento Word (`npm run manual`) e a base de
+  conhecimento do assistente (`npm run assistente:base`).
+
 ## Configurações (Configurações → E-mail)
 
 Exibe o estado do envio de e-mail (SMTP) e permite o envio de mensagem de teste. As credenciais do servidor de

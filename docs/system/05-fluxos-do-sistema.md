@@ -160,6 +160,37 @@ flowchart TD
 
 As transições de pagamento, renegociação e cancelamento são registradas em auditoria e notificadas ao aluno.
 
+## Dúvida no assistente e roteiro guiado
+
+```mermaid
+sequenceDiagram
+    participant U as Usuário
+    participant C as Chat (frontend)
+    participant A as API /assistente
+    participant T as Roteiro guiado (frontend)
+    U->>C: escreve a dúvida ("como abro um chamado?")
+    C->>A: POST /assistente/perguntas { pergunta, rotaAtual }
+    A->>A: normaliza, reduz a radicais, aplica sinônimos e corrige digitação
+    A->>A: compara com a base de conhecimento (manual e guias) e com as frases de exemplo
+    alt fora do escopo ou similaridade insuficiente
+        A-->>C: nao-encontrado, com sugestões de tarefas permitidas
+    else assunto reconhecido
+        A-->>C: trecho do manual, assuntos relacionados e roteiro { id, permitido }
+        C-->>U: cartão de resposta, com "Abrir a tela" e, se permitido, "Mostrar na tela"
+        U->>C: seleciona "Mostrar na tela"
+        C->>T: inicia o roteiro (o chat é ocultado)
+        loop cada passo
+            T->>T: navega até a tela do passo, quando necessário, e localiza o elemento (data-tour)
+            T-->>U: tela escurecida, elemento em destaque e legenda (o que fazer e por quê)
+            U->>T: clica no elemento destacado ou seleciona "Próximo"
+        end
+        T-->>U: "Roteiro concluído" (ou encerramento por Esc, sem alteração de dados)
+    end
+```
+
+As operações executadas durante o roteiro (abrir o chamado, salvar o cadastro) são requisições comuns do próprio
+usuário, sujeitas às permissões e validações de sempre (RN052).
+
 ## Verificação de autorização nas rotas protegidas
 
 ```mermaid

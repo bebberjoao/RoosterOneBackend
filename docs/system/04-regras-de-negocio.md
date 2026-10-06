@@ -8,7 +8,7 @@ contas externas do Boost; RN039, da caixa de notificações; RN040 a RN042, da g
 conversa com o orientador e do certificado por curso; RN043 e RN044, da política de multa e juros e do vínculo entre
 reserva e turma; RN045 a RN047, do login institucional no portal do Boost, da matrícula pela gestão e da recuperação de senha do aluno
 externo; RN048 a RN050, das questões das atividades do Learn, da correção automática e por questão e da restrição do
-gabarito. Revisão de 02/10/2026.
+gabarito; RN051 e RN052, do assistente de dúvidas e dos roteiros guiados. Revisão de 06/10/2026.
 
 ## RN001 — O administrador é definido por permissão, e não por papel
 
@@ -550,3 +550,35 @@ imagem é servida por rota autenticada, decifrada no momento da leitura.
 
 **Implementação**: `learn.controller.ts::listarQuestoes/imagemQuestao` (`isGestorOuProfessorDaTurma` e
 `exigirAtividadeAberta`) e `questoes.service.ts::listar/serializar`.
+
+## RN051 — O assistente de dúvidas responde exclusivamente com o conteúdo do Manual do Usuário
+
+O assistente está disponível a todo usuário autenticado, sem permissão específica, e responde apenas com trechos do
+Manual do Usuário e dos guias do sistema, organizados em base de conhecimento gerada a partir desses documentos; não
+produz texto próprio, não consulta dados de negócio (notas, cobranças, chamados, reservas) e não executa operações. A
+única informação do usuário consultada são os nomes das próprias permissões, utilizados para preferir, entre assuntos
+parecidos, as telas a que ele tem acesso (por exemplo, "minhas notas" no portal do aluno, para o aluno, e o lançamento
+de notas, para o professor) e para restringir as sugestões de roteiro (RN052). A pergunta, de 1 a 300 caracteres, é
+recusada (`400`) fora desse limite. Considera-se fora do escopo, com resposta de orientação e sugestões, a pergunta
+cujos termos não pertençam, em ao menos metade, ao vocabulário da documentação, ou cuja similaridade com a melhor
+entrada seja inferior a 0,25 (0,35 quando parte da pergunta não é reconhecida). As senhas dos usuários de
+demonstração (Apêndice B do manual) são excluídas da base de conhecimento. A classificação é feita por motor local,
+sem envio da pergunta a serviço externo.
+
+**Implementação**: `assistente.service.ts::perguntar` (`LIMIAR_CONFIANCA`, `COBERTURA_MINIMA` e
+`LIMIAR_COBERTURA_PARCIAL`), `motor-linguagem.ts`, `dto/pergunta-assistente.dto.ts` e
+`scripts/assistente/gerar-base.js`.
+
+## RN052 — O roteiro guiado é oferecido apenas a quem pode executar a tarefa e não age pelo usuário
+
+Cada roteiro guiado declara a permissão necessária à tarefa (chave `modulo.tela.acao` do catálogo, por exemplo
+`desk.tickets.criar` para abrir chamado). As sugestões do chat relacionam somente os roteiros cuja permissão o usuário
+possui, e a resposta indica, no campo `roteiro.permitido`, se a tarefa pode ser executada; sem a permissão, o roteiro
+não é iniciado e o usuário é orientado a solicitá-la ao administrador. Durante o roteiro, a interface é escurecida e
+apenas o elemento do passo responde ao clique, mas toda operação é realizada pelo próprio usuário, sujeita às mesmas
+permissões e validações do backend: o roteiro não envia requisições nem preenche campos. O roteiro pode ser encerrado
+a qualquer momento (tecla Esc ou botão de fechar) sem alteração de dados; quando o elemento do passo não está visível,
+a legenda informa o motivo, nenhum clique é bloqueado, e o roteiro prossegue assim que o elemento aparece.
+
+**Implementação**: `roteiros.ts` (`permissao` de cada roteiro), `assistente.service.ts::sugestoes/montar` e,
+no frontend, `components/rooster/assistente/tour.tsx` e `roteiros.ts`.

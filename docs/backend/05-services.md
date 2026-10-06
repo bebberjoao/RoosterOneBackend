@@ -111,6 +111,23 @@ da autorização reside no controller, e não no service, padrão distinto do re
   notificação ao aluno), geração de mensalidades em lote, aplicação de descontos e de multa e juros, status
   derivado (`statusEfetivo`), relatórios, boleto em memória e nota fiscal interna em PDF e XML.
 
+## `AssistenteService` (`src/assistente/assistente.service.ts`)
+
+- **Índice**: na construção, monta o `IndiceSemantico` (`motor-linguagem.ts`) com as entradas da base de
+  conhecimento (título, módulo, resumo, passos, observações, usuários e efeitos, com pesos) e os roteiros (título e
+  frases de exemplo), além dos vetores das frases de exemplo, comparadas isoladamente à pergunta.
+- **`perguntar(pergunta, rotaAtual?, permissoes?)`**: trata cumprimentos, agradecimentos e perguntas sobre o próprio
+  assistente; calcula a similaridade com fatores de preferência (exemplo praticamente idêntico, módulo atual,
+  glossário somente em perguntas de definição, portal do Boost somente quando mencionado e telas acessíveis ao
+  usuário); recusa a pergunta fora do escopo pela cobertura do vocabulário e pelos limiares de similaridade; e monta
+  a resposta com a entrada, até três assuntos relacionados e o roteiro guiado, com `permitido` conforme as
+  permissões (RN051 e RN052).
+- **`sugestoes(permissoes?)`**, **`responderEntrada`** e **`responderRoteiro`**: respostas a partir das escolhas
+  feitas no chat, com `NotFoundException` para identificador inexistente.
+- **`motor-linguagem.ts`**: `normalizar` (acentos, caixa e pontuação), `termos` (palavras vazias, exceções,
+  radicais e sinônimos), `distancia` (Damerau-Levenshtein, para corrigir digitação) e `IndiceSemantico`
+  (TF-IDF com cosseno e comparação com o exemplo mais próximo).
+
 ## Localização da autorização contextual
 
 Em Desk e Rooms, a verificação de que o usuário pode atuar sobre um recurso específico (e não apenas de que possui a

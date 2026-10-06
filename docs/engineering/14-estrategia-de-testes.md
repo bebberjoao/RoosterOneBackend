@@ -7,12 +7,12 @@ quantitativos) e, ao final, a matriz que associa cada teste ao requisito ou regr
 
 | Camada | Localização | Comando | Quantidade |
 |---|---|---|---|
-| e2e de API (backend) | `test/*.e2e-spec.ts` | `npm run test:e2e` | 86 testes, 2 arquivos |
-| Unitário (backend) | `src/**/*.spec.ts` | `npm test` | 137 testes, 12 arquivos |
-| Unitário e de componente (frontend) | `src/**/*.test.{ts,tsx}` | `npm test` (repositório do frontend) | 81 testes, 7 arquivos |
-| Acessibilidade (frontend) | `src/components/shared/acessibilidade.test.tsx` | incluída em `npm test` | 12 dos 81 acima |
+| e2e de API (backend) | `test/*.e2e-spec.ts` | `npm run test:e2e` | 87 testes, 2 arquivos |
+| Unitário (backend) | `src/**/*.spec.ts` | `npm test` | 155 testes, 13 arquivos |
+| Unitário e de componente (frontend) | `src/**/*.test.{ts,tsx}` | `npm test` (repositório do frontend) | 96 testes, 10 arquivos |
+| Acessibilidade (frontend) | `src/components/shared/acessibilidade.test.tsx` e `assistente-chat.test.tsx` | incluída em `npm test` | 13 dos 96 acima |
 
-Total: **304 testes**. No backend, `npm run test:all` executa os testes unitários e e2e em sequência. Todas as
+Total: **338 testes**. No backend, `npm run test:all` executa os testes unitários e e2e em sequência. Todas as
 camadas são executadas pelo CI a cada envio para `main` e a cada pull request (ver
 `docs/operations/05-cicd.md`).
 
@@ -34,8 +34,19 @@ escopo e `404` que não revela a existência do recurso.
 decisões que dispensam banco de dados: auxiliares de paginação, mascaramento de segredos em log, regra do último
 administrador (com o Prisma substituído por dublê), criptografia de arquivos (incluindo o motor de armazenamento
 de vídeo), verificação de assinatura binária de arquivos, critério de origem do CORS, filtro de exceções, conversão dos erros do Prisma em exceções HTTP
-(`prisma-erro.spec.ts`) e a
+(`prisma-erro.spec.ts`), o assistente de dúvidas (`assistente.service.spec.ts`, ver abaixo) e a
 **suíte dedicada de validação de entrada**.
+
+#### Assistente de dúvidas (`src/assistente/assistente.service.spec.ts`)
+
+Verifica o processamento de linguagem (normalização, radicais, sinônimos, distância de edição), a integridade da
+base de conhecimento (origens, ausência das senhas de demonstração, roteiros e exemplos apontando para entradas
+existentes), as respostas (cumprimento, agradecimento, perguntas sobre o próprio assistente, recusa de assunto fora
+do escopo e direcionamento pelas permissões) e a oferta de roteiros conforme a permissão (RN052). A **precisão da
+classificação** é medida em três conjuntos de perguntas: calibração (44 perguntas, utilizadas nos ajustes do
+dicionário; exigência de 100%), validação (26 perguntas, utilizadas a partir da segunda rodada de ajustes; mínimo de
+95%) e teste cego (26 perguntas escritas depois dos ajustes e não utilizadas para calibrar; mínimo de 80%). Medição de
+06/10/2026: 44 de 44, 26 de 26 e 23 de 26 (88%).
 
 #### Validação de entrada (`src/common/validacao-dtos.spec.ts`)
 
@@ -56,8 +67,10 @@ permanecendo coberta pela suíte e2e.
 
 Vitest, Testing Library e jsdom (`vitest.config.ts`, separado do `vite.config.ts` da aplicação, que é montado pelo
 preset do Lovable e não deve receber plugins manualmente). Cobre a lógica da agenda de reservas, o contrato do
-cliente HTTP (incluindo o prefixo `/v1` e a renovação de sessão) e o componente de tabela utilizado pelas telas de
-gestão.
+cliente HTTP (incluindo o prefixo `/v1` e a renovação de sessão), o componente de tabela utilizado pelas telas de
+gestão e o assistente de dúvidas: integridade dos roteiros guiados contra o código das telas (`roteiros.test.ts`),
+motor do roteiro — destaque, bloqueio de cliques fora do destaque, avanço, passo opcional e Esc — (`tour.test.tsx`)
+e chat (`assistente-chat.test.tsx`).
 
 #### Acessibilidade (`acessibilidade.test.tsx`)
 
@@ -142,6 +155,8 @@ teste automatizado estão indicadas, com o motivo.
 | RN045 | Login institucional no portal do Boost, com criação ou vínculo da conta do portal | e2e: "Login institucional no portal: cria e vincula a conta, emite token do portal e acompanha a situação no Hub"; "Login institucional vincula conta externa preexistente com o mesmo e-mail e invalida a senha própria" |
 | RN047 | Recuperação de senha do aluno externo por e-mail | e2e: "Recuperação de senha da conta externa: link por e-mail, uso único, invalidação de links anteriores e orientação à conta institucional" |
 | RN046 | Matrícula e cancelamento pela gestão do Boost | e2e: "Matrícula pela gestão: aluno interno e conta externa, candidatos, duplicidade, cancelamento e reativação" |
+| RN051 | Assistente responde apenas com o manual, recusa assunto fora do escopo e exige autenticação | e2e: "Assistente de dúvidas: responde com o manual e o roteiro guiado, direciona pelo perfil e exige autenticação". Unitário: `assistente.service.spec.ts` (respostas, base de conhecimento sem senhas e precisão nos três conjuntos). Frontend: `assistente-chat.test.tsx` |
+| RN052 | Roteiro oferecido apenas a quem pode executar a tarefa; o roteiro não age pelo usuário | e2e: o anterior (sugestões e `roteiro.permitido` conforme as permissões). Unitário: "oferece e libera apenas os roteiros das tarefas que o usuário pode executar". Frontend: `tour.test.tsx` (cliques fora do destaque descartados, avanço e encerramento) e `roteiros.test.ts` (alvos existentes no código) |
 
 ### Requisitos não funcionais e de contrato
 

@@ -145,6 +145,34 @@ permite decifrar apenas o trecho solicitado.
 **Evidência**: `src/common/file-encryption.util.ts`, `src/common/video-stream.util.ts`,
 `docs/operations/06-backup-e-recuperacao.md`.
 
+## ADR-008 — Assistente de dúvidas com motor de linguagem local, sem modelo neural nem serviço externo
+
+**Decisão**: o assistente classifica a pergunta por processamento de linguagem clássico, implementado no próprio
+backend (`src/assistente/motor-linguagem.ts`): normalização, palavras vazias, radicais, sinônimos do domínio,
+correção de digitação (distância de Damerau-Levenshtein) e similaridade TF-IDF com as entradas do Manual do Usuário e
+com frases de exemplo de cada tarefa. A resposta é sempre um trecho do manual, e nunca texto gerado.
+
+**Contexto**: o requisito definiu um assistente "local e extremamente leve", destinado exclusivamente a dúvidas de
+uso. As alternativas avaliadas foram um modelo de linguagem hospedado (dependência de serviço externo, custo por
+requisição, envio das perguntas a terceiros e risco de respostas inventadas) e um modelo neural local de
+`embeddings` (Transformers.js com ONNX Runtime): o pacote do runtime nativo, de cerca de 300 MB, não pôde sequer ser
+obtido de forma confiável no ambiente de desenvolvimento, e o modelo aumentaria o consumo de memória e o tempo de
+inicialização do servidor, sem ganho proporcional para um domínio fechado de cerca de 130 assuntos.
+
+**Implementação**: base de conhecimento gerada do manual (`npm run assistente:base`), índice montado em memória na
+inicialização e classificação em 1 a 2 ms por pergunta. A precisão é verificada por três conjuntos de perguntas em
+`assistente.service.spec.ts`: calibração (100%, utilizada nos ajustes), validação (mínimo de 95%) e teste cego,
+escrito após os ajustes (mínimo de 80%; 88% na medição de 06/10/2026).
+
+**Consequências**:
+- Positivas: nenhuma dependência nova em execução, nenhuma pergunta enviada para fora do servidor, resposta
+  determinística e restrita ao conteúdo revisado do manual (RN051).
+- Negativas: a compreensão depende do vocabulário da documentação e das frases de exemplo; formulações muito
+  diferentes podem não ser reconhecidas, caso em que o assistente informa não ter encontrado o assunto e sugere
+  tarefas. A base precisa ser regenerada a cada alteração do manual (`docs/engineering/08-divida-tecnica.md`).
+
+**Evidência**: `src/assistente/`, `scripts/assistente/gerar-base.js` e `src/assistente/assistente.service.spec.ts`.
+
 ## Decisões sem motivação histórica confirmada
 
 As escolhas abaixo estão confirmadas no código, mas a motivação original **não foi localizada** em comentário de

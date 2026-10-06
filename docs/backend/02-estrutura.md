@@ -32,6 +32,15 @@ src/
 │   ├── video-stream.util.ts       # transmissão com Range sobre arquivo cifrado
 │   └── pagination.ts              # paginação opcional por deslocamento
 │
+├── assistente/               # assistente de dúvidas (transversal, sem tabelas)
+│   ├── assistente.module.ts
+│   ├── assistente.controller.ts   # /assistente/perguntas, sugestoes, entradas/:id e roteiros/:id
+│   ├── assistente.service.ts      # classificação, preferências por permissão e montagem da resposta
+│   ├── motor-linguagem.ts         # normalização, radicais, sinônimos, correção de digitação e TF-IDF
+│   ├── roteiros.ts                # roteiros guiados (permissão e frases de exemplo) e exemplos de telas
+│   ├── base-conhecimento.ts       # GERADO por npm run assistente:base (não editar)
+│   └── dto/pergunta-assistente.dto.ts
+│
 ├── mail/                     # MailService (nodemailer)
 │
 ├── roster-hub/                       # núcleo administrativo (pasta grafada "roster-hub")
@@ -138,6 +147,7 @@ Cada submódulo do Hub (`usuarios/`, `setores/` etc.) segue internamente o mesmo
 | `rooster-learn/` | Atividades, entregas, correções e anexos de entrega. |
 | `rooster-boost/` e `rooster-boost-portal/` | Cursos extracurriculares: gestão pelo instrutor e consumo pelo aluno externo. |
 | `rooster-finance/` | Cobranças, catálogo financeiro, descontos, políticas de multa e juros, boleto, nota fiscal e relatórios. |
+| `assistente/` | Assistente de dúvidas: classificação local da pergunta e resposta com o conteúdo do Manual do Usuário e dos guias, sem acesso a dados de negócio (RN051 e RN052). A base de conhecimento é gerada a partir de `docs/manual-usuario/manual.json` e `docs/user-guides/` por `scripts/assistente/gerar-base.js`. |
 
 ## Convenções de nomenclatura
 
@@ -164,3 +174,13 @@ permissão, por não herdar o `@RequirePermission` do método original.
 
 O mesmo critério é adotado em `rooms.controller.ts` (`campus`, `blocos`, `ambientes` e `reservas`) e em
 `assets.controller.ts` (`patrimonio*`): nenhum módulo do backend utiliza alias bilíngue de rota.
+
+## Pastas fora de `src/` relacionadas ao assistente e ao manual
+
+| Pasta ou arquivo | Responsabilidade |
+|---|---|
+| `docs/manual-usuario/manual.json` | Conteúdo do Manual do Usuário, fonte única do documento Word e da base de conhecimento do assistente. |
+| `docs/manual-usuario/gerar-manual.js` | Gera o Manual do Usuário em Word (`npm run manual [caminho de saída]`); o sumário é atualizado no Word. O documento gerado não é versionado. |
+| `docs/manual-usuario/capturar-telas.mjs` | Captura automática das telas do manual (Playwright), com o sistema em execução sobre o banco de demonstração. |
+| `docs/manual-usuario/imagens/` | Capturas de tela inseridas no manual, nomeadas pela rota normalizada da tela. |
+| `scripts/assistente/gerar-base.js` | Gera `src/assistente/base-conhecimento.ts` (`npm run assistente:base`) a partir do manual e dos guias, sem as senhas de demonstração. |
