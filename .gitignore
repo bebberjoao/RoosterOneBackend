@@ -20,3 +20,7 @@ Thumbs.db
 .rooster/
 scripts/instalador/instaladores/*.msi
 scripts/instalador/instaladores/*.exe
+scripts/instalador/*.exe
+scripts/instalador/*.msi
+/postgresql-*.exe
+/node-*.msi

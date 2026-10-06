@@ -11,7 +11,7 @@ Arquivos (repositório do backend):
 |---|---|
 | `scripts/instalador/INSTALAR.bat` | Ponto de entrada: solicita a elevação de administrador e abre o menu |
 | `scripts/instalador/instalador.ps1` | Menu e todas as operações (Windows PowerShell 5.1 ou superior) |
-| `scripts/instalador/instaladores/` | Opcional: instaladores do Node.js (`node-*.msi`) e do PostgreSQL (`postgresql-*.exe`) para uso sem internet |
+| `scripts/instalador/instaladores/` | Opcional: instaladores do Node.js (`node-*.msi`) e do PostgreSQL da EDB (`postgresql-*.exe`) para uso sem internet |
 | `.rooster/` (gerada) | Configuração da instalação, lançador dos serviços, logs e senha protegida do superusuário do PostgreSQL |
 
 ## Pré-requisitos
@@ -24,6 +24,17 @@ Arquivos (repositório do backend):
   `scripts/instalador/instaladores` (ver `LEIAME.txt` na pasta).
 - Cerca de 5 GB livres em disco e as portas 3000 (API) e 8080 (site) livres; o instalador verifica as portas e,
   se ocupadas por outro programa, solicita portas alternativas.
+
+## Instalação sem internet (PostgreSQL e Node.js locais)
+
+Para que a instalação dispense a internet, basta baixar o instalador do PostgreSQL para Windows da EDB
+(`postgresql-<versão>-windows-x64.exe`) e, se necessário, o do Node.js LTS (`node-<versão>-x64.msi`), e colocá-los,
+sem renomear, em `scripts/instalador/instaladores`. Também são aceitos na pasta `scripts/instalador`, na raiz do
+backend ou na pasta que contém os dois repositórios; havendo mais de um, é utilizado o de versão mais recente. Os
+arquivos têm prioridade sobre o `winget` e são ignorados quando o programa já está instalado. O PostgreSQL é
+instalado em modo silencioso (`--mode unattended --unattendedmodeui none`), sem nenhuma interação, na porta 5432 e
+com senha aleatória para o superusuário. A opção 5 do menu informa qual arquivo será utilizado. Os executáveis não
+são versionados no Git.
 
 ## Uso
 

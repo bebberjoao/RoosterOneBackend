@@ -1,9 +1,17 @@
 Instaladores para uso sem internet (opcional)
 
-Se a maquina nao tiver acesso a internet (ou nao tiver o winget), coloque nesta pasta:
+Para instalar sem depender da internet, baixe e coloque nesta pasta:
 
-  - node-v24.x.x-x64.msi           (https://nodejs.org, versao LTS, instalador .msi para Windows 64 bits)
-  - postgresql-16.x-x-windows-x64.exe  (https://www.enterprisedb.com/downloads/postgres-postgresql-downloads)
+  - PostgreSQL: postgresql-16.x-x-windows-x64.exe
+      https://www.enterprisedb.com/downloads/postgres-postgresql-downloads (Windows x86-64)
+  - Node.js:    node-v24.x.x-x64.msi
+      https://nodejs.org (versao LTS, instalador .msi para Windows 64 bits)
 
-O instalador (INSTALAR.bat) usa estes arquivos antes de recorrer ao winget.
-Os arquivos .msi e .exe desta pasta nao sao versionados no Git (ver .gitignore).
+Nao e preciso renomear os arquivos. O instalador (INSTALAR.bat) tambem os encontra na pasta
+scripts\instalador, na raiz do RoosterOneBackend ou na pasta que contem os dois repositorios
+(havendo mais de um, usa o de versao mais recente). O PostgreSQL e instalado em modo silencioso,
+sem nenhuma tela, com senha do superusuario gerada e guardada de forma protegida em .rooster.
+Se o PostgreSQL ou o Node.js ja estiverem instalados, os arquivos sao ignorados.
+
+A opcao 5 do menu (Verificar pre-requisitos) mostra qual arquivo sera usado.
+Os arquivos .exe e .msi nao sao versionados no Git (ver .gitignore).

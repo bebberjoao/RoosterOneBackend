@@ -99,6 +99,20 @@ function Executar($exe, [string[]]$argumentos, $pasta) {
 }
 
 # ---------------------------------------------------------------------------------------------------------------
+# Instaladores locais (uso sem internet)
+# ---------------------------------------------------------------------------------------------------------------
+# Procura o instalador baixado em vários lugares, para que baste colocá-lo em qualquer um deles: a pasta
+# "instaladores", a própria pasta do instalador, a raiz do backend ou a pasta que contém os dois repositórios.
+# Havendo mais de um, usa o de versão mais recente.
+function Procurar-Instalador($padrao) {
+    $pastas = @($Instaladores, $PSScriptRoot, $Back, (Split-Path $Back -Parent)) | Select-Object -Unique
+    $achados = foreach ($p in $pastas) { Get-ChildItem $p -Filter $padrao -File -ErrorAction SilentlyContinue }
+    if (-not $achados) { return $null }
+    return $achados | Sort-Object { [regex]::Matches($_.Name, '\d+') | ForEach-Object { $_.Value.PadLeft(6, '0') } | Out-String } -Descending |
+        Select-Object -First 1
+}
+
+# ---------------------------------------------------------------------------------------------------------------
 # Localização do frontend
 # ---------------------------------------------------------------------------------------------------------------
 function Localizar-Frontend($cfg) {
@@ -153,16 +167,16 @@ function Garantir-Node($cfg) {
     $n = Versao-Node
     if ($n -and $n.Maior -ge 20) { Ok "Node.js $($n.Versao) encontrado ($($n.Caminho))"; $cfg.Node = $n.Caminho; return }
     if ($n) { Aviso "Node.js $($n.Versao) é anterior à versão 20; será instalada a versão LTS." }
-    $msi = Get-ChildItem $Instaladores -Filter 'node-*.msi' -ErrorAction SilentlyContinue | Select-Object -First 1
+    $msi = Procurar-Instalador 'node-*.msi'
     if ($msi) {
-        Info "Instalando $($msi.Name) (pasta instaladores)..."
+        Info "Instalando $($msi.Name) ($($msi.DirectoryName))..."
         $p = Start-Process msiexec.exe -ArgumentList "/i `"$($msi.FullName)`" /qn /norestart" -Wait -PassThru
         if ($p.ExitCode -ne 0) { throw "O instalador do Node.js terminou com código $($p.ExitCode)." }
     } elseif (Get-Command winget -ErrorAction SilentlyContinue) {
         Info 'Instalando Node.js LTS pelo winget (requer internet)...'
         & winget install --id OpenJS.NodeJS.LTS -e --silent --accept-package-agreements --accept-source-agreements --scope machine
     } else {
-        throw 'Node.js não encontrado, sem winget e sem instalador em scripts\instalador\instaladores (node-*.msi).'
+        throw 'Node.js não encontrado, sem winget e sem instalador node-*.msi (coloque-o em scripts\instalador\instaladores).'
     }
     Atualizar-Path
     $n = Versao-Node
@@ -196,16 +210,16 @@ function Garantir-Postgres {
     if (-not $pg) {
         $senha = Gerar-Senha 20
         $argsPg = "--mode unattended --unattendedmodeui none --superpassword $senha --serverport 5432"
-        $exe = Get-ChildItem $Instaladores -Filter 'postgresql-*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
+        $exe = Procurar-Instalador 'postgresql-*.exe'
         if ($exe) {
-            Info "Instalando $($exe.Name) (pasta instaladores; leva alguns minutos)..."
+            Info "Instalando $($exe.Name) em modo silencioso ($($exe.DirectoryName)); leva de 3 a 10 minutos..."
             $p = Start-Process $exe.FullName -ArgumentList $argsPg -Wait -PassThru
             if ($p.ExitCode -ne 0) { throw "O instalador do PostgreSQL terminou com código $($p.ExitCode)." }
         } elseif (Get-Command winget -ErrorAction SilentlyContinue) {
             Info 'Instalando PostgreSQL 16 pelo winget (requer internet; leva alguns minutos)...'
             & winget install --id PostgreSQL.PostgreSQL.16 -e --silent --accept-package-agreements --accept-source-agreements --override $argsPg
         } else {
-            throw 'PostgreSQL não encontrado, sem winget e sem instalador em scripts\instalador\instaladores (postgresql-*.exe).'
+            throw 'PostgreSQL não encontrado, sem winget e sem instalador postgresql-*.exe (coloque-o em scripts\instalador\instaladores).'
         }
         $pg = Localizar-Postgres
         if (-not $pg) { throw 'O PostgreSQL foi instalado, mas não foi localizado em C:\Program Files\PostgreSQL.' }
@@ -507,7 +521,15 @@ function Mostrar-Status($cfg) {
 function Verificar-Ambiente($cfg) {
     Mostrar-Status $cfg
     Titulo 'Verificação de pré-requisitos'
-    if (Get-Command winget -ErrorAction SilentlyContinue) { Ok 'winget disponível (instalação pela internet)' } else { Aviso 'winget indisponível: use a pasta scripts\instalador\instaladores' }
+    $temWinget = [bool](Get-Command winget -ErrorAction SilentlyContinue)
+    if ($temWinget) { Ok 'winget disponível (instalação pela internet)' } else { Aviso 'winget indisponível' }
+    foreach ($item in @(@('PostgreSQL', 'postgresql-*.exe', [bool](Localizar-Postgres)), @('Node.js', 'node-*.msi', [bool](Versao-Node)))) {
+        $arq = Procurar-Instalador $item[1]
+        if ($item[2]) { Ok "$($item[0]) já instalado: o instalador não será usado" }
+        elseif ($arq) { Ok "$($item[0]) será instalado a partir de $($arq.FullName)" }
+        elseif ($temWinget) { Info "$($item[0]) será instalado pela internet (winget)" }
+        else { Falha "$($item[0]) não instalado e sem instalador $($item[1]): coloque-o em scripts\instalador\instaladores" }
+    }
     $front = Localizar-Frontend $cfg
     Verificar-Portas $cfg $front
     $disco = Get-PSDrive ((Split-Path $Back -Qualifier).TrimEnd(':'))
