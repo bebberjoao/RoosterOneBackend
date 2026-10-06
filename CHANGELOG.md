@@ -208,6 +208,10 @@ estão indicadas; as demais não alteram o banco de dados.
 
 ### Segurança
 
+- **Atualização de dependências por avisos publicados em 06/10/2026.** Backend: `proxy-addr` 2.0.8 (aviso crítico,
+  falsificação de IP no Express) e `js-yaml` 5.4.3 no `@nestjs/swagger` (por `overrides`); frontend: `source-map-js`
+  1.2.2. O aviso remanescente (`deepmerge-ts`, via CLI do Prisma) permanece como risco aceito; ver
+  `docs/security/04-seguranca-aplicacao.md`.
 - **Revogação das sessões na troca de senha e na desativação** (01/10/2026). A redefinição de senha (por
   recuperação ou pelo administrador) não revogava os refresh tokens em aberto; uma sessão obtida indevidamente
   continuava a renovar o acesso por até 30 dias após a troca de senha. A redefinição e a desativação do usuário

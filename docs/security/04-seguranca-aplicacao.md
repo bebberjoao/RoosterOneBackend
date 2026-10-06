@@ -101,15 +101,17 @@ SMTP, o conteúdo não é registrado, e apenas a falha de configuração é info
 
 ## Dependências (`npm audit --omit=dev`)
 
-Situação em 01/10/2026:
+Situação em 06/10/2026:
 
 - **Backend**: as vulnerabilidades exploráveis por requisição HTTP foram corrigidas por atualização dentro das faixas
-  declaradas (`@nestjs/*` 11.2.7, `multer` 2.4.0 e `qs` 6.16.0). Permanecem cinco avisos (três altos e dois
-  moderados), todos decorrentes de duas bibliotecas classificadas como risco aceito, por processarem apenas entrada
-  confiável: `deepmerge-ts` (por meio de `@prisma/config`, utilizado pela CLI do Prisma na leitura da configuração
-  local) e `js-yaml` (fixado pelo `@nestjs/swagger`, utilizado na serialização do próprio esquema da API, com o
-  Swagger desabilitado em produção). A correção automática rebaixaria a CLI do Prisma para versão incompatível com
-  o cliente e, por isso, não foi aplicada.
-- **Frontend**: nenhum aviso.
+  declaradas (`@nestjs/*` 11.2.7, `multer` 2.4.0 e `qs` 6.16.0) e, em 06/10/2026, `proxy-addr` 2.0.8 (aviso
+  crítico publicado na mesma data: falsificação de IP via endereço IPv6 mapeado, no Express). O `js-yaml` utilizado
+  pelo `@nestjs/swagger` passou a 5.4.3 por meio de `overrides` no `package.json`, restrito a essa dependência.
+  Permanecem três avisos altos, todos do `deepmerge-ts` (por meio de `@prisma/config`, utilizado pela CLI do Prisma
+  na leitura da configuração local), classificados como risco aceito por processarem apenas entrada confiável: a
+  correção exige o Prisma 8 (versão maior), e a correção automática rebaixaria a CLI do Prisma para versão
+  incompatível com o cliente.
+- **Frontend**: nenhum aviso. Em 06/10/2026, `source-map-js` foi atualizado para 1.2.2 (aviso alto publicado na mesma
+  data).
 
 A varredura é executada pelo pipeline de integração contínua (job `auditoria`, não bloqueante).
