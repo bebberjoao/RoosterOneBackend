@@ -15,3 +15,8 @@ coverage/
 npm-debug.log*
 .DS_Store
 Thumbs.db
+
+# Instalador: dados locais (lancador, logs e configuracao) e instaladores para uso sem internet
+.rooster/
+scripts/instalador/instaladores/*.msi
+scripts/instalador/instaladores/*.exe

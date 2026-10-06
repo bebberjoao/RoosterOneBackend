@@ -1,0 +1,9 @@
+Instaladores para uso sem internet (opcional)
+
+Se a maquina nao tiver acesso a internet (ou nao tiver o winget), coloque nesta pasta:
+
+  - node-v24.x.x-x64.msi           (https://nodejs.org, versao LTS, instalador .msi para Windows 64 bits)
+  - postgresql-16.x-x-windows-x64.exe  (https://www.enterprisedb.com/downloads/postgres-postgresql-downloads)
+
+O instalador (INSTALAR.bat) usa estes arquivos antes de recorrer ao winget.
+Os arquivos .msi e .exe desta pasta nao sao versionados no Git (ver .gitignore).

@@ -5,7 +5,13 @@ Prisma e PostgreSQL.
 
 Documentação completa: [docs/README.md](docs/README.md).
 
-## Início rápido
+## Instalação automática no Windows
+
+Com os dois repositórios lado a lado na mesma pasta, execute `scripts\instalador\INSTALAR.bat` (duplo clique). O menu
+instala Node.js e PostgreSQL, cria o banco, gera o `.env`, compila backend e frontend e registra o sistema para
+iniciar com o Windows, em `http://localhost:8080`. Detalhes: [docs/operations/09-instalador.md](docs/operations/09-instalador.md).
+
+## Início rápido (desenvolvimento)
 
 ```bash
 npm install

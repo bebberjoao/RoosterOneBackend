@@ -95,6 +95,7 @@ autorização, validações, tratamento de erros e guia do desenvolvedor.
 - [Backup e Recuperação](operations/06-backup-e-recuperacao.md)
 - [Troubleshooting](operations/07-troubleshooting.md)
 - [Requisitos de hardware](operations/08-requisitos-de-hardware.md)
+- [Instalador para Windows](operations/09-instalador.md)
 
 ## Diagramas
 

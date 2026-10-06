@@ -25,6 +25,15 @@ estão indicadas; as demais não alteram o banco de dados.
 
 ### Adicionado
 
+- **Instalador para Windows** (06/10/2026). `scripts/instalador/INSTALAR.bat` abre, com elevação de administrador, um
+  menu que instala Node.js LTS e PostgreSQL (pelo `winget` ou por instaladores locais, para uso sem internet), cria o
+  usuário e o banco com senha aleatória, gera o `.env` com `JWT_SECRET` e `FILE_ENCRYPTION_KEY` aleatórios (sem
+  nunca substituir segredos existentes), compila backend e frontend (este com `NITRO_PRESET=node-server`, pois o
+  padrão do template gera pacote para Cloudflare Workers), aplica as migrations, oferece os dados de demonstração em
+  banco vazio, registra a API e o site no Agendador de Tarefas para iniciarem com o Windows (com reinício automático
+  em caso de queda e logs em `.rooster/logs`) e cria o atalho "Rooster One" na área de trabalho. O menu oferece
+  também iniciar, parar, situação, verificação de pré-requisitos, backup, restauração dos dados de demonstração e
+  desinstalação. Documentação em `docs/operations/09-instalador.md`.
 - **Questões nas atividades do Rooster Learn** (02/10/2026). **Exige migration** (`20261002170000_learn_questoes`).
   A atividade passa a admitir questões de múltipla escolha com uma ou várias respostas, verdadeiro ou falso,
   discursivas e de envio de arquivo, com enunciado, texto de apoio, imagem de apoio (JPEG, PNG, GIF ou WebP, até

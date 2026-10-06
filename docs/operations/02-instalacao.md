@@ -1,7 +1,8 @@
 # Instalação em ambiente de desenvolvimento
 
 Procedimento para a primeira execução local dos dois repositórios (`RoosterOneBackend-main` e
-`RoosterOneFrontEnd-main`). A instalação em servidor está em `04-deploy.md`.
+`RoosterOneFrontEnd-main`). A instalação em servidor está em `04-deploy.md`, e a instalação automatizada em
+computador Windows (pré-requisitos, banco, compilação e início automático), em `09-instalador.md`.
 
 ## Pré-requisitos
 
