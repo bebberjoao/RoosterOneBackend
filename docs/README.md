@@ -110,7 +110,7 @@ autorização, validações, tratamento de erros e guia do desenvolvedor.
 
 ## Documento consolidado
 
-O documento `Rooster-One-Documentacao-Geral.docx`, na raiz da pasta do TCC, consolida esta árvore, com as 52 figuras
+O documento `Rooster-One-Documentacao-Geral.docx`, na raiz da pasta do TCC, consolida esta árvore, com as 54 figuras
 incorporadas, e o `Rooster-One-Manual-do-Usuario.docx` descreve a operação do sistema tela a tela. A árvore `docs/`
 permanece a fonte de verdade técnica, mantida junto ao código; os documentos Word constituem a visão consolidada para
 a entrega acadêmica.
