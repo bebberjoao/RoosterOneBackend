@@ -1,18 +1,19 @@
+%%{init: {"flowchart":{"nodeSpacing":26,"rankSpacing":32,"padding":6,"diagramPadding":6,"subGraphTitleMargin":{"top":6,"bottom":12}}}}%%
 graph TB
-  subgraph FE["FRONTEND - RoosterOneFrontEnd-main"]
+  subgraph FE["FRONTEND · TanStack Start"]
     R[TanStack Router<br/>rotas file-based]
-    AS[AppShell<br/>sessao + navegacao + RequireAccess]
-    CTX[Contexts<br/>auth / permission / role / theme]
-    SVC[Servicos por modulo<br/>services/mock-api/*.service.ts]
+    AS[AppShell<br/>sessao + navegacao<br/>+ RequireAccess]
+    CTX[Contexts<br/>auth / permission<br/>role / theme]
+    SVC[Servicos por modulo<br/>services/mock-api/<br/>*.service.ts]
     HTTP[Cliente HTTP central<br/>services/hub/client.ts]
     R --> AS --> CTX
     R --> SVC --> HTTP
   end
 
-  subgraph BE["BACKEND - RoosterOneBackend-main"]
-    GUARD[JwtAuthGuard + PermissionGuard<br/>globais]
+  subgraph BE["BACKEND · NestJS"]
+    GUARD[JwtAuthGuard<br/>+ PermissionGuard<br/>globais]
     CTRL[Controllers<br/>9 modulos de dominio]
-    SERV[Services<br/>regra de negocio + transacao]
+    SERV[Services<br/>regra de negocio<br/>+ transacao]
     PRISMA[PrismaService<br/>Prisma Client]
     WS[Gateways WebSocket<br/>chat Desk / chat Boost]
     GUARD --> CTRL --> SERV --> PRISMA

@@ -1,27 +1,25 @@
+%%{init: {"sequence":{"mirrorActors":false,"wrap":true,"width":150,"actorMargin":30,"boxMargin":6,"messageMargin":24,"noteMargin":6,"diagramMarginX":8,"diagramMarginY":8}}}%%
 sequenceDiagram
   actor F as Equipe financeira
   participant FE as Frontend
-  participant CTRL as FinanceController
-  participant FS as FinanceService
-  participant AS as AcademyService
+  participant CTRL as Finance<br/>Controller
+  participant FS as Finance<br/>Service
   participant DB as PostgreSQL
-
-  F->>FE: escolhe competencia e turma
+  F->>FE: escolhe servico, competencia, vencimento e turma
   FE->>CTRL: POST /cobrancas/gerar-lote
-  CTRL->>FS: gerarLote(competencia, turmaId, servicoId)
-  FS->>AS: alunos matriculados na turma
-  AS->>DB: busca Matriculas ativas
-  AS-->>FS: lista de Alunos
+  CTRL->>FS: gerarLoteMensalidades(dto)
+  FS->>DB: busca o servico e as matriculas ativas (da turma, se informada)
   loop para cada aluno
-    FS->>DB: ja existe Cobranca dessa competencia?
+    FS->>DB: ja existe mensalidade dessa competencia e servico?
     alt ja existe
-      FS->>FS: pula (idempotente)
+      FS->>FS: ignora (idempotente)
     else nao existe
-      FS->>DB: busca DescontoAluno vigente
+      FS->>DB: busca o desconto vigente do aluno
       FS->>FS: calcula valorDesconto
-      FS->>DB: cria Cobranca status=aberto
+      FS->>DB: cria Cobranca status=aberto, com a politica de multa e juros do servico
+      FS->>DB: notifica o aluno da nova mensalidade
     end
   end
-  FS-->>CTRL: resumo (criadas / puladas)
+  FS-->>CTRL: geradas, ignoradas e cobrancas
   CTRL-->>FE: 201
   FE-->>F: N mensalidades geradas

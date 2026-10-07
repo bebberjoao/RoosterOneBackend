@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Camadas de teste</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+  .camada { display: grid; grid-template-columns: 210px 1fr; gap: 0; border-radius: 14px; overflow: hidden; margin-bottom: 14px; border: 2px solid; }
+  .qtd { color: #fff; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 12px; }
+  .qtd b { font-size: 54px; line-height: 1; }
+  .qtd span { font-size: 16px; margin-top: 4px; opacity: 0.95; }
+  .desc { padding: 12px 16px; background: #fff; }
+  .desc h3 { font-size: 22px; }
+  .desc .onde { font-family: Consolas, monospace; font-size: 15.5px; color: var(--cinza); margin: 2px 0 6px; }
+  .desc ul { margin-left: 22px; }
+  .desc li { font-size: 17.5px; margin: 2px 0; }
+  .e2e { border-color: var(--verm); } .e2e .qtd { background: var(--verm); } .e2e h3 { color: var(--verm); }
+  .uni { border-color: var(--azul2); } .uni .qtd { background: var(--azul2); } .uni h3 { color: var(--azul2); }
+  .fro { border-color: var(--verde); } .fro .qtd { background: var(--verde); } .fro h3 { color: var(--verde); }
+  .total { display: flex; gap: 14px; align-items: center; background: var(--azul); color: #fff; border-radius: 14px; padding: 12px 16px; }
+  .total b { font-size: 40px; }
+  .total span { font-size: 18px; }
+  .extra { margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .extra .tag { font-size: 16px; padding: 5px 12px; }
+</style>
+</head>
+<body>
+<div class="diagrama" style="width: 980px">
+  <div class="camada e2e">
+    <div class="qtd"><b>87</b><span>2 arquivos</span></div>
+    <div class="desc">
+      <h3>e2e de API (backend) — camada principal</h3>
+      <div class="onde">test/*.e2e-spec.ts · npm run test:e2e · SQLite isolado</div>
+      <ul>
+        <li>Aplicação completa: guard, controller, service e banco.</li>
+        <li>Foco em autorização: 401 sem token, 403 fora do escopo, 404 que não revela o registro.</li>
+        <li>Fluxos dos nove módulos e do assistente de dúvidas.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="camada uni">
+    <div class="qtd"><b>155</b><span>13 arquivos</span></div>
+    <div class="desc">
+      <h3>Unitários (backend)</h3>
+      <div class="onde">src/**/*.spec.ts · npm test</div>
+      <ul>
+        <li>Lógica pura: paginação, erros do Prisma, filtro de exceções, CORS, cifragem e vídeo por trechos.</li>
+        <li>Validação de entrada, regra a regra, de cada DTO.</li>
+        <li>Assistente: linguagem, base de conhecimento e precisão (44/44, 26/26 e 23/26 no teste cego).</li>
+      </ul>
+    </div>
+  </div>
+  <div class="camada fro">
+    <div class="qtd"><b>96</b><span>10 arquivos</span></div>
+    <div class="desc">
+      <h3>Unidade, componente e acessibilidade (frontend)</h3>
+      <div class="onde">src/**/*.test.{ts,tsx} · npm test (Vitest)</div>
+      <ul>
+        <li>Cliente HTTP (prefixo /v1, renovação de sessão), agenda de reservas e tabela de dados.</li>
+        <li>Auditoria de acessibilidade com axe-core.</li>
+        <li>Roteiros guiados (alvos no código), motor do roteiro e chat do assistente.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="total"><b>338</b><span>testes automatizados, executados pelo CI (GitHub Actions) a cada envio para a main e a cada pull request, nos dois repositórios</span></div>
+  <div class="extra">
+    <span class="tag t-cinza">Fora do CI: roteiros guiados percorridos no navegador (Playwright)</span>
+    <span class="tag t-cinza">Primeira barreira: compilação (tsc) e build de produção</span>
+  </div>
+</div>
+</body>
+</html>

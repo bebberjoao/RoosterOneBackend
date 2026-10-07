@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Mapa de navegação do frontend</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+  .corpo { display: flex; gap: 18px; align-items: stretch; }
+  .shell { flex: 1; border: 3px solid var(--azul); border-radius: 16px; padding: 12px 14px 14px; background: #fbfcfe; }
+  .shell-titulo { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .shell-titulo b { font-size: 22px; color: var(--azul); }
+  .shell-titulo span { font-size: 16.5px; color: var(--cinza); }
+  .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 10px; }
+  .card { background: #fff; border: 2px solid var(--borda); border-top: 6px solid var(--azul2); border-radius: 10px; padding: 7px 9px; }
+  .card h3 { font-size: 18px; margin-bottom: 4px; }
+  .card ul { list-style: none; }
+  .card li { font-family: Consolas, "Cascadia Mono", monospace; font-size: 15.5px; line-height: 1.38; white-space: nowrap; }
+  .c-adm { border-top-color: var(--azul2); } .c-aca { border-top-color: var(--verde); } .c-fin { border-top-color: #c8861f; }
+  .c-ext { border-top-color: var(--roxo); } .c-ger { border-top-color: var(--cinza); }
+  .fora { width: 330px; display: flex; flex-direction: column; gap: 14px; }
+  .fora .bloco { border: 3px dashed var(--verde); border-radius: 16px; padding: 10px 12px; background: var(--verdec); }
+  .fora .bloco.auth { border-color: var(--cinza); background: var(--cinzac); }
+  .fora h3 { font-size: 19px; color: var(--verde); }
+  .fora .auth h3 { color: var(--cinza); }
+  .fora p { font-size: 15.5px; color: var(--cinza); margin: 2px 0 6px; }
+  .fora li { list-style: none; font-family: Consolas, "Cascadia Mono", monospace; font-size: 15.5px; line-height: 1.4; }
+  .seta-login { font-size: 15.5px; color: var(--azul); font-weight: 700; margin-top: 4px; }
+  .rodape { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .rodape .tag { font-size: 15.5px; padding: 4px 12px; }
+</style>
+</head>
+<body>
+<div class="diagrama" style="width: 1500px">
+  <div class="corpo">
+    <div class="shell">
+      <div class="shell-titulo">
+        <b>AppShell — telas autenticadas (sessão do Hub)</b>
+        <span>Menu lateral, barra superior e assistente de dúvidas em todas as telas</span>
+      </div>
+      <div class="cards">
+        <div class="card c-ger"><h3>Gerais</h3><ul><li>/</li><li>/notifications</li><li>/settings</li></ul></div>
+        <div class="card c-adm"><h3>Hub</h3><ul><li>/hub</li><li>/hub/usuarios</li><li>/hub/setores</li><li>/hub/acessos</li></ul></div>
+        <div class="card c-adm"><h3>Desk</h3><ul><li>/desk</li><li>/desk/tickets</li><li>/desk/tickets/:id</li><li>/desk/categories</li><li>/desk/categories/:id</li><li>/desk/team</li></ul></div>
+        <div class="card c-adm"><h3>Rooms</h3><ul><li>/rooms</li><li>/rooms/book</li><li>/rooms/reservations</li><li>/rooms/reservations/:id</li><li>/rooms/manage</li><li>/rooms/structure</li></ul></div>
+        <div class="card c-adm"><h3>Assets</h3><ul><li>/assets</li><li>/assets/inventory</li></ul></div>
+        <div class="card c-aca"><h3>Academy</h3><ul><li>/academy</li><li>/academy/manage</li><li>/academy/attendance</li><li>/academy/grades</li></ul></div>
+        <div class="card c-aca"><h3>Learn</h3><ul><li>/learn</li><li>/learn/classes</li><li>/learn/activities/:id</li><li>/learn/student</li></ul></div>
+        <div class="card c-aca"><h3>Student</h3><ul><li>/student</li><li>/student/profile</li><li>/student/disciplines</li><li>/student/activities</li><li>/student/grades</li><li>/student/attendance</li><li>/student/history</li><li>/student/calendar</li><li>/student/documents</li><li>/student/finance</li><li>/student/notifications</li></ul></div>
+        <div class="card c-fin"><h3>Finance</h3><ul><li>/finance</li><li>/finance/charges</li><li>/finance/tuitions</li><li>/finance/boletos</li><li>/finance/products</li><li>/finance/services</li><li>/finance/nfe</li><li>/finance/reports</li><li>/finance/discounts</li><li>/finance/policies</li></ul></div>
+        <div class="card c-ext"><h3>Boost (gestão)</h3><ul><li>/boost</li><li>/boost/manage/:id</li><li>/boost/conversas</li><li>/boost/students</li></ul></div>
+      </div>
+      <div class="rodape">
+        <span class="tag t-azul">RequireAccess: cada rota exige a ação "acessar" da tela</span>
+        <span class="tag t-azul">Sem a permissão: tela "Acesso negado"</span>
+        <span class="tag t-azul">Sessão expirada: retorno ao /login</span>
+      </div>
+    </div>
+    <div class="fora">
+      <div class="bloco auth">
+        <h3>Autenticação (pública)</h3>
+        <p>Fora do AppShell</p>
+        <ul><li>/login</li><li>/redefinir-senha</li></ul>
+        <div class="seta-login">login aceito → AppShell (/)</div>
+      </div>
+      <div class="bloco">
+        <h3>Portal do Boost</h3>
+        <p>Fora do AppShell, com sessão própria do aluno do portal</p>
+        <ul>
+          <li>/boost-portal</li><li>/boost-portal/cursos/:slug</li><li>/boost-portal/cadastro</li><li>/boost-portal/entrar</li>
+          <li>/boost-portal/esqueci-senha</li><li>/boost-portal/redefinir-senha</li><li>/boost-portal/painel</li>
+          <li>/boost-portal/painel/:matriculaId</li><li>/boost-portal/verificar</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,10 +1,13 @@
+%%{init: {"flowchart":{"subGraphTitleMargin":{"top":6,"bottom":12},"nodeSpacing":14,"rankSpacing":40,"padding":10,"diagramPadding":6}}}%%
 flowchart LR
-  GES((Gestor - login do Hub))
-  ORI((Orientador - professor, login do Hub))
+  GES((Gestor<br/>login do Hub))
+  ORI((Orientador<br/>professor,<br/>login do Hub))
   ADM((Administrador))
-  EXT((Aluno externo - login proprio))
-  INT((Aluno da instituicao - login institucional))
-  VIS((Visitante nao autenticado))
+  VIS((Visitante<br/>nao<br/>autenticado))
+  subgraph ALUNOS[Alunos do portal]
+    EXT((Aluno<br/>externo<br/>login proprio))
+    INT((Aluno da<br/>instituicao<br/>login<br/>institucional))
+  end
 
   subgraph Boost[Rooster Boost]
     B1([Criar, publicar e retirar curso])
@@ -37,11 +40,7 @@ flowchart LR
   VIS --> B9
   VIS --> B10
   VIS --> B11
-  EXT --> B12
-  EXT --> B13
-  EXT --> B14
-  EXT --> B15
-  INT --> B12
-  INT --> B13
-  INT --> B14
-  INT --> B15
+  ALUNOS --> B12
+  ALUNOS --> B13
+  ALUNOS --> B14
+  ALUNOS --> B15

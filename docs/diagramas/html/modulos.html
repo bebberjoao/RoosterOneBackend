@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Visão geral dos módulos</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+  .grade { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; align-items: start; }
+  .grupo { border-radius: 14px; padding: 12px 12px 4px; }
+  .grupo h2 { font-size: 17px; letter-spacing: 0.06em; text-transform: uppercase; margin: 2px 4px 10px; }
+  .modulo { background: #fff; border-radius: 10px; padding: 9px 12px; margin-bottom: 10px; border-left: 7px solid; }
+  .modulo b { font-size: 21px; display: block; }
+  .modulo span { font-size: 17.5px; color: var(--cinza); }
+  .adm { background: var(--azulc); } .adm h2 { color: var(--azul); } .adm .modulo { border-color: var(--azul2); }
+  .aca { background: var(--verdec); } .aca h2 { color: var(--verde); } .aca .modulo { border-color: var(--verde); }
+  .fin { background: var(--ambarc); } .fin h2 { color: var(--ambar); } .fin .modulo { border-color: #c8861f; }
+  .ext { background: var(--roxoc); } .ext h2 { color: var(--roxo); } .ext .modulo { border-color: var(--roxo); }
+  .direita .grupo + .grupo { margin-top: 16px; }
+  .transversal { margin-top: 16px; border: 2px dashed var(--azul2); border-radius: 14px; padding: 12px 14px; }
+  .transversal .itens { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .transversal .tag { font-size: 16.5px; padding: 4px 12px; }
+  .numeros { display: flex; gap: 12px; margin-top: 14px; }
+  .numero { flex: 1; background: var(--cinzac); border-radius: 12px; padding: 8px; text-align: center; color: var(--cinza); font-size: 17px; }
+  .numero b { display: block; font-size: 30px; color: var(--azul); line-height: 1.1; }
+</style>
+</head>
+<body>
+<div class="diagrama" style="width: 980px">
+  <div class="titulo-faixa">Rooster One — nove módulos sobre uma única API e um único banco de dados</div>
+  <div class="grade">
+    <div class="direita">
+      <div class="grupo adm">
+        <h2>Administrativo</h2>
+        <div class="modulo"><b>Rooster Hub</b><span>Usuários, setores e permissões; notificações, auditoria e configurações</span></div>
+        <div class="modulo"><b>Rooster Desk</b><span>Chamados de suporte com prazo de atendimento (SLA), categorias e atendentes</span></div>
+        <div class="modulo"><b>Rooster Rooms</b><span>Reserva de salas e ambientes, com recorrência e aprovação pelo gestor</span></div>
+        <div class="modulo"><b>Rooster Assets</b><span>Patrimônio, movimentações e empréstimos com prazo de devolução</span></div>
+      </div>
+      <div class="grupo fin">
+        <h2>Financeiro</h2>
+        <div class="modulo"><b>Rooster Finance</b><span>Cobranças e mensalidades; boleto, PIX e nota fiscal internos; relatórios</span></div>
+      </div>
+    </div>
+    <div class="direita">
+      <div class="grupo aca">
+        <h2>Acadêmico</h2>
+        <div class="modulo"><b>Rooster Academy</b><span>Cursos, disciplinas, turmas e matrículas; frequência, notas e calendário</span></div>
+        <div class="modulo"><b>Rooster Learn</b><span>Atividades e questões; entregas, correção automática e por questão</span></div>
+        <div class="modulo"><b>Rooster Student</b><span>Portal do aluno: notas, frequência, atividades, financeiro e documentos</span></div>
+      </div>
+      <div class="grupo ext">
+        <h2>Extensão</h2>
+        <div class="modulo"><b>Rooster Boost</b><span>Cursos livres com portal público; vídeo, progresso e certificado</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="transversal">
+    <span class="rotulo">Recursos comuns a todos os módulos</span>
+    <div class="itens">
+      <span class="tag t-azul">Login com sessão renovável</span>
+      <span class="tag t-azul">Permissão por usuário (módulo.tela.ação)</span>
+      <span class="tag t-azul">Notificações</span>
+      <span class="tag t-azul">Auditoria</span>
+      <span class="tag t-azul">Arquivos cifrados em repouso</span>
+      <span class="tag t-azul">Assistente de dúvidas</span>
+    </div>
+  </div>
+  <div class="numeros">
+    <div class="numero"><b>68</b>tabelas</div>
+    <div class="numero"><b>149</b>permissões</div>
+    <div class="numero"><b>77</b>arquivos de rota</div>
+    <div class="numero"><b>338</b>testes automatizados</div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,22 +1,21 @@
+%%{init: {"flowchart":{"subGraphTitleMargin":{"top":6,"bottom":12},"nodeSpacing":26,"rankSpacing":32,"padding":8,"diagramPadding":6}}}%%
 graph TB
   subgraph Maquina["Maquina de desenvolvimento"]
-    subgraph NodeFE["Processo Node - Vite"]
-      FE[Frontend TanStack Start<br/>porta 8080+]
-    end
-    subgraph NodeBE["Processo Node - NestJS"]
-      BE[API REST + WebSocket<br/>porta 3000]
-    end
-    subgraph PGS["Servico PostgreSQL"]
-      DB[(rooster_one)]
-    end
-    DISK[["uploads/"]]
+    direction TB
+    NAV[Navegador]
+    FE["Processo Node - Vite<br/>frontend TanStack Start<br/>porta 8080+"]
+    BE["Processo Node - NestJS<br/>API REST + WebSocket<br/>porta 3000"]
+    DB[("PostgreSQL<br/>banco rooster_one")]
+    DISK[["uploads/<br/>arquivos cifrados"]]
   end
-
-  NAV[Navegador] --> FE
+  NAV --> FE
   FE -->|VITE_API_URL| BE
   BE -->|DATABASE_URL| DB
   BE --> DISK
 
-  NOTA["NAO EXISTE HOJE: staging, producao,<br/>container, balanceador, CI/CD"]
+  NOTA["NAO EXISTE HOJE:<br/>homologacao, producao<br/>e balanceador de carga"]
+  DISP["IMPLEMENTADO, SEM<br/>AMBIENTE DE DESTINO:<br/>Dockerfile e<br/>docker-compose;<br/>integracao continua<br/>(GitHub Actions)"]
   classDef aviso fill:#FDE8E8,stroke:#9B2C2C,color:#6B1F1F
+  classDef disponivel fill:#FFF4E0,stroke:#9A6412,color:#5C3B0A
   class NOTA aviso
+  class DISP disponivel

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Anatomia de uma permissão</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+  .chave { display: flex; justify-content: center; align-items: flex-start; gap: 6px; margin: 6px 0 4px; }
+  .parte { text-align: center; width: 270px; }
+  .parte .valor { font-family: Consolas, "Cascadia Mono", monospace; font-size: 40px; font-weight: 700; border-radius: 12px; padding: 8px 6px; }
+  .parte .nome { font-size: 20px; font-weight: 700; margin-top: 6px; }
+  .parte .expl { font-size: 16.5px; color: var(--cinza); margin-top: 2px; }
+  .ponto { font-family: Consolas, monospace; font-size: 40px; font-weight: 700; color: var(--cinza); padding-top: 8px; }
+  .v1 { background: var(--azulc); color: var(--azul); } .v2 { background: var(--verdec); color: var(--verde); } .v3 { background: var(--ambarc); color: var(--ambar); }
+  .concessao { margin: 16px 0 0; background: var(--cinzac); border-radius: 12px; padding: 10px 14px; font-size: 18px; }
+  .concessao b { color: var(--azul); }
+  .colunas { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .lado { border-radius: 14px; padding: 12px 14px; }
+  .lado h3 { font-size: 21px; margin-bottom: 2px; }
+  .lado .sub { font-size: 16px; color: var(--cinza); margin-bottom: 10px; }
+  .front { background: var(--azulc); } .front h3 { color: var(--azul); }
+  .back { background: var(--vermc); } .back h3 { color: var(--verm); }
+  .passo { display: flex; gap: 10px; background: #fff; border-radius: 10px; padding: 9px 11px; margin-bottom: 9px; }
+  .num { flex: none; width: 30px; height: 30px; border-radius: 50%; color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 17px; }
+  .front .num { background: var(--azul2); } .back .num { background: var(--verm); }
+  .passo b { display: block; font-size: 18.5px; }
+  .passo span { font-size: 16.5px; color: var(--cinza); }
+  .resultado { font-weight: 700; color: var(--verm); }
+  .rodape { margin-top: 14px; text-align: center; font-size: 17px; color: var(--cinza); }
+</style>
+</head>
+<body>
+<div class="diagrama" style="width: 980px">
+  <div class="chave">
+    <div class="parte"><div class="valor v1">desk</div><div class="nome">módulo</div><div class="expl">Rooster Desk</div></div>
+    <div class="ponto">.</div>
+    <div class="parte"><div class="valor v2">tickets</div><div class="nome">tela</div><div class="expl">último segmento da rota /desk/tickets ("dashboard" na raiz do módulo)</div></div>
+    <div class="ponto">.</div>
+    <div class="parte"><div class="valor v3">criar</div><div class="nome">ação</div><div class="expl">operação da tela; "acessar" libera a entrada na tela</div></div>
+  </div>
+  <div class="concessao">Concedida <b>diretamente ao usuário</b> em Rooster Hub › Acessos e permissões, sem perfil intermediário (RN002).
+    Administrador é quem possui <b>hub.acessos.gerenciar-permissoes</b> (RN001).</div>
+  <div class="colunas">
+    <div class="lado front">
+      <h3>Frontend — orienta a interface</h3>
+      <div class="sub">Usa as permissões recebidas no login</div>
+      <div class="passo"><div class="num">1</div><div><b>Menu lateral</b><span>exibe somente as telas com a ação "acessar"</span></div></div>
+      <div class="passo"><div class="num">2</div><div><b>RequireAccess</b><span>rota sem "acessar": tela "Acesso negado"</span></div></div>
+      <div class="passo"><div class="num">3</div><div><b>Botões e ações</b><span>exibidos apenas com a ação correspondente (useCan)</span></div></div>
+    </div>
+    <div class="lado back">
+      <h3>Backend — barreira definitiva</h3>
+      <div class="sub">A cada requisição, sem cache</div>
+      <div class="passo"><div class="num">1</div><div><b>JwtAuthGuard</b><span>token válido e usuário ativo; senão, <span class="resultado">401</span></span></div></div>
+      <div class="passo"><div class="num">2</div><div><b>PermissionGuard</b><span>@RequirePermission(módulo, tela, ação); senão, <span class="resultado">403</span></span></div></div>
+      <div class="passo"><div class="num">3</div><div><b>Regra contextual</b><span>setor do chamado, titularidade da turma ou do recurso; senão, <span class="resultado">403</span> ou <span class="resultado">404</span></span></div></div>
+    </div>
+  </div>
+  <div class="rodape">As duas pontas usam a mesma chave: o frontend evita mostrar o que o backend recusaria, e o backend decide.</div>
+</div>
+</body>
+</html>

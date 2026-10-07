@@ -1,3 +1,4 @@
+%%{init: {"state":{"nodeSpacing":28,"rankSpacing":32,"padding":6}}}%%
 stateDiagram-v2
   [*] --> Analise : solicitacao enviada
   Analise --> Confirmada : gestor aprova
@@ -10,8 +11,9 @@ stateDiagram-v2
 
   note right of Analise
     Criacao valida capacidade,
-    dia de funcionamento, janela
-    de horario e conflito (RN010)
-    e o horizonte de antecedencia
+    dia de funcionamento,
+    janela de horario e
+    conflito (RN010) e o
+    horizonte de antecedencia
     de 15/365 dias (RN017)
   end note

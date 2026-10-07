@@ -1,27 +1,27 @@
+%%{init: {"sequence":{"mirrorActors":false,"wrap":true,"width":150,"actorMargin":30,"boxMargin":6,"messageMargin":24,"noteMargin":6,"diagramMarginX":8,"diagramMarginY":8}}}%%
 sequenceDiagram
-  actor A as Aluno externo
+  actor A as Aluno do portal
   participant FE as Portal Boost
-  participant G as BoostJwtAuthGuard
-  participant CTRL as BoostPortalController
-  participant SVC as BoostPortalService
-  participant CERT as CertificadoBoostService
+  participant G as BoostJwtAuth<br/>Guard
+  participant CTRL as BoostPortal<br/>Controller
+  participant SVC as BoostPortal<br/>Service
+  participant CERT as CertificadoBoost<br/>Service
   participant DB as PostgreSQL
-
-  A->>FE: marca ultima aula como concluida
-  FE->>G: PATCH /boost/aulas/:id/concluir + token tipo=boost
+  A->>FE: conclui a ultima aula (botao ou 90% do video)
+  FE->>G: PATCH /boost/aulas/:id/concluir ou /progresso + token tipo=boost
   G->>G: verifica token contra boost_usuarios
   G->>CTRL: autorizado
-  CTRL->>SVC: concluirAula(aulaId, boostUsuarioId)
-  SVC->>SVC: exigirMatriculaDaAula()
-  SVC->>DB: BEGIN TRANSACTION
-  SVC->>DB: cria ProgressoAula
-  SVC->>DB: recalcula progressoPct da matricula
-  alt progressoPct = 100 e curso emite certificado
+  CTRL->>SVC: concluirAula ou atualizarProgressoVideo
+  SVC->>SVC: exigirMatricula<br/>DaAula()
+  SVC->>DB: grava ProgressoAula (concluidoEm)
+  SVC->>DB: conta as aulas concluidas e atualiza progressoPct
+  alt progressoPct = 100
     SVC->>DB: matricula status = concluida
-    SVC->>CERT: gerar(matricula)
-    CERT->>CERT: monta PDF com pdfkit
-    CERT->>DB: cria CertificadoBoost (codigo unico)
+    opt curso emite certificado
+      SVC->>CERT: emitir(matriculaId)
+      CERT->>CERT: monta o PDF (pdfkit) com codigo unico e grava o arquivo cifrado
+      CERT->>DB: cria CertificadoBoost (um por matricula)
+    end
   end
-  SVC->>DB: COMMIT
-  SVC-->>FE: 200 { progressoPct, certificado }
+  SVC-->>FE: 200 com a matricula atualizada
   FE-->>A: certificado disponivel para download

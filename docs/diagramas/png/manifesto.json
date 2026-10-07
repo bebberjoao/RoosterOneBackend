@@ -1,0 +1,612 @@
+{
+ "arquitetura-geral": {
+  "fonte": "mermaid",
+  "larguraPx": 738,
+  "alturaPx": 967,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 8.831,
+  "fontePt": 10.5
+ },
+ "assistente": {
+  "fonte": "html",
+  "larguraPx": 980,
+  "alturaPx": 930,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 6.396,
+  "fontePt": 9.4
+ },
+ "ativ-academico": {
+  "fonte": "mermaid",
+  "larguraPx": 579,
+  "alturaPx": 931,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 5.529,
+  "alturaPol": 8.89,
+  "fontePt": 11
+ },
+ "ativ-atividade": {
+  "fonte": "mermaid",
+  "larguraPx": 456,
+  "alturaPx": 445,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 4.354,
+  "alturaPol": 4.249,
+  "fontePt": 11
+ },
+ "ativ-atividade-2": {
+  "fonte": "mermaid",
+  "larguraPx": 736,
+  "alturaPx": 1300,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 5.095,
+  "alturaPol": 9,
+  "fontePt": 8
+ },
+ "ativ-autenticacao": {
+  "fonte": "mermaid",
+  "larguraPx": 481,
+  "alturaPx": 948,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 4.566,
+  "alturaPol": 9,
+  "fontePt": 10.9
+ },
+ "ativ-financeiro": {
+  "fonte": "mermaid",
+  "larguraPx": 586,
+  "alturaPx": 641,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 5.595,
+  "alturaPol": 6.121,
+  "fontePt": 11
+ },
+ "ativ-financeiro-2": {
+  "fonte": "mermaid",
+  "larguraPx": 850,
+  "alturaPx": 944,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 7.485,
+  "fontePt": 9.1
+ },
+ "ativ-patrimonio": {
+  "fonte": "mermaid",
+  "larguraPx": 902,
+  "alturaPx": 1376,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 5.9,
+  "alturaPol": 9,
+  "fontePt": 7.5
+ },
+ "ativ-reserva": {
+  "fonte": "mermaid",
+  "larguraPx": 771,
+  "alturaPx": 1423,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 4.876,
+  "alturaPol": 9,
+  "fontePt": 7.3
+ },
+ "atores": {
+  "fonte": "mermaid",
+  "larguraPx": 407,
+  "alturaPx": 912,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 3.886,
+  "alturaPol": 8.708,
+  "fontePt": 11
+ },
+ "auth-dupla": {
+  "fonte": "mermaid",
+  "larguraPx": 989,
+  "alturaPx": 604,
+  "fator": 4,
+  "orientacao": "paisagem",
+  "larguraPol": 9.444,
+  "alturaPol": 5.767,
+  "fontePt": 11
+ },
+ "camadas-autorizacao": {
+  "fonte": "mermaid",
+  "larguraPx": 751,
+  "alturaPx": 1181,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 5.723,
+  "alturaPol": 9,
+  "fontePt": 8.8
+ },
+ "camadas-permissao-front": {
+  "fonte": "mermaid",
+  "larguraPx": 472,
+  "alturaPx": 718,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 4.507,
+  "alturaPol": 6.856,
+  "fontePt": 11
+ },
+ "casos-uso-academy": {
+  "fonte": "mermaid",
+  "larguraPx": 363,
+  "alturaPx": 522,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 3.466,
+  "alturaPol": 4.984,
+  "fontePt": 11
+ },
+ "casos-uso-boost": {
+  "fonte": "mermaid",
+  "larguraPx": 565,
+  "alturaPx": 1051,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 4.838,
+  "alturaPol": 9,
+  "fontePt": 9.9
+ },
+ "casos-uso-desk": {
+  "fonte": "mermaid",
+  "larguraPx": 381,
+  "alturaPx": 506,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 3.638,
+  "alturaPol": 4.832,
+  "fontePt": 11
+ },
+ "casos-uso-geral": {
+  "fonte": "mermaid",
+  "larguraPx": 371,
+  "alturaPx": 486,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 3.543,
+  "alturaPol": 4.641,
+  "fontePt": 11
+ },
+ "casos-uso-geral-2": {
+  "fonte": "mermaid",
+  "larguraPx": 370,
+  "alturaPx": 582,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 3.533,
+  "alturaPol": 5.557,
+  "fontePt": 11
+ },
+ "casos-uso-hub": {
+  "fonte": "mermaid",
+  "larguraPx": 446,
+  "alturaPx": 660,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 4.259,
+  "alturaPol": 6.302,
+  "fontePt": 11
+ },
+ "cifragem": {
+  "fonte": "html",
+  "larguraPx": 980,
+  "alturaPx": 712,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 4.897,
+  "fontePt": 9.4
+ },
+ "componentes": {
+  "fonte": "mermaid",
+  "larguraPx": 1440,
+  "alturaPx": 544,
+  "fator": 3,
+  "orientacao": "paisagem",
+  "larguraPol": 10.1,
+  "alturaPol": 3.816,
+  "fontePt": 8.1
+ },
+ "contexto": {
+  "fonte": "mermaid",
+  "larguraPx": 829,
+  "alturaPx": 484,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 3.935,
+  "fontePt": 9.4
+ },
+ "dependencias-modulos": {
+  "fonte": "mermaid",
+  "larguraPx": 899,
+  "alturaPx": 488,
+  "fator": 4,
+  "orientacao": "paisagem",
+  "larguraPol": 8.584,
+  "alturaPol": 4.66,
+  "fontePt": 11
+ },
+ "erd-academy": {
+  "fonte": "mermaid",
+  "larguraPx": 852,
+  "alturaPx": 1100,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 8.702,
+  "fontePt": 9.1
+ },
+ "erd-assets": {
+  "fonte": "mermaid",
+  "larguraPx": 350,
+  "alturaPx": 708,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 3.342,
+  "alturaPol": 6.76,
+  "fontePt": 11
+ },
+ "erd-boost": {
+  "fonte": "mermaid",
+  "larguraPx": 1395,
+  "alturaPx": 864,
+  "fator": 3,
+  "orientacao": "paisagem",
+  "larguraPol": 10.01,
+  "alturaPol": 6.2,
+  "fontePt": 8.3
+ },
+ "erd-desk": {
+  "fonte": "mermaid",
+  "larguraPx": 819,
+  "alturaPx": 1106,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.665,
+  "alturaPol": 9,
+  "fontePt": 9.4
+ },
+ "erd-finance": {
+  "fonte": "mermaid",
+  "larguraPx": 511,
+  "alturaPx": 1088,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 4.227,
+  "alturaPol": 9,
+  "fontePt": 9.5
+ },
+ "erd-geral": {
+  "fonte": "mermaid",
+  "larguraPx": 985,
+  "alturaPx": 700,
+  "fator": 4,
+  "orientacao": "paisagem",
+  "larguraPol": 8.724,
+  "alturaPol": 6.2,
+  "fontePt": 10.2
+ },
+ "erd-hub": {
+  "fonte": "mermaid",
+  "larguraPx": 858,
+  "alturaPx": 815,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 6.402,
+  "fontePt": 9
+ },
+ "erd-learn": {
+  "fonte": "mermaid",
+  "larguraPx": 683,
+  "alturaPx": 1101,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 5.583,
+  "alturaPol": 9,
+  "fontePt": 9.4
+ },
+ "erd-rooms": {
+  "fonte": "mermaid",
+  "larguraPx": 400,
+  "alturaPx": 836,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 3.819,
+  "alturaPol": 7.983,
+  "fontePt": 11
+ },
+ "estado-atividade": {
+  "fonte": "mermaid",
+  "larguraPx": 502,
+  "alturaPx": 578,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 4.793,
+  "alturaPol": 5.519,
+  "fontePt": 11
+ },
+ "estado-cobranca": {
+  "fonte": "mermaid",
+  "larguraPx": 900,
+  "alturaPx": 602,
+  "fator": 4,
+  "orientacao": "paisagem",
+  "larguraPol": 8.594,
+  "alturaPol": 5.748,
+  "fontePt": 11
+ },
+ "estado-entrega": {
+  "fonte": "mermaid",
+  "larguraPx": 501,
+  "alturaPx": 971,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 4.644,
+  "alturaPol": 9,
+  "fontePt": 10.7
+ },
+ "estado-matricula": {
+  "fonte": "mermaid",
+  "larguraPx": 575,
+  "alturaPx": 462,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 5.49,
+  "alturaPol": 4.411,
+  "fontePt": 11
+ },
+ "estado-matricula-boost": {
+  "fonte": "mermaid",
+  "larguraPx": 621,
+  "alturaPx": 556,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 5.93,
+  "alturaPol": 5.309,
+  "fontePt": 11
+ },
+ "estado-patrimonio": {
+  "fonte": "mermaid",
+  "larguraPx": 771,
+  "alturaPx": 540,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 4.721,
+  "fontePt": 10.1
+ },
+ "estado-reserva": {
+  "fonte": "mermaid",
+  "larguraPx": 779,
+  "alturaPx": 626,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 5.416,
+  "fontePt": 10
+ },
+ "estado-ticket": {
+  "fonte": "mermaid",
+  "larguraPx": 504,
+  "alturaPx": 770,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 4.813,
+  "alturaPol": 7.352,
+  "fontePt": 11
+ },
+ "estado-usuario": {
+  "fonte": "mermaid",
+  "larguraPx": 413,
+  "alturaPx": 484,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 3.944,
+  "alturaPol": 4.622,
+  "fontePt": 11
+ },
+ "implantacao": {
+  "fonte": "mermaid",
+  "larguraPx": 853,
+  "alturaPx": 618,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 4.883,
+  "fontePt": 9.1
+ },
+ "instalador": {
+  "fonte": "html",
+  "larguraPx": 980,
+  "alturaPx": 897,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 6.169,
+  "fontePt": 9.4
+ },
+ "integracao-modulos": {
+  "fonte": "mermaid",
+  "larguraPx": 1151,
+  "alturaPx": 456,
+  "fator": 4,
+  "orientacao": "paisagem",
+  "larguraPol": 10.1,
+  "alturaPol": 4.001,
+  "fontePt": 10.1
+ },
+ "linha-do-tempo": {
+  "fonte": "html",
+  "larguraPx": 980,
+  "alturaPx": 925,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 6.362,
+  "fontePt": 9.4
+ },
+ "mapa-navegacao": {
+  "fonte": "html",
+  "larguraPx": 1500,
+  "alturaPx": 629,
+  "fator": 3,
+  "orientacao": "paisagem",
+  "larguraPol": 10.1,
+  "alturaPol": 4.235,
+  "fontePt": 9.2
+ },
+ "modulos": {
+  "fonte": "html",
+  "larguraPx": 980,
+  "alturaPx": 985,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 6.774,
+  "fontePt": 9.4
+ },
+ "permissao": {
+  "fonte": "html",
+  "larguraPx": 980,
+  "alturaPx": 719,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 4.945,
+  "fontePt": 9.4
+ },
+ "rbac-modelo": {
+  "fonte": "mermaid",
+  "larguraPx": 703,
+  "alturaPx": 722,
+  "fator": 4,
+  "orientacao": "retrato",
+  "larguraPol": 6.713,
+  "alturaPol": 6.894,
+  "fontePt": 11
+ },
+ "roteiro": {
+  "fonte": "html",
+  "larguraPx": 980,
+  "alturaPx": 724,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 4.979,
+  "fontePt": 9.4
+ },
+ "seq-autorizacao": {
+  "fonte": "mermaid",
+  "larguraPx": 1087,
+  "alturaPx": 971,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 6.021,
+  "fontePt": 7.1
+ },
+ "seq-certificado": {
+  "fonte": "mermaid",
+  "larguraPx": 1259,
+  "alturaPx": 1001,
+  "fator": 3,
+  "orientacao": "paisagem",
+  "larguraPol": 7.798,
+  "alturaPol": 6.2,
+  "fontePt": 7.1
+ },
+ "seq-cobranca-lote": {
+  "fonte": "mermaid",
+  "larguraPx": 896,
+  "alturaPx": 920,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 6.921,
+  "fontePt": 8.7
+ },
+ "seq-correcao-nota": {
+  "fonte": "mermaid",
+  "larguraPx": 1069,
+  "alturaPx": 743,
+  "fator": 3,
+  "orientacao": "paisagem",
+  "larguraPol": 8.92,
+  "alturaPol": 6.2,
+  "fontePt": 9.6
+ },
+ "seq-login": {
+  "fonte": "mermaid",
+  "larguraPx": 1074,
+  "alturaPx": 1009,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 6.332,
+  "fontePt": 7.2
+ },
+ "seq-permissao": {
+  "fonte": "mermaid",
+  "larguraPx": 1267,
+  "alturaPx": 676,
+  "fator": 3,
+  "orientacao": "paisagem",
+  "larguraPol": 10.1,
+  "alturaPol": 5.389,
+  "fontePt": 9.2
+ },
+ "seq-reserva": {
+  "fonte": "mermaid",
+  "larguraPx": 915,
+  "alturaPx": 1130,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 8.324,
+  "fontePt": 8.5
+ },
+ "seq-ticket": {
+  "fonte": "mermaid",
+  "larguraPx": 1266,
+  "alturaPx": 1009,
+  "fator": 3,
+  "orientacao": "paisagem",
+  "larguraPol": 7.779,
+  "alturaPol": 6.2,
+  "fontePt": 7.1
+ },
+ "sessao": {
+  "fonte": "html",
+  "larguraPx": 980,
+  "alturaPx": 709,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 4.876,
+  "fontePt": 9.4
+ },
+ "testes": {
+  "fonte": "html",
+  "larguraPx": 980,
+  "alturaPx": 822,
+  "fator": 3,
+  "orientacao": "retrato",
+  "larguraPol": 6.74,
+  "alturaPol": 5.653,
+  "fontePt": 9.4
+ }
+}

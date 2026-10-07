@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Assistente de dúvidas — classificação de uma pergunta</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+  .etapa { display: grid; grid-template-columns: 44px 1fr 330px; gap: 12px; align-items: center; margin-bottom: 4px; }
+  .num { width: 40px; height: 40px; border-radius: 50%; background: var(--azul2); color: #fff; font-weight: 700; font-size: 19px; display: flex; align-items: center; justify-content: center; }
+  .o-que { border: 2px solid var(--azulm); background: var(--azulc); border-radius: 12px; padding: 9px 13px; }
+  .o-que b { display: block; font-size: 19px; color: var(--azul); }
+  .o-que span { font-size: 16.5px; color: var(--cinza); }
+  .exemplo { font-family: Consolas, "Cascadia Mono", monospace; font-size: 16px; background: var(--cinzac); border-radius: 10px; padding: 9px 11px; border-left: 5px solid var(--borda); }
+  .liga { height: 14px; margin-left: 20px; border-left: 3px solid var(--azul2); }
+  .cab { display: grid; grid-template-columns: 44px 1fr 330px; gap: 12px; margin-bottom: 6px; }
+  .cab div { font-size: 15px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--cinza); }
+  .decisao { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 12px; }
+  .saida { border-radius: 14px; padding: 12px 14px; }
+  .saida b { font-size: 19px; display: block; }
+  .saida span { font-size: 16.5px; }
+  .ok { background: var(--verdec); border: 2px solid #9fceb4; } .ok b { color: var(--verde); }
+  .nao { background: var(--vermc); border: 2px solid #e2a9a9; } .nao b { color: var(--verm); }
+  .regra { text-align: center; font-size: 16.5px; color: var(--cinza); margin-top: 10px; }
+  .chips { display: flex; gap: 10px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+  .chips .tag { font-size: 16px; padding: 5px 12px; }
+</style>
+</head>
+<body>
+<div class="diagrama" style="width: 980px">
+  <div class="cab"><div></div><div>Etapa</div><div>Exemplo</div></div>
+  <div class="etapa"><div class="num">1</div><div class="o-que"><b>Pergunta</b><span>texto livre, com a tela atual e as permissões do usuário</span></div><div class="exemplo">Como eu abro um chamado?</div></div>
+  <div class="liga"></div>
+  <div class="etapa"><div class="num">2</div><div class="o-que"><b>Normalização</b><span>minúsculas, sem acentos e sem pontuação</span></div><div class="exemplo">como eu abro um chamado</div></div>
+  <div class="liga"></div>
+  <div class="etapa"><div class="num">3</div><div class="o-que"><b>Palavras vazias e radicais</b><span>retira "como", "eu", "um"...; reduz flexões ao radical (reservar, reservas → reserv)</span></div><div class="exemplo">abro · chamado</div></div>
+  <div class="liga"></div>
+  <div class="etapa"><div class="num">4</div><div class="o-que"><b>Sinônimos e digitação</b><span>vocabulário do domínio ("abro" → cadastrar, "ticket" → chamado) e correção de erros de digitação</span></div><div class="exemplo">cadastrar · chamado</div></div>
+  <div class="liga"></div>
+  <div class="etapa"><div class="num">5</div><div class="o-que"><b>Similaridade (TF-IDF)</b><span>com as 135 entradas do manual e dos guias e com as frases de exemplo dos 15 roteiros</span></div><div class="exemplo">roteiro "abrir-chamado" e tela Chamados no topo</div></div>
+  <div class="liga"></div>
+  <div class="etapa"><div class="num">6</div><div class="o-que"><b>Preferências</b><span>telas acessíveis ao usuário, módulo atual e glossário apenas em "o que é"</span></div><div class="exemplo">aluno: "minhas notas" → portal do aluno</div></div>
+  <div class="decisao">
+    <div class="saida ok"><b>Resposta</b><span>trecho do Manual do Usuário (tela, procedimento e observações), assuntos relacionados e roteiro guiado, com <i>permitido</i> conforme a permissão da tarefa</span></div>
+    <div class="saida nao"><b>Não encontrado</b><span>orientação para reformular a pergunta e sugestões das tarefas que o usuário pode executar</span></div>
+  </div>
+  <div class="regra">Reconhecida quando ao menos metade dos termos pertence ao vocabulário da documentação e a similaridade é de ao menos 0,25 (0,35 se parte da pergunta não é reconhecida)</div>
+  <div class="chips">
+    <span class="tag t-azul">Local, sem serviço externo</span>
+    <span class="tag t-azul">1 a 2 ms por pergunta</span>
+    <span class="tag t-azul">Resposta sempre extraída do manual</span>
+  </div>
+</div>
+</body>
+</html>

@@ -1,17 +1,18 @@
+%%{init: {"flowchart":{"nodeSpacing":26,"rankSpacing":32,"padding":6,"diagramPadding":6}}}%%
 flowchart TD
-  A([Inicio do periodo letivo]) --> B["Coordenacao: periodo letivo,<br/>cursos e disciplinas (catalogo)"]
-  B --> C["Cria turmas<br/>(disciplina + periodo + professor)"]
+  A([Inicio do periodo letivo]) --> B["Coordenacao cadastra<br/>periodo letivo, cursos<br/>e disciplinas (catalogo)"]
+  B --> C["Cria turmas<br/>(disciplina, periodo<br/>e professor)"]
   C --> D[Matricula alunos nas turmas]
   D --> E["Professor registra<br/>frequencia por data"]
-  D --> F["Professor cria itens avaliativos<br/>com peso e lanca notas"]
+  D --> F["Professor cria itens<br/>avaliativos com peso<br/>e lanca notas"]
   E --> G[Aluno acompanha pelo portal Student]
   F --> G
-  F --> H["Sistema calcula media ponderada<br/>(ignora item sem nota)"]
+  F --> H["Sistema calcula a<br/>media ponderada<br/>(ignora item sem nota)"]
   H --> I{"Resultado<br/>do periodo"}
   E --> I
   I --> J([Historico academico atualizado])
 
-  NOTA["Ressalva: nao existe rotina de<br/>fechamento de periodo — a decisao<br/>de aprovacao/reprovacao e registrada<br/>manualmente (item 213)"]
+  NOTA["Ressalva: nao existe<br/>rotina de fechamento<br/>de periodo; aprovacao<br/>e reprovacao sao<br/>registradas manualmente<br/>(item 213)"]
   I -.- NOTA
   classDef aviso fill:#FDF2E0,stroke:#B4741A,color:#6B4410
   class NOTA aviso

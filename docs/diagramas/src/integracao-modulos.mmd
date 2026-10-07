@@ -1,8 +1,9 @@
+%%{init: {"flowchart":{"nodeSpacing":30,"rankSpacing":36,"padding":6,"diagramPadding":6}}}%%
 graph LR
-  LEARN[Rooster Learn] -->|"publicar atividade com peso<br/>cria ItemAvaliativo origem=learn"| ACAD[Rooster Academy]
-  LEARN -->|"corrigir entrega<br/>propaga nota na mesma transacao"| ACAD
-  FIN[Rooster Finance] -->|"resolve Aluno pelo usuarioId do JWT<br/>rotas /financeiro/me/*"| ACAD
-  BOOST[Rooster Boost] -->|"instrutor e sempre um Professor<br/>ja cadastrado"| ACAD
-  ACAD -->|"Professor/Aluno sao vinculos<br/>a um Usuario existente"| HUB[Rooster Hub]
-  DESK[Rooster Desk] -->|"escopo de visibilidade por Setor"| HUB
-  HUB -->|"registrar evento sensivel"| AUD[LogAuditoria]
+  LEARN[Rooster Learn] -->|"ao publicar atividade<br/>com peso, cria<br/>ItemAvaliativo<br/>(origem=learn);<br/>ao corrigir entrega,<br/>propaga a nota na<br/>mesma transacao"| ACAD[Rooster Academy]
+  FIN[Rooster Finance] -->|"resolve Aluno pelo<br/>usuarioId do JWT<br/>rotas /financeiro/me/*"| ACAD
+  ROOMS[Rooster Rooms] -->|"vincula a reserva<br/>a turma do professor<br/>solicitante"| ACAD
+  BOOST[Rooster Boost] -->|"instrutor e sempre<br/>um Professor<br/>ja cadastrado"| ACAD
+  ACAD -->|"Professor e Aluno sao<br/>vinculos a um<br/>Usuario existente"| HUB["Rooster Hub<br/>tambem recebe as<br/>notificacoes por evento"]
+  DESK[Rooster Desk] -->|"escopo de visibilidade<br/>por Setor"| HUB
+  HUB -->|"registrar evento<br/>sensivel"| AUD[LogAuditoria]

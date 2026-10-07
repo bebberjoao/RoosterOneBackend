@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Cifragem de arquivos em repouso</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+  h3 { font-size: 21px; color: var(--azul); margin-bottom: 8px; }
+  .fluxo { display: flex; align-items: stretch; gap: 8px; }
+  .fluxo .caixa { flex: 1; text-align: center; padding: 10px 8px; }
+  .fluxo .caixa b { display: block; font-size: 18px; }
+  .fluxo .caixa span { font-size: 15.5px; color: var(--cinza); }
+  .fluxo .seta-dir { margin: 0 -2px; }
+  .cx-auth { background: var(--azulc); border-color: var(--azulm); }
+  .cx-valida { background: var(--ambarc); border-color: #e8c98d; }
+  .cx-cifra { background: var(--verdec); border-color: #9fceb4; }
+  .cx-disco { background: var(--cinzac); }
+  .esquemas { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px; }
+  .esquema { border-radius: 14px; padding: 12px 14px; border: 2px solid; }
+  .esquema h4 { font-size: 21px; }
+  .esquema .alg { font-family: Consolas, monospace; font-size: 19px; font-weight: 700; margin: 2px 0 6px; }
+  .esquema ul { margin-left: 22px; }
+  .esquema li { font-size: 17px; margin: 2px 0; }
+  .doc { border-color: #9fceb4; background: var(--verdec); } .doc h4, .doc .alg { color: var(--verde); }
+  .vid { border-color: #c4b3e8; background: var(--roxoc); } .vid h4, .vid .alg { color: var(--roxo); }
+  .chave { margin-top: 16px; display: grid; grid-template-columns: 70px 1fr; gap: 12px; align-items: center; background: var(--cinzac); border-radius: 14px; padding: 12px 14px; }
+  .chave .icone { font-size: 46px; text-align: center; }
+  .chave p { font-size: 17.5px; }
+  .leitura { margin-top: 18px; }
+</style>
+</head>
+<body>
+<div class="diagrama" style="width: 980px">
+  <h3>Gravação (envio de arquivo)</h3>
+  <div class="fluxo">
+    <div class="caixa cx-auth"><b>1. Autenticação e permissão</b><span>verificadas antes de receber o arquivo</span></div>
+    <div class="seta-dir"></div>
+    <div class="caixa cx-valida"><b>2. Validação</b><span>tipo aceito e assinatura binária do conteúdo; tamanho máximo</span></div>
+    <div class="seta-dir"></div>
+    <div class="caixa cx-cifra"><b>3. Cifragem</b><span>vetor de inicialização aleatório por arquivo</span></div>
+    <div class="seta-dir"></div>
+    <div class="caixa cx-disco"><b>4. Disco</b><span>nome gerado no servidor; banco guarda só os metadados</span></div>
+  </div>
+  <div class="esquemas">
+    <div class="esquema doc">
+      <h4>Documentos</h4>
+      <div class="alg">AES-256-GCM</div>
+      <ul>
+        <li>Anexos de chamados e de entregas, documentos acadêmicos, imagens de questões, materiais e certificados do Boost e notas fiscais.</li>
+        <li>Confidencialidade e integridade: arquivo alterado em disco é recusado na leitura.</li>
+        <li>Lidos por inteiro (até 25 MB).</li>
+      </ul>
+    </div>
+    <div class="esquema vid">
+      <h4>Vídeos das aulas do Boost</h4>
+      <div class="alg">AES-256-CTR</div>
+      <ul>
+        <li>Até 2 GB por vídeo.</li>
+        <li>Permite decifrar somente o trecho pedido (Range), o que mantém a barra de progresso do player.</li>
+        <li>Reprodução por token de 5 minutos, restrito à aula.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="chave">
+    <div class="icone">🔑</div>
+    <p><b>FILE_ENCRYPTION_KEY</b> (32 bytes): obrigatória — a API não inicia sem ela. A mesma chave cifra todos os arquivos;
+      sua perda torna os arquivos irrecuperáveis, razão pela qual integra o procedimento de cópia de segurança.</p>
+  </div>
+  <div class="leitura">
+    <h3>Leitura (download)</h3>
+    <div class="fluxo">
+      <div class="caixa cx-auth"><b>Rota autenticada</b><span>permissão e vínculo com o registro</span></div>
+      <div class="seta-dir"></div>
+      <div class="caixa cx-cifra"><b>Decifragem</b><span>no momento da leitura (vídeo: apenas o trecho pedido)</span></div>
+      <div class="seta-dir"></div>
+      <div class="caixa cx-disco"><b>Resposta</b><span>com o nome original do arquivo</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

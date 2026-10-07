@@ -1,5 +1,6 @@
+%%{init: {"state":{"nodeSpacing":28,"rankSpacing":32,"padding":6}}}%%
 stateDiagram-v2
-  direction LR
+  direction TB
   [*] --> Aberto : solicitante cria chamado
   Aberto --> EmAtendimento : tecnico assume / e atribuido
   EmAtendimento --> Resolvido : tecnico marca resolucao
@@ -15,8 +16,9 @@ stateDiagram-v2
   end note
   note left of EmAtendimento
     Transicao exige permissao
-    especifica: editar / encerrar
-    / reabrir (RN005).
-    Solicitante nunca muda
-    o proprio status.
+    especifica: editar,
+    encerrar ou reabrir
+    (RN005). O solicitante
+    nunca muda o proprio
+    status.
   end note

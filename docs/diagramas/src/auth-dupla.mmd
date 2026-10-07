@@ -1,22 +1,24 @@
+%%{init: {"flowchart":{"subGraphTitleMargin":{"top":6,"bottom":12},"nodeSpacing":26,"rankSpacing":32,"padding":6,"diagramPadding":6}}}%%
 graph TB
   subgraph HubAuth["Login do Hub - Usuario"]
-    H1[POST /auth/login] --> H2[JWT 8h - sem claim tipo]
+    H1[POST /auth/login] --> H2["JWT 8h, sem claim tipo,<br/>e refresh token"]
     H2 --> H3[JwtAuthGuard global]
     H3 --> H4[PermissionGuard<br/>RBAC completo]
     H4 --> H5[Todas as rotas internas<br/>Hub, Desk, Rooms, Assets,<br/>Academy, Learn, Student,<br/>Finance, Boost-instrutor]
   end
 
   subgraph BoostAuth["Login do Boost - BoostUsuario"]
-    B1[POST /boost/login] --> B2["JWT 8h - claim tipo='boost'"]
+    B1["POST /boost/login ou<br/>/boost/login-institucional"] --> B2["JWT 8h - claim tipo='boost'"]
     B2 --> B3[BoostJwtAuthGuard<br/>verifica contra boost_usuarios]
-    B3 --> B4[Autorizacao so por matricula<br/>sem RBAC, sem permissao]
+    B3 --> B4["Autorizacao so por<br/>matricula, sem RBAC<br/>e sem permissao"]
     B4 --> B5[Rotas do portal publico<br/>marcadas @Public]
   end
 
-  X{{"Token de um sistema NUNCA<br/>e aceito no outro - 401<br/>(confirmado por teste e2e<br/>nos dois sentidos)"}}
+  X{{"Token de um sistema<br/>NUNCA e aceito no outro<br/>(401), conforme teste<br/>e2e nos dois sentidos"}}
   H2 -.-> X
   B2 -.-> X
 
+  X ~~~ CHAT
   CHAT[BoostChatGateway<br/>unico ponto que autentica<br/>os dois tipos de token]
   H2 -.-> CHAT
   B2 -.-> CHAT

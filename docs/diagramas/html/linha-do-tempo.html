@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Linha do tempo do desenvolvimento</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+  .mes { font-size: 19px; font-weight: 800; letter-spacing: 0.06em; color: #fff; background: var(--azul); display: inline-block; border-radius: 8px; padding: 4px 12px; margin: 10px 0 8px 112px; }
+  .mes:first-child { margin-top: 0; }
+  .evento { display: grid; grid-template-columns: 100px 26px 1fr; gap: 0 12px; align-items: start; }
+  .data { text-align: right; font-weight: 800; font-size: 18px; color: var(--azul); padding-top: 4px; }
+  .trilho { position: relative; height: 100%; }
+  .trilho::before { content: ""; position: absolute; left: 11px; top: 0; bottom: -10px; width: 4px; background: var(--azulm); }
+  .trilho::after { content: ""; position: absolute; left: 3px; top: 7px; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 4px solid var(--azul2); box-sizing: border-box; }
+  .texto { padding: 2px 0 12px; font-size: 18px; }
+  .texto .tag { font-size: 14px; padding: 1px 9px; margin-left: 4px; vertical-align: 1px; }
+  .lateral { margin-top: 6px; margin-left: 112px; background: var(--cinzac); border-radius: 12px; padding: 9px 13px; font-size: 17px; }
+  .lateral b { color: var(--azul); }
+  .legenda { display: flex; gap: 10px; margin-top: 12px; margin-left: 112px; flex-wrap: wrap; }
+  .legenda .tag { font-size: 14.5px; }
+</style>
+</head>
+<body>
+<div class="diagrama" style="width: 980px">
+  <div class="mes">AGOSTO DE 2026</div>
+  <div class="evento"><div class="data">06/08</div><div class="trilho"></div><div class="texto">Base do sistema: usuários, setores e permissões <span class="tag t-azul">Hub</span></div></div>
+  <div class="evento"><div class="data">18/08</div><div class="trilho"></div><div class="texto">Chamados de suporte; no dia seguinte, prazo de atendimento (SLA) e prioridades fixas <span class="tag t-azul">Desk</span></div></div>
+  <div class="mes">SETEMBRO DE 2026</div>
+  <div class="evento"><div class="data">03/09</div><div class="trilho"></div><div class="texto">Reserva de ambientes e patrimônio; categorias de chamado por setor e atendentes por subcategoria <span class="tag t-azul">Rooms</span><span class="tag t-azul">Assets</span><span class="tag t-azul">Desk</span></div></div>
+  <div class="evento"><div class="data">16/09</div><div class="trilho"></div><div class="texto">Permissão concedida diretamente ao usuário, sem perfis; conversa e extras na reserva <span class="tag t-azul">Hub</span><span class="tag t-azul">Rooms</span></div></div>
+  <div class="evento"><div class="data">17/09</div><div class="trilho"></div><div class="texto">Redefinição de senha, reservas recorrentes e prazo de empréstimo; estrutura acadêmica e atividades <span class="tag t-azul">Hub</span><span class="tag t-azul">Rooms</span><span class="tag t-azul">Assets</span><span class="tag t-verde">Academy</span><span class="tag t-verde">Learn</span></div></div>
+  <div class="evento"><div class="data">18/09</div><div class="trilho"></div><div class="texto">Cursos livres com portal público e login próprio <span class="tag t-roxo">Boost</span></div></div>
+  <div class="evento"><div class="data">21/09</div><div class="trilho"></div><div class="texto">Cobranças, mensalidades, boleto e nota fiscal; índices de desempenho <span class="tag t-ambar">Finance</span></div></div>
+  <div class="evento"><div class="data">25–26/09</div><div class="trilho"></div><div class="texto">Vídeo hospedado e progresso; orientadores e conversas; permissão para ver o SLA <span class="tag t-roxo">Boost</span><span class="tag t-azul">Desk</span></div></div>
+  <div class="evento"><div class="data">28/09</div><div class="trilho"></div><div class="texto">Multa e juros, vínculo entre reserva e turma, rota nas notificações e rastreamento de erros <span class="tag t-ambar">Finance</span><span class="tag t-azul">Rooms</span><span class="tag t-azul">Hub</span></div></div>
+  <div class="evento"><div class="data">30/09</div><div class="trilho"></div><div class="texto">Índice de reservas por ambiente e data <span class="tag t-azul">Rooms</span></div></div>
+  <div class="lateral"><b>Ao longo de setembro, sem migration:</b> sessões renováveis (refresh token), cifragem de arquivos em repouso, integração contínua e conteinerização.</div>
+  <div class="mes">OUTUBRO DE 2026</div>
+  <div class="evento"><div class="data">02/10</div><div class="trilho"></div><div class="texto">Login institucional e matrícula pela gestão no portal; recuperação de senha do aluno externo; questões nas atividades <span class="tag t-roxo">Boost</span><span class="tag t-verde">Learn</span></div></div>
+  <div class="evento"><div class="data">05/10</div><div class="trilho"></div><div class="texto">Verificação final: permissões de acesso a todas as telas <span class="tag t-azul">Hub</span></div></div>
+  <div class="evento"><div class="data">06/10</div><div class="trilho"></div><div class="texto">Instalador para Windows e assistente de dúvidas com roteiros guiados (sem migration) <span class="tag t-cinza">Transversal</span></div></div>
+  <div class="legenda">
+    <span class="tag t-azul">Administrativo</span><span class="tag t-verde">Acadêmico</span><span class="tag t-ambar">Financeiro</span><span class="tag t-roxo">Extensão</span><span class="tag t-cinza">Transversal</span>
+  </div>
+</div>
+</body>
+</html>

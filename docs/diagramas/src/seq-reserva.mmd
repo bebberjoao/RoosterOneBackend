@@ -1,18 +1,18 @@
+%%{init: {"sequence":{"mirrorActors":false,"wrap":true,"width":150,"actorMargin":30,"boxMargin":6,"messageMargin":24,"noteMargin":6,"diagramMarginX":8,"diagramMarginY":8}}}%%
 sequenceDiagram
   actor U as Solicitante
   participant FE as Frontend
-  participant CTRL as RoomsController
+  participant CTRL as Rooms<br/>Controller
   participant SVC as RoomsService
   participant DB as PostgreSQL
-
   U->>FE: escolhe ambiente, data e horario
   FE->>CTRL: POST /reservas
   CTRL->>CTRL: assertDentroDoPrazo()
   alt data alem do horizonte permitido
-    CTRL-->>FE: 403 - limite de 15 dias (RN017)
+    CTRL-->>FE: 403 - acima do limite<br/>(15 ou 365 dias, RN017)
   else dentro do prazo
     CTRL->>SVC: createReserva(dto)
-    SVC->>SVC: assertReservaDisponivel()
+    SVC->>SVC: assertReserva<br/>Disponivel()
     SVC->>DB: busca Ambiente
     SVC->>SVC: valida capacidade
     SVC->>SVC: valida diasFuncionamento

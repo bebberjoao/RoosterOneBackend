@@ -1,12 +1,12 @@
+%%{init: {"sequence":{"mirrorActors":false,"wrap":true,"width":150,"actorMargin":30,"boxMargin":6,"messageMargin":24,"noteMargin":6,"diagramMarginX":8,"diagramMarginY":8}}}%%
 sequenceDiagram
   actor A as Administrador
   participant FE as Frontend
-  participant CTRL as UsuariosPermissoesController
-  participant PG as PermissionGuard
-  participant SVC as UsuariosPermissoesService
-  participant AUD as AuditoriaService
+  participant CTRL as UsuariosPermissoes<br/>Controller
+  participant PG as Permission<br/>Guard
+  participant SVC as UsuariosPermissoes<br/>Service
+  participant AUD as Auditoria<br/>Service
   participant DB as PostgreSQL
-
   A->>FE: escolhe usuario e permissao
   FE->>CTRL: POST /usuarios-permissoes
   CTRL->>PG: exige hub.acessos.conceder

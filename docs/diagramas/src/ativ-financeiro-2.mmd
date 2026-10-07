@@ -1,6 +1,6 @@
-%%{init: {'flowchart': {'wrappingWidth': 420}}}%%
+%%{init: {"flowchart":{"wrappingWidth":420,"nodeSpacing":26,"rankSpacing":32,"padding":6,"diagramPadding":6}}}%%
 flowchart TD
-  A([Cobranca em aberto]) --> B{"Pagou ate o vencimento?"}
+  A([Cobranca em aberto]) --> B{"Pagou ate o<br/>vencimento?"}
   B -->|Sim| C["Baixa manual pelo financeiro - status pago"]
   B -->|Nao| D["Vencido - derivado na leitura, nunca persistido"]
   D --> E{"Negociar?"}

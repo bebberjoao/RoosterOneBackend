@@ -1,10 +1,11 @@
+%%{init: {"flowchart":{"nodeSpacing":26,"rankSpacing":32,"padding":6,"diagramPadding":6}}}%%
 flowchart TD
-  A([Usuario acessa o sistema]) --> B{"Tem token valido?"}
-  B -->|Nao| C["Tela de login: informa e-mail e senha"]
-  C --> D{"Credenciais corretas e usuario ativo?"}
-  D -->|Nao| E["Registra login_falha na auditoria"]
+  A([Usuario acessa o sistema]) --> B{"Sessao guardada<br/>no navegador?"}
+  B -->|Nao| C["Tela de login:<br/>informa e-mail e senha"]
+  C --> D{"Credenciais corretas<br/>e usuario ativo?"}
+  D -->|Nao| E["Registra login_falhou<br/>na auditoria"]
   E --> C
-  D -->|Sim| F["Emite JWT de 8h e registra login_sucesso"]
-  B -->|Sim| G["Carrega permissoes e monta a navegacao apenas com o que a permissao libera"]
+  D -->|Sim| F["Emite JWT de 8h e<br/>refresh token, grava a<br/>sessao e registra<br/>login_sucesso"]
+  B -->|Sim| G["Monta a navegacao apenas<br/>com o que as permissoes<br/>da sessao liberam"]
   F --> G
   G --> H([Usuario dentro do sistema])

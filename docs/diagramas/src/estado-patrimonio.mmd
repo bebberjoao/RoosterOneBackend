@@ -1,13 +1,14 @@
+%%{init: {"state":{"nodeSpacing":28,"rankSpacing":32,"padding":6}}}%%
 stateDiagram-v2
   [*] --> Disponivel : cadastro do item
-  Disponivel --> EmUso : movimentacao para setor/sala
-  Disponivel --> Emprestado : emprestimo com prazo
-  Emprestado --> Disponivel : devolucao registrada
-  Emprestado --> EmAtraso : passou a data prevista
-  EmAtraso --> Disponivel : devolucao registrada
-  EmUso --> Manutencao : envio para manutencao
-  Manutencao --> Disponivel : retorno da manutencao
-  EmUso --> Disponivel : retorno ao estoque
+  Disponivel --> EmUso : movimentacao<br/>para setor/sala
+  Disponivel --> Emprestado : emprestimo<br/>com prazo
+  Emprestado --> Disponivel : devolucao<br/>registrada
+  Emprestado --> EmAtraso : passou a<br/>data prevista
+  EmAtraso --> Disponivel : devolucao<br/>registrada
+  EmUso --> Manutencao : envio para<br/>manutencao
+  Manutencao --> Disponivel : retorno da<br/>manutencao
+  EmUso --> Disponivel : retorno ao<br/>estoque
   Disponivel --> Baixado : baixa do item
   EmUso --> Baixado : baixa do item
   Baixado --> [*]

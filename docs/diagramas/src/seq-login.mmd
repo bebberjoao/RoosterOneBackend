@@ -1,29 +1,29 @@
+%%{init: {"sequence":{"mirrorActors":false,"wrap":true,"width":150,"actorMargin":30,"boxMargin":6,"messageMargin":24,"noteMargin":6,"diagramMarginX":8,"diagramMarginY":8}}}%%
 sequenceDiagram
   actor U as Usuario
   participant FE as Frontend
   participant API as AuthController
-  participant SVC as UsuariosService
+  participant SVC as Usuarios<br/>Service
   participant DB as PostgreSQL
-  participant AUD as AuditoriaService
-
+  participant AUD as Auditoria<br/>Service
   U->>FE: e-mail + senha
   FE->>API: POST /auth/login
   API->>SVC: login(email, senha)
   SVC->>DB: busca Usuario por email
   DB-->>SVC: usuario + senhaHash
-  SVC->>SVC: bcrypt.compare(senha, senhaHash)
-  alt senha valida e usuario ativo
+  SVC->>SVC: usuario ativo e<br/>bcrypt.compare()
+  alt credenciais validas e usuario ativo
     SVC->>DB: atualiza ultimoLogin
     SVC->>AUD: registra login_sucesso
-    SVC-->>API: accessToken (JWT 8h)
-    API-->>FE: 200 { accessToken, usuario }
-    FE->>API: GET /usuarios/:id/acesso
-    API-->>FE: permissoes + modulos
-    FE->>FE: monta navegacao so com o permitido
+    SVC->>DB: consulta o acesso efetivo
+    SVC->>DB: grava Sessao com o hash do refresh token (30 dias)
+    SVC-->>API: usuario, acesso, accessToken (JWT 8h) e refreshToken
+    API-->>FE: 200
+    FE->>FE: guarda a sessao e monta a<br/>navegacao so com o permitido
     FE-->>U: dashboard
   else falha
-    SVC->>AUD: registra login_falha
+    SVC->>AUD: registra login_falhou
     SVC-->>API: UnauthorizedException
     API-->>FE: 401
-    FE-->>U: credenciais invalidas
+    FE-->>U: login ou senha invalidos
   end

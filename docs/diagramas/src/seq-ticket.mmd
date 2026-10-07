@@ -1,12 +1,12 @@
+%%{init: {"sequence":{"mirrorActors":false,"wrap":true,"width":150,"actorMargin":30,"boxMargin":6,"messageMargin":16,"noteMargin":6,"diagramMarginX":8,"diagramMarginY":8}}}%%
 sequenceDiagram
   actor S as Solicitante
   actor T as Tecnico
   participant FE as Frontend
-  participant CTRL as RoosterDeskController
-  participant SVC as RoosterDeskService
-  participant WS as MensagensGateway
+  participant CTRL as RoosterDesk<br/>Controller
+  participant SVC as RoosterDesk<br/>Service
+  participant WS as Mensagens<br/>Gateway
   participant DB as PostgreSQL
-
   S->>FE: descreve o problema
   FE->>CTRL: POST /chamados
   CTRL->>SVC: validateTicketClassification()
@@ -16,18 +16,17 @@ sequenceDiagram
   T->>FE: assume o chamado
   FE->>CTRL: PATCH /chamados/:id/atribuir
   CTRL->>SVC: verifica tecnico pertence ao setor
-  SVC->>DB: atualiza tecnicoId
-  SVC->>DB: cria HistoricoTicket (RN009)
+  SVC->>DB: atualiza tecnicoId e cria HistoricoTicket (RN009)
 
   T->>FE: responde ao solicitante
   FE->>CTRL: POST /chamados/:id/mensagens
   CTRL->>SVC: createMensagemChamado()
   SVC->>DB: cria MensagemTicket
-  SVC->>WS: emite evento em tempo real
+  CTRL->>WS: emite o evento apos gravar
   WS-->>FE: mensagem aparece na conversa do solicitante
 
-  T->>FE: marca como resolvido
+  T->>FE: encerra o chamado
   FE->>CTRL: PATCH /chamados/:id/status
-  CTRL->>CTRL: statusTransitionAction() exige 'encerrar' (RN005)
-  CTRL->>SVC: derivarEncerradoEm() (RN006)
-  SVC->>DB: atualiza status + encerradoEm + historico
+  CTRL->>CTRL: statusTransitionAction()<br/>exige 'encerrar' (RN005)
+  CTRL->>CTRL: derivarEncerradoEm()<br/>(RN006)
+  CTRL->>SVC: grava status, encerradoEm e historico

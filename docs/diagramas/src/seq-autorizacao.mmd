@@ -1,20 +1,21 @@
+%%{init: {"sequence":{"mirrorActors":false,"wrap":true,"width":150,"actorMargin":30,"boxMargin":6,"messageMargin":24,"noteMargin":6,"diagramMarginX":8,"diagramMarginY":8}}}%%
 sequenceDiagram
   participant FE as Frontend
   participant JWT as JwtAuthGuard
-  participant PG as PermissionGuard
-  participant SVC as UsuariosService
+  participant PG as Permission<br/>Guard
+  participant SVC as Usuarios<br/>Service
   participant DB as PostgreSQL
   participant CTRL as Controller
-
   FE->>JWT: requisicao + Bearer token
   JWT->>JWT: verifica assinatura e expiracao
-  alt token invalido
+  JWT->>DB: busca o usuario do token
+  alt token invalido ou usuario inativo
     JWT-->>FE: 401
-  else token valido
-    JWT->>PG: request.user = { id }
+  else token valido e usuario ativo
+    JWT->>PG: request.user = usuario
     PG->>PG: le metadata @RequirePermission
     PG->>SVC: isAdmin(usuarioId)
-    SVC->>DB: getAccess(usuarioId)
+    SVC->>DB: getAccess(usuarioId):<br/>permissoes efetivas
     alt e administrador
       PG->>CTRL: libera (bypass total)
     else nao e admin

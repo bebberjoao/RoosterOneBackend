@@ -1,13 +1,14 @@
+%%{init: {"flowchart":{"nodeSpacing":26,"rankSpacing":32,"padding":6,"diagramPadding":6}}}%%
 flowchart TD
   A([Item adquirido]) --> B[Cadastro com codigo, categoria e valor]
   B --> C[Status disponivel]
-  C --> D{Tipo de movimentacao}
-  D -->|Setor/Sala| E{Informou destino?}
+  C --> D{"Tipo de<br/>movimentacao"}
+  D -->|Setor/Sala| E{"Informou<br/>destino?"}
   E -->|Nao| F[Rejeitado - RN014]
   F --> D
   E -->|Sim| G[Item alocado]
   D -->|Emprestimo| H[Define data de devolucao prevista]
-  H --> I{Devolvido no prazo?}
+  H --> I{"Devolvido<br/>no prazo?"}
   I -->|Sim| J[Devolucao registrada - volta a disponivel]
   I -->|Nao| K[Aparece na lista de atrasados]
   K --> J

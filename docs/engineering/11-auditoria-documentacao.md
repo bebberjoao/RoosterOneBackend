@@ -65,8 +65,10 @@ A confrontação da documentação com o código revelou dois defeitos, corrigid
 
 ### Pendências
 
-- Os diagramas Mermaid foram construídos a partir da leitura do código; as imagens em `docs/diagramas/png/` devem
-  ser regeneradas sempre que as fontes forem alteradas (ver `docs/diagramas/README.md`).
+- Os diagramas (Mermaid e HTML) foram construídos a partir da leitura do código; as imagens em `docs/diagramas/png/`
+  devem ser regeneradas por `docs/diagramas/renderizar.mjs` sempre que as fontes forem alteradas (ver
+  `docs/diagramas/README.md`). Em 07/10/2026, os diagramas foram novamente confrontados com o código, com as correções
+  registradas no próprio README.
 - A referência de endpoints (`docs/api/02-endpoints.md`) deve ser confrontada com o Swagger (`/api/docs`) antes de
   sua utilização como contrato para nova integração externa.
 

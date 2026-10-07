@@ -1,3 +1,4 @@
+%%{init: {"state":{"nodeSpacing":28,"rankSpacing":32,"padding":6}}}%%
 stateDiagram-v2
   [*] --> Aberto : cobranca gerada
   Aberto --> Pago : baixa manual do financeiro
@@ -11,7 +12,9 @@ stateDiagram-v2
   Cancelado --> [*]
 
   note right of Vencido
-    "Vencido" e sempre derivado
-    na leitura (vencimento < hoje),
-    nunca persistido como status
+    "Vencido" e sempre
+    derivado na leitura
+    (vencimento < hoje),
+    nunca persistido
+    como status
   end note

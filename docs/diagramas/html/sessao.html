@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Ciclo de vida da sessão</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+  .etapa { display: grid; grid-template-columns: 190px 1fr; gap: 14px; align-items: stretch; }
+  .marco { border-radius: 14px; color: #fff; padding: 12px; display: flex; flex-direction: column; justify-content: center; text-align: center; }
+  .marco b { font-size: 23px; }
+  .marco span { font-size: 15.5px; opacity: 0.92; }
+  .m1 { background: var(--azul); } .m2 { background: var(--azul2); } .m3 { background: var(--verde); } .m4 { background: var(--verm); }
+  .detalhe { border: 2px solid var(--borda); border-radius: 14px; padding: 11px 14px; background: #fff; }
+  .detalhe ul { margin-left: 22px; }
+  .detalhe li { font-size: 18px; margin: 3px 0; }
+  .ligacao { height: 22px; display: grid; grid-template-columns: 190px 1fr; }
+  .ligacao div:first-child { border-left: 3px solid var(--azul2); margin-left: 94px; }
+  .tokens { display: flex; gap: 12px; margin: 6px 0 2px; flex-wrap: wrap; }
+  .token { border-radius: 10px; padding: 6px 12px; font-size: 17px; font-weight: 700; }
+  .rotacao { margin-top: 16px; background: var(--ambarc); border-left: 7px solid #c8861f; border-radius: 12px; padding: 11px 14px; font-size: 18px; }
+  .rotacao b { color: var(--ambar); }
+</style>
+</head>
+<body>
+<div class="diagrama" style="width: 980px">
+  <div class="etapa">
+    <div class="marco m1"><b>Login</b><span>POST /auth/login</span></div>
+    <div class="detalhe">
+      <div class="tokens">
+        <span class="token t-azul">access token (JWT) — 8 horas</span>
+        <span class="token t-verde">refresh token aleatório — 30 dias</span>
+      </div>
+      <ul><li>Uma sessão é gravada com o hash SHA-256 do refresh token (o token em si não é armazenado).</li></ul>
+    </div>
+  </div>
+  <div class="ligacao"><div></div><div></div></div>
+  <div class="etapa">
+    <div class="marco m2"><b>Uso</b><span>cada requisição</span></div>
+    <div class="detalhe"><ul>
+      <li>Cabeçalho <code>Authorization: Bearer &lt;access token&gt;</code>, anexado pelo cliente HTTP do frontend.</li>
+      <li>O usuário é consultado no banco a cada requisição: usuário desativado perde o acesso de imediato.</li>
+    </ul></div>
+  </div>
+  <div class="ligacao"><div></div><div></div></div>
+  <div class="etapa">
+    <div class="marco m3"><b>Renovação</b><span>POST /auth/refresh</span></div>
+    <div class="detalhe"><ul>
+      <li>Access token expirado: a API responde 401, e o frontend renova a sessão uma única vez (chamadas simultâneas aguardam a mesma renovação) e repete a chamada.</li>
+      <li>Emite novo par de tokens e <b>revoga a sessão utilizada</b> (rotação); usuário inativo não renova.</li>
+      <li>Falha de rede durante a renovação não encerra a sessão.</li>
+    </ul></div>
+  </div>
+  <div class="ligacao"><div></div><div></div></div>
+  <div class="etapa">
+    <div class="marco m4"><b>Encerramento</b><span>revogação</span></div>
+    <div class="detalhe"><ul>
+      <li>Logout (<code>POST /auth/logout</code>): revoga a sessão atual.</li>
+      <li>Troca de senha (por recuperação ou pelo administrador) e desativação do usuário: revogam todas as sessões abertas.</li>
+    </ul></div>
+  </div>
+  <div class="rotacao"><b>Por que a rotação:</b> cada refresh token vale uma única vez. Se um terceiro o utilizar, a renovação seguinte do usuário
+    legítimo falha e exige novo login: o uso indevido se manifesta, em vez de passar despercebido.</div>
+</div>
+</body>
+</html>

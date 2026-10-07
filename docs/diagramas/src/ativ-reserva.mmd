@@ -1,27 +1,29 @@
+%%{init: {"flowchart":{"nodeSpacing":20,"rankSpacing":18,"padding":6,"diagramPadding":6}}}%%
 flowchart TD
-  A([Solicitante precisa de uma sala]) --> B[Consulta estrutura e disponibilidade]
-  B --> C[Escolhe ambiente, data e horario]
-  C --> D{Dentro do horizonte<br/>de antecedencia?}
-  D -->|Nao| E[403 - limite de 15 dias]
-  E --> C
-  D -->|Sim| F{Quer repetir<br/>a reserva?}
-  F -->|Sim| G{Tem permissao<br/>solicitar-recorrente?}
-  G -->|Nao| H[Opcao bloqueada na interface]
-  H --> I[Segue como reserva unica]
-  G -->|Sim| J[Define recorrencia e data final]
-  F -->|Nao| I
-  J --> K{Alguma ocorrencia<br/>em conflito?}
-  K -->|Sim| L[Serie inteira rejeitada - RN011]
-  L --> C
-  K -->|Nao| M[Cria todas as ocorrencias]
-  I --> N{Conflito, capacidade<br/>ou dia invalido?}
-  N -->|Sim| O[Rejeita com o motivo]
-  O --> C
-  N -->|Nao| P[Cria reserva em analise]
-  M --> Q[Gestor avalia]
-  P --> Q
-  Q --> R{Aprova?}
-  R -->|Sim| S[Status confirmada]
-  R -->|Nao| T[Status cancelada com motivo]
-  S --> U([Sala reservada])
-  T --> U
+  B([Solicitante consulta<br/>estrutura e disponibilidade])
+  B --> C[Escolhe ambiente,<br/>data e horario]
+  C --> D{Antecedencia<br/>permitida?}
+  D -->|Sim| F{Repetir<br/>a reserva?}
+  F -->|Nao| I[Segue como<br/>reserva unica]
+  F -->|Sim| G{Permissao de<br/>recorrencia?}
+  G -->|Nao| H[Opcao bloqueada<br/>na interface]
+  H --> I
+  G -->|Sim| J[Define recorrencia<br/>e data final]
+  J --> K{Conflito<br/>na serie?}
+  K -->|Nao| M[Cria todas as<br/>ocorrencias]
+  I --> N{Conflito ou dado<br/>invalido?}
+  N -->|Nao| P[Cria reserva<br/>em analise]
+  D -->|"Nao: 403 (15 dias;<br/>365 com prazo<br/>estendido)"| X[Rejeita com o motivo;<br/>o solicitante<br/>ajusta o pedido]
+  K -->|"Sim: serie inteira<br/>rejeitada (RN011)"| X
+  N -->|Sim| X
+  X --> C
+  subgraph ANALISE["Analise pelo gestor"]
+    direction LR
+    Q[Gestor avalia] --> R{Aprova?}
+    R -->|Sim| S[Status confirmada]
+    R -->|Nao| T[Status cancelada<br/>com motivo]
+    S --> U([Sala reservada])
+    T --> U
+  end
+  M --> ANALISE
+  P --> ANALISE

@@ -1,3 +1,4 @@
+%%{init: {"flowchart":{"subGraphTitleMargin":{"top":6,"bottom":12},"nodeSpacing":26,"rankSpacing":32,"padding":6,"diagramPadding":6}}}%%
 graph TB
   subgraph Classico["RBAC classico - NAO usado aqui"]
     CU[Usuario] --> CP[Perfil / Role] --> CPE[Permissoes]
@@ -11,7 +12,7 @@ graph TB
   KEY["Chave efetiva de autorizacao:<br/>Modulo.nome + Permissao.recurso + Permissao.acao<br/>comparados por igualdade exata de string"]
   P -.-> KEY
 
-  ADMIN["Administrador =<br/>ter a permissao<br/>Rooster Hub / /hub/acessos / gerenciar-permissoes<br/>(concede bypass total no PermissionGuard)"]
+  ADMIN["Administrador =<br/>ter a permissao<br/>Rooster Hub /<br/>/hub/acessos /<br/>gerenciar-permissoes<br/>(concede bypass total<br/>no PermissionGuard)"]
   KEY -.-> ADMIN
 
   classDef nao fill:#F2F2F2,stroke:#999,color:#777

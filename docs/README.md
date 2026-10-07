@@ -99,7 +99,7 @@ autorização, validações, tratamento de erros e guia do desenvolvedor.
 
 ## Diagramas
 
-- [Catálogo de diagramas](diagramas/README.md): 52 diagramas (contexto, arquitetura, componentes, ERDs por módulo, RBAC, casos de uso, sequência, atividade e estados), com a fonte Mermaid em [`diagramas/src/`](diagramas/src/) e a renderização em [`diagramas/png/`](diagramas/png/).
+- [Catálogo de diagramas](diagramas/README.md): 61 diagramas (visão geral dos módulos, contexto, arquitetura, componentes, ERDs por módulo, segurança, casos de uso, sequência, atividade, estados, interface, assistente, testes, instalador e linha do tempo), com a fonte Mermaid em [`diagramas/src/`](diagramas/src/), a fonte HTML em [`diagramas/html/`](diagramas/html/), a renderização em alta resolução em [`diagramas/png/`](diagramas/png/) e o enquadramento de cada figura (página em pé ou deitada) em `diagramas/png/manifesto.json`, gerados por `diagramas/renderizar.mjs`.
 
 ## Guias
 
@@ -110,7 +110,7 @@ autorização, validações, tratamento de erros e guia do desenvolvedor.
 
 ## Documento consolidado
 
-O documento `Rooster-One-Documentacao-Geral.docx`, na raiz da pasta do TCC, consolida esta árvore, com as 54 figuras
-incorporadas, e o `Rooster-One-Manual-do-Usuario.docx` descreve a operação do sistema tela a tela. A árvore `docs/`
-permanece a fonte de verdade técnica, mantida junto ao código; os documentos Word constituem a visão consolidada para
-a entrega acadêmica.
+O documento `Rooster-One-Documentacao-Geral.docx`, na raiz da pasta do TCC, consolida esta árvore, com as 63 figuras
+incorporadas (os diagramas mais largos em página deitada), e o `Rooster-One-Manual-do-Usuario.docx` descreve a
+operação do sistema tela a tela. A árvore `docs/` permanece a fonte de verdade técnica, mantida junto ao código; os
+documentos Word constituem a visão consolidada para a entrega acadêmica.

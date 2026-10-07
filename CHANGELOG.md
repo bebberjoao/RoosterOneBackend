@@ -394,6 +394,20 @@ estão indicadas; as demais não alteram o banco de dados.
   **deduzido das permissões reais** (`deriveRole`), com o nome do usuário autenticado.
 - `beforeAll` de `test/rooms-reservas.e2e-spec.ts` tornado idempotente: a ordem de execução dos arquivos pelo Jest
   não é determinística, e uma criação incondicional colidia com dados de outra suíte.
+- **Diagramas da documentação revistos para legibilidade e conferidos com o código** (07/10/2026). Somente
+  documentação; não altera código nem banco. A renderização passou a `docs/diagramas/renderizar.mjs`, que define, para
+  cada diagrama, a orientação da página e o tamanho de impressão, até a página inteira, com resolução de 350 a 488
+  pontos por polegada, registrados em `docs/diagramas/png/manifesto.json`; o texto impresso varia de 7,1 a 11 pt, e 12
+  diagramas são apresentados em página deitada. Foram acrescentados dez diagramas em HTML e CSS (`docs/diagramas/html/`):
+  módulos e recursos comuns, anatomia de uma permissão, ciclo de vida da sessão, cifragem de arquivos, camadas do
+  roteiro guiado, etapas do assistente de dúvidas, camadas de testes, instalador, linha do tempo e mapa de navegação,
+  este em substituição à fonte Mermaid. Os diagramas Mermaid receberam espaçamentos compactos, quebras de linha
+  explícitas, rótulos de seta opacos e, nos ERDs, layout ELK. A conferência com o código corrigiu dez diagramas, entre
+  os quais o login (o acesso efetivo integra a resposta do login, e a falha é registrada como `login_falhou`), a
+  emissão de certificado do Boost (sem transação única, ao contrário do que a documentação afirmava), os componentes do
+  backend (importações efetivas dos módulos) e as camadas de permissão do frontend (perfil deduzido das permissões,
+  sem a antiga visão de demonstração); o detalhamento consta de `docs/diagramas/README.md`. O documento geral passou a
+  63 figuras, renumeradas, com cada figura na mesma página que a sua legenda.
 
 ---
 

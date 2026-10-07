@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Instalador para Windows — etapas</title>
+<link rel="stylesheet" href="estilo.css">
+<style>
+  .entrada { display: flex; align-items: stretch; gap: 10px; }
+  .entrada .caixa { text-align: center; padding: 10px 12px; }
+  .entrada .caixa b { display: block; font-size: 19px; }
+  .entrada .caixa span { font-size: 15.5px; color: var(--cinza); }
+  .menu { flex: 1.6; text-align: left !important; background: var(--azulc); border-color: var(--azulm) !important; }
+  .menu ol { columns: 2; margin-left: 22px; font-size: 15.5px; }
+  .menu li:first-child { font-weight: 700; color: var(--azul); }
+  .titulo-etapas { margin: 16px 0 10px; font-size: 21px; font-weight: 700; color: var(--azul); }
+  .etapas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; grid-auto-flow: column; grid-template-rows: repeat(6, auto); }
+  .etapa { display: grid; grid-template-columns: 42px 1fr; gap: 10px; align-items: center; border: 2px solid var(--borda); border-radius: 12px; padding: 8px 10px; background: #fff; }
+  .etapa .n { width: 38px; height: 38px; border-radius: 50%; background: var(--azul2); color: #fff; font-weight: 700; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+  .etapa b { display: block; font-size: 18.5px; }
+  .etapa span { font-size: 15.5px; color: var(--cinza); }
+  .etapa.opc { border-style: dashed; }
+  .etapa.auto .n { background: var(--verde); }
+  .rodape { margin-top: 14px; background: var(--verdec); border-left: 7px solid var(--verde); border-radius: 12px; padding: 10px 14px; font-size: 17.5px; }
+</style>
+</head>
+<body>
+<div class="diagrama" style="width: 980px">
+  <div class="entrada">
+    <div class="caixa"><b>INSTALAR.bat</b><span>duplo clique</span></div>
+    <div class="seta-dir"></div>
+    <div class="caixa"><b>Elevação</b><span>confirmação de administrador</span></div>
+    <div class="seta-dir"></div>
+    <div class="caixa menu"><b>Menu (8 opções)</b>
+      <ol>
+        <li>Instalação completa</li><li>Iniciar o sistema</li><li>Parar o sistema</li><li>Ver situação</li>
+        <li>Verificar pré-requisitos</li><li>Fazer backup</li><li>Restaurar dados de demonstração</li><li>Desinstalar</li>
+      </ol>
+    </div>
+  </div>
+  <div class="titulo-etapas">Instalação completa — 11 etapas</div>
+  <div class="etapas">
+    <div class="etapa"><div class="n">1</div><div><b>Portas</b><span>3000 (API) e 8080 (site) livres, ou portas alternativas</span></div></div>
+    <div class="etapa"><div class="n">2</div><div><b>Node.js</b><span>mantém a versão 20 ou superior; senão, instala a LTS</span></div></div>
+    <div class="etapa"><div class="n">3</div><div><b>PostgreSQL</b><span>mantém o existente; senão, instala em modo silencioso, com senha aleatória protegida</span></div></div>
+    <div class="etapa"><div class="n">4</div><div><b>Configuração</b><span>.env com JWT_SECRET e FILE_ENCRYPTION_KEY aleatórios; segredos existentes preservados</span></div></div>
+    <div class="etapa"><div class="n">5</div><div><b>Banco</b><span>usuário rooster e banco rooster_one, se o .env ainda não conecta</span></div></div>
+    <div class="etapa"><div class="n">6</div><div><b>Compilação</b><span>backend e frontend em produção (NITRO_PRESET=node-server)</span></div></div>
+    <div class="etapa"><div class="n">7</div><div><b>Migrations</b><span>prisma migrate deploy</span></div></div>
+    <div class="etapa opc"><div class="n">8</div><div><b>Dados de demonstração</b><span>somente em banco vazio, com confirmação</span></div></div>
+    <div class="etapa auto"><div class="n">9</div><div><b>Início automático</b><span>tarefas "Rooster One - API" e "Rooster One - Site" (SYSTEM), reinício em 5 s e logs em .rooster/logs</span></div></div>
+    <div class="etapa auto"><div class="n">10</div><div><b>Atalho</b><span>"Rooster One" na área de trabalho</span></div></div>
+    <div class="etapa auto"><div class="n">11</div><div><b>Início</b><span>aguarda /health e a tela de login e abre o navegador</span></div></div>
+    <div class="etapa" style="visibility: hidden"></div>
+  </div>
+  <div class="rodape"><b>Reexecução</b> sobre uma instalação existente: dados, segredos e banco são preservados; somente a compilação e as migrations são refeitas.</div>
+</div>
+</body>
+</html>

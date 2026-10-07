@@ -1,11 +1,11 @@
+%%{init: {"sequence":{"mirrorActors":false,"wrap":true,"width":150,"actorMargin":30,"boxMargin":6,"messageMargin":24,"noteMargin":6,"diagramMarginX":8,"diagramMarginY":8}}}%%
 sequenceDiagram
   actor P as Professor
   participant FE as Frontend
-  participant CTRL as LearnController
+  participant CTRL as Learn<br/>Controller
   participant LS as LearnService
-  participant AS as AcademyService
+  participant AS as Academy<br/>Service
   participant DB as PostgreSQL
-
   P->>FE: lanca nota + feedback na entrega
   FE->>CTRL: PATCH /entregas/:id/corrigir
   CTRL->>AS: isTurmaDoProfessor(turmaId, professorId)
