@@ -516,12 +516,12 @@ model Disciplina {
   codigo String @unique
   nome String
   descricao String?
-  cursoId String
+  cursoId String?
   cargaHoraria Int
   status String @default("ativa")
   criadoEm DateTime?
   atualizadoEm DateTime?
-  curso Curso @relation(fields: [cursoId], references: [id])
+  curso Curso? @relation(fields: [cursoId], references: [id], onDelete: Restrict)
   turmas Turma[]
   documentos DocumentoAcademico[]
 }
@@ -564,7 +564,7 @@ model Aluno {
 model Turma {
   id String @id @default(uuid())
   codigo String
-  disciplinaId String
+  disciplinaId String?
   periodoLetivoId String
   professorId String?
   turno String?
@@ -574,7 +574,7 @@ model Turma {
   status String @default("aberta")
   criadoEm DateTime?
   atualizadoEm DateTime?
-  disciplina Disciplina @relation(fields: [disciplinaId], references: [id])
+  disciplina Disciplina? @relation(fields: [disciplinaId], references: [id], onDelete: Restrict)
   periodoLetivo PeriodoLetivo @relation(fields: [periodoLetivoId], references: [id])
   professor Professor? @relation(fields: [professorId], references: [id])
   matriculas Matricula[]

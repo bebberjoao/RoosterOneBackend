@@ -102,7 +102,7 @@ export class AcademyService {
 
   // ===================== Disciplina =====================
   async createDisciplina(dto: CreateDisciplinaDto) {
-    await this.findOneCurso(dto.cursoId);
+    if (dto.cursoId) await this.findOneCurso(dto.cursoId);
     try {
       return await this.prisma.disciplina.create({ data: { ...dto, criadoEm: new Date(), atualizadoEm: new Date() } });
     } catch (error) {
@@ -258,7 +258,8 @@ export class AcademyService {
 
   // ===================== Turma =====================
   async createTurma(dto: CreateTurmaDto) {
-    await this.findOneDisciplina(dto.disciplinaId);
+    // A disciplina é opcional: a turma pode nascer sem ela e recebê-la depois em updateTurma.
+    if (dto.disciplinaId) await this.findOneDisciplina(dto.disciplinaId);
     await this.findOnePeriodoLetivo(dto.periodoLetivoId);
     if (dto.professorId) await this.findOneProfessor(dto.professorId);
     try {

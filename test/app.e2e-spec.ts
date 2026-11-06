@@ -1464,6 +1464,48 @@ describe('Full API e2e tests', () => {
       expect(matriculasRes.body[0].aluno.usuario.nome).toBe('João Teste');
     });
 
+    it('Disciplina é cadastrada sem curso; turma é criada sem disciplina e a recebe depois', async () => {
+      const cenario = await montarCenarioAcademico();
+      const server = app.getHttpServer();
+      const auth = cenario.coordenador.header;
+
+      const disciplina = await request(server)
+        .post('/v1/disciplinas')
+        .set('Authorization', auth)
+        .send({ codigo: 'AVULSA-T', nome: 'Disciplina Avulsa', cargaHoraria: 40 })
+        .expect(201);
+      expect(disciplina.body.cursoId).toBeNull();
+
+      const turma = await request(server)
+        .post('/v1/turmas')
+        .set('Authorization', auth)
+        .send({ codigo: 'SEM-DISC-A', periodoLetivoId: cenario.periodo.id })
+        .expect(201);
+      expect(turma.body.disciplinaId).toBeNull();
+      expect(turma.body.disciplina).toBeNull();
+
+      const atribuida = await request(server)
+        .patch(`/v1/turmas/${turma.body.id}`)
+        .set('Authorization', auth)
+        .send({ disciplinaId: disciplina.body.id })
+        .expect(200);
+      expect(atribuida.body.disciplina.nome).toBe('Disciplina Avulsa');
+
+      const desvinculada = await request(server)
+        .patch(`/v1/turmas/${turma.body.id}`)
+        .set('Authorization', auth)
+        .send({ disciplinaId: null })
+        .expect(200);
+      expect(desvinculada.body.disciplinaId).toBeNull();
+
+      const comCurso = await request(server)
+        .patch(`/v1/disciplinas/${disciplina.body.id}`)
+        .set('Authorization', auth)
+        .send({ cursoId: cenario.curso.id })
+        .expect(200);
+      expect(comCurso.body.cursoId).toBe(cenario.curso.id);
+    });
+
     it('Rooms ↔ Academy: ao criar a reserva de uma aula, só o professor dono da turma pode vinculá-la', async () => {
       const cenario = await montarCenarioAcademico();
 

@@ -721,7 +721,7 @@
         ],
         [
           "Disciplina",
-          "componente curricular do curso, com carga horária."
+          "componente curricular com carga horária; o vínculo com um curso é opcional."
         ],
         [
           "Período letivo",
@@ -729,7 +729,7 @@
         ],
         [
           "Turma",
-          "oferta de uma disciplina em um período, com professor, horário e vagas."
+          "oferta em um período letivo, com professor, horário e vagas; a disciplina é opcional e pode ser atribuída depois."
         ],
         [
           "Matrícula",
@@ -765,13 +765,13 @@
           "quemUsa": "Coordenação acadêmica.",
           "oQueE": "Organização da estrutura do período letivo, em abas: Disciplinas, Turmas, Professores, Alunos e Calendário.",
           "bullets": [
-            "Disciplinas: catálogo do que a instituição oferece, com curso, carga horária e documentos (planos de ensino e ementas).",
-            "Turmas: oferta efetiva de uma disciplina em um período letivo, com professor, turno, sala, horário e quantidade de vagas.",
+            "Disciplinas: catálogo do que a instituição oferece, com carga horária, curso (opcional) e documentos (planos de ensino e ementas). A disciplina é cadastrada sem precisar de curso nem de turma.",
+            "Turmas: oferta efetiva em um período letivo, com disciplina, professor, turno, sala, horário e quantidade de vagas. A turma pode ser criada sem disciplina; a disciplina é atribuída depois, pelo botão Editar da turma.",
             "Professores e Alunos: vínculo de pessoa já cadastrada no Rooster Hub à função de professor ou de aluno (com registro acadêmico e curso); não se cria novo login.",
             "Matrícula: inclusão de aluno em turma, respeitado o número de vagas.",
             "Calendário: datas relevantes do período (início do semestre, provas, feriados e eventos), exibidas a professores e alunos."
           ],
-          "deOndeVem": "A turma depende do cadastro prévio da disciplina, do período letivo e do professor. O aluno somente aparece nas telas de frequência e de notas de uma turma após a matrícula.",
+          "deOndeVem": "A turma depende apenas do cadastro prévio do período letivo; disciplina e professor são opcionais e podem ser atribuídos depois, na edição da turma. Documentos acadêmicos só ficam disponíveis na turma depois que ela recebe uma disciplina. O aluno somente aparece nas telas de frequência e de notas de uma turma após a matrícula.",
           "legenda": "Tela de Gestão acadêmica, aba Disciplinas, com as disciplinas, o curso, a carga horária e a quantidade de turmas.",
           "extras": [
             {
@@ -1576,7 +1576,7 @@
         ],
         [
           "Turma",
-          "oferta de uma disciplina em um período letivo, com professor e alunos matriculados."
+          "oferta em um período letivo, com professor e alunos matriculados; a disciplina é opcional e pode ser atribuída depois."
         ]
       ]
     },

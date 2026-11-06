@@ -1,8 +1,8 @@
 %%{init: {"layout":"elk","er":{"entityPadding":8,"minEntityWidth":60,"diagramPadding":8}}}%%
 erDiagram
-  Curso ||--o{ Disciplina : oferece
+  Curso |o--o{ Disciplina : oferece_opcional
   PeriodoLetivo ||--o{ Turma : vigente_em
-  Disciplina ||--o{ Turma : ofertada_como
+  Disciplina |o--o{ Turma : ofertada_como_opcional
   Professor ||--o{ Turma : leciona
   Usuario ||--|| Professor : vinculo
   Usuario ||--|| Aluno : vinculo
@@ -19,7 +19,7 @@ erDiagram
   Turma {
     uuid id PK
     string codigo
-    uuid disciplinaId FK
+    uuid disciplinaId FK "opcional"
     uuid professorId FK
     uuid periodoId FK
     string turno

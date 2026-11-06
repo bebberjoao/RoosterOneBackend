@@ -523,9 +523,9 @@ export const BASE_CONHECIMENTO: EntradaBase[] = [
     ],
     "observacoes": [
       "Curso: programa de formação (por exemplo, Engenharia de Software), ao qual o aluno está vinculado.",
-      "Disciplina: componente curricular do curso, com carga horária.",
+      "Disciplina: componente curricular com carga horária; o vínculo com um curso é opcional.",
       "Período letivo: semestre ou ano letivo (por exemplo, 2026.2), com datas de início e de término.",
-      "Turma: oferta de uma disciplina em um período, com professor, horário e vagas.",
+      "Turma: oferta em um período letivo, com professor, horário e vagas; a disciplina é opcional e pode ser atribuída depois.",
       "Matrícula: inclusão do aluno em uma turma.",
       "Item avaliativo: avaliação da turma (prova, trabalho ou atividade do Learn), com peso e nota máxima.",
       "Média: média ponderada dos itens com nota lançada."
@@ -551,8 +551,8 @@ export const BASE_CONHECIMENTO: EntradaBase[] = [
   {
     "passos": [],
     "observacoes": [
-      "Disciplinas: catálogo do que a instituição oferece, com curso, carga horária e documentos (planos de ensino e ementas).",
-      "Turmas: oferta efetiva de uma disciplina em um período letivo, com professor, turno, sala, horário e quantidade de vagas.",
+      "Disciplinas: catálogo do que a instituição oferece, com carga horária, curso (opcional) e documentos (planos de ensino e ementas). A disciplina é cadastrada sem precisar de curso nem de turma.",
+      "Turmas: oferta efetiva em um período letivo, com disciplina, professor, turno, sala, horário e quantidade de vagas. A turma pode ser criada sem disciplina; a disciplina é atribuída depois, pelo botão Editar da turma.",
       "Professores e Alunos: vínculo de pessoa já cadastrada no Rooster Hub à função de professor ou de aluno (com registro acadêmico e curso); não se cria novo login.",
       "Matrícula: inclusão de aluno em turma, respeitado o número de vagas.",
       "Calendário: datas relevantes do período (início do semestre, provas, feriados e eventos), exibidas a professores e alunos."
@@ -564,7 +564,7 @@ export const BASE_CONHECIMENTO: EntradaBase[] = [
     "rota": "/academy/manage",
     "quemUsa": "Coordenação acadêmica.",
     "resumo": "Organização da estrutura do período letivo, em abas: Disciplinas, Turmas, Professores, Alunos e Calendário.",
-    "efeitos": "A turma depende do cadastro prévio da disciplina, do período letivo e do professor. O aluno somente aparece nas telas de frequência e de notas de uma turma após a matrícula."
+    "efeitos": "A turma depende apenas do cadastro prévio do período letivo; disciplina e professor são opcionais e podem ser atribuídos depois, na edição da turma. Documentos acadêmicos só ficam disponíveis na turma depois que ela recebe uma disciplina. O aluno somente aparece nas telas de frequência e de notas de uma turma após a matrícula."
   },
   {
     "passos": [
@@ -1603,7 +1603,7 @@ export const BASE_CONHECIMENTO: EntradaBase[] = [
     "modulo": "Geral",
     "titulo": "O que significa \"Turma\"",
     "rota": null,
-    "resumo": "Turma: oferta de uma disciplina em um período letivo, com professor e alunos matriculados."
+    "resumo": "Turma: oferta em um período letivo, com professor e alunos matriculados; a disciplina é opcional e pode ser atribuída depois."
   },
   {
     "passos": [
@@ -1823,13 +1823,16 @@ export const BASE_CONHECIMENTO: EntradaBase[] = [
   },
   {
     "passos": [],
-    "observacoes": [],
+    "observacoes": [
+      "Disciplina sem curso: o campo \"Curso\" da disciplina é opcional. A disciplina pode ser cadastrada no catálogo",
+      "Turma sem disciplina: para criar uma turma basta a identificação e o período letivo; disciplina e professor são"
+    ],
     "id": "guia-estrutura-academica-rooster-academy",
     "origem": "guia",
     "modulo": "Guia do administrador",
     "titulo": "Estrutura acadêmica (Rooster Academy) (guia do administrador)",
     "rota": null,
-    "resumo": "A ordem recomendada de cadastro é: cursos, período letivo, disciplinas, vínculos de professor e de aluno (a partir de usuários existentes no Hub), turmas e matrículas. A matrícula respeita a capacidade da turma."
+    "resumo": "A ordem recomendada de cadastro é: cursos, período letivo, disciplinas, vínculos de professor e de aluno (a partir de usuários existentes no Hub), turmas e matrículas. A matrícula respeita a capacidade da turma. Os vínculos entre esses cadastros são flexíveis: sem curso e sem turma, e vinculada a um curso depois, pela edição. O filtro \"Sem curso\" da aba Disciplinas lista as que ainda não têm curso. opcionais. A disciplina é atribuída depois, em Turmas → abrir a turma → Editar → Disciplina. Enquanto a turma não tiver disciplina, ela aparece como \"Sem disciplina\" e não permite anexar documentos acadêmicos (que pertencem à disciplina)."
   },
   {
     "passos": [],

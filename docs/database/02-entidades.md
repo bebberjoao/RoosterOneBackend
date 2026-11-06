@@ -597,7 +597,7 @@ Relações: `turmas` → `Turma[]`.
 
 ### Disciplina — tabela `disciplinas`
 
-PK: `id`. FK: `cursoId` → `Curso.id` (`ON DELETE RESTRICT`).
+PK: `id`. FK: `cursoId` → `Curso.id` (opcional, `ON DELETE RESTRICT`).
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
 |---|---|---|---|---|
@@ -605,15 +605,15 @@ PK: `id`. FK: `cursoId` → `Curso.id` (`ON DELETE RESTRICT`).
 | codigo | codigo | VarChar(30) | obrigatório | `@unique` |
 | nome | nome | VarChar(150) | obrigatório | |
 | descricao | descricao | Text | opcional | |
-| cursoId | curso_id | Uuid | obrigatório | |
+| cursoId | curso_id | Uuid | opcional | a disciplina pode ser cadastrada sem curso; `null` na edição remove o vínculo |
 | cargaHoraria | carga_horaria | Int | obrigatório | |
 | status | status | VarChar(20) | obrigatório | padrão `"ativa"` (`ativa`\|`arquivada`\|`inativa`) |
 | criadoEm | criado_em | Timestamp | opcional | |
 | atualizadoEm | atualizado_em | Timestamp | opcional | |
 
-> **Disciplina e Turma**: `Disciplina` é o catálogo curricular (código, nome, curso e carga horária), independente de período letivo e de professor. A oferta efetiva (período, professor e local) é modelada em `Turma`. Uma disciplina pode ter várias turmas em diversos períodos, cada qual com professor, turno, sala e horário próprios. Trata-se de correção deliberada em relação ao protótipo anterior do frontend, que vinculava `termId` e `teacherId` diretamente à disciplina.
+> **Disciplina e Turma**: `Disciplina` é o catálogo curricular (código, nome, carga horária e, opcionalmente, curso), independente de período letivo, de professor e de turma: é cadastrada sem exigir curso nem turma. A oferta efetiva (período, professor e local) é modelada em `Turma`. Uma disciplina pode ter várias turmas em diversos períodos, cada qual com professor, turno, sala e horário próprios. Trata-se de correção deliberada em relação ao protótipo anterior do frontend, que vinculava `termId` e `teacherId` diretamente à disciplina.
 
-Relações: `curso` (N:1), `turmas` → `Turma[]`, `documentos` → `DocumentoAcademico[]`.
+Relações: `curso` (N:1, opcional), `turmas` → `Turma[]`, `documentos` → `DocumentoAcademico[]`.
 
 ### Professor — tabela `professores`
 
@@ -651,13 +651,13 @@ Relações: `usuario` (N:1, obrigatória), `curso` (N:1), `matriculas` → `Matr
 
 ### Turma — tabela `turmas`
 
-PK: `id`. FKs: `disciplinaId` → `Disciplina.id` (`ON DELETE RESTRICT`), `periodoLetivoId` → `PeriodoLetivo.id` (`ON DELETE RESTRICT`), `professorId` → `Professor.id` (opcional, `ON DELETE SET NULL`).
+PK: `id`. FKs: `disciplinaId` → `Disciplina.id` (opcional, `ON DELETE RESTRICT`), `periodoLetivoId` → `PeriodoLetivo.id` (`ON DELETE RESTRICT`), `professorId` → `Professor.id` (opcional, `ON DELETE SET NULL`).
 
 | Campo (Prisma) | Coluna real | Tipo | Nullability | Observação |
 |---|---|---|---|---|
 | id | id | Uuid | obrigatório | |
 | codigo | codigo | VarChar(40) | obrigatório | |
-| disciplinaId | disciplina_id | Uuid | obrigatório | |
+| disciplinaId | disciplina_id | Uuid | opcional | a turma pode ser criada sem disciplina e recebê-la depois pela edição (`PATCH /turmas/:id`); `null` remove o vínculo. Sem disciplina, a turma não tem documentos acadêmicos |
 | periodoLetivoId | periodo_letivo_id | Uuid | obrigatório | |
 | professorId | professor_id | Uuid | opcional | |
 | turno | turno | VarChar(20) | opcional | `Matutino`\|`Vespertino`\|`Noturno` |

@@ -419,10 +419,10 @@ Ordem de declaração: `GET /patrimonio-emprestimos-atrasados` e `PATCH /patrimo
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
-| POST | `/disciplinas` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-disciplinas` | Cria disciplina (catálogo curricular, agnóstica a período/professor) |
+| POST | `/disciplinas` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-disciplinas` | Cria disciplina (catálogo curricular, agnóstica a período/professor/turma; `cursoId` opcional) |
 | GET | `/disciplinas` | Bearer | Rooster Academy / `/academy/manage` / `acessar` | Lista disciplinas (query `cursoId` opcional) |
 | GET | `/disciplinas/:id` | Bearer | Rooster Academy / `/academy/manage` / `acessar` | Busca disciplina por id |
-| PATCH | `/disciplinas/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-disciplinas` | Atualiza disciplina |
+| PATCH | `/disciplinas/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-disciplinas` | Atualiza disciplina (`cursoId: null` remove o vínculo com o curso) |
 | DELETE | `/disciplinas/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-disciplinas` | Remove disciplina |
 
 ### 5.4 Professor
@@ -449,10 +449,10 @@ Ordem de declaração: `GET /patrimonio-emprestimos-atrasados` e `PATCH /patrimo
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
-| POST | `/turmas` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-turmas` | Cria turma (oferta efetiva: disciplina, período, professor, turno, sala e horário) |
+| POST | `/turmas` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-turmas` | Cria turma (oferta efetiva: período, turno, sala e horário; `disciplinaId` e `professorId` opcionais — a disciplina pode ser atribuída depois via `PATCH /turmas/:id`, e `null` remove o vínculo) |
 | GET | `/turmas` | Bearer | manual — ver nota (1) | Lista turmas (query `disciplinaId`, `periodoLetivoId`, `minhas=true`, `pagina`/`limite` opcionais) |
 | GET | `/turmas/:id` | Bearer | manual — ver nota (2) | Busca turma por id (com disciplina, período, professor e matrículas) |
-| PATCH | `/turmas/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-turmas` | Atualiza turma |
+| PATCH | `/turmas/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-turmas` | Atualiza turma; também é por aqui que se atribui a disciplina a uma turma criada sem ela (`disciplinaId`; `null` remove) |
 | DELETE | `/turmas/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-turmas` | Remove turma |
 
 ### 5.7 Matrícula

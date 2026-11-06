@@ -614,13 +614,13 @@ model Disciplina {
   codigo       String    @unique @db.VarChar(30)
   nome         String    @db.VarChar(150)
   descricao    String?
-  cursoId      String    @map("curso_id") @db.Uuid
+  cursoId      String?   @map("curso_id") @db.Uuid // opcional: a disciplina existe no catálogo sem curso
   cargaHoraria Int       @map("carga_horaria")
   status       String    @default("ativa") @db.VarChar(20) // ativa | arquivada | inativa
   criadoEm     DateTime? @map("criado_em") @db.Timestamp()
   atualizadoEm DateTime? @map("atualizado_em") @db.Timestamp()
 
-  curso      Curso                @relation(fields: [cursoId], references: [id])
+  curso      Curso?               @relation(fields: [cursoId], references: [id], onDelete: Restrict)
   turmas     Turma[]
   documentos DocumentoAcademico[]
 
@@ -671,7 +671,7 @@ model Aluno {
 model Turma {
   id              String    @id @default(uuid()) @db.Uuid
   codigo          String    @db.VarChar(40)
-  disciplinaId    String    @map("disciplina_id") @db.Uuid
+  disciplinaId    String?   @map("disciplina_id") @db.Uuid // opcional: a turma pode ser criada sem disciplina e recebê-la depois
   periodoLetivoId String    @map("periodo_letivo_id") @db.Uuid
   professorId     String?   @map("professor_id") @db.Uuid
   turno           String?   @db.VarChar(20) // Matutino | Vespertino | Noturno
@@ -682,7 +682,7 @@ model Turma {
   criadoEm        DateTime? @map("criado_em") @db.Timestamp()
   atualizadoEm    DateTime? @map("atualizado_em") @db.Timestamp()
 
-  disciplina       Disciplina         @relation(fields: [disciplinaId], references: [id])
+  disciplina       Disciplina?        @relation(fields: [disciplinaId], references: [id], onDelete: Restrict)
   periodoLetivo    PeriodoLetivo      @relation(fields: [periodoLetivoId], references: [id])
   professor        Professor?         @relation(fields: [professorId], references: [id])
   matriculas       Matricula[]

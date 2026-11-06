@@ -1,7 +1,7 @@
 %%{init: {"flowchart":{"nodeSpacing":26,"rankSpacing":32,"padding":6,"diagramPadding":6}}}%%
 flowchart TD
-  A([Inicio do periodo letivo]) --> B["Coordenacao cadastra<br/>periodo letivo, cursos<br/>e disciplinas (catalogo)"]
-  B --> C["Cria turmas<br/>(disciplina, periodo<br/>e professor)"]
+  A([Inicio do periodo letivo]) --> B["Coordenacao cadastra<br/>periodo letivo, cursos<br/>e disciplinas (catalogo,<br/>curso opcional)"]
+  B --> C["Cria turmas<br/>(periodo; disciplina e<br/>professor opcionais,<br/>atribuiveis depois)"]
   C --> D[Matricula alunos nas turmas]
   D --> E["Professor registra<br/>frequencia por data"]
   D --> F["Professor cria itens<br/>avaliativos com peso<br/>e lanca notas"]

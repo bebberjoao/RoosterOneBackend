@@ -73,10 +73,10 @@ Não há modelo `Perfil` ou `Role` no schema atual: o vínculo de autorização 
 |---|---|---|---|
 | Usuario → Professor | 1:1 | `Professor.usuarioId` (`@unique`), relação `professorAcademico` | Restrict |
 | Usuario → Aluno | 1:1 | `Aluno.usuarioId` (`@unique`), relação `alunoAcademico` | Restrict |
-| Curso → Disciplina | 1:N | `Disciplina.cursoId` | Restrict |
+| Curso → Disciplina | 0..1:N (opcional) | `Disciplina.cursoId` | Restrict |
 | Curso → Aluno | 1:N | `Aluno.cursoId` | Restrict |
 | PeriodoLetivo → Turma | 1:N | `Turma.periodoLetivoId` | Restrict |
-| Disciplina → Turma | 1:N | `Turma.disciplinaId` | Restrict |
+| Disciplina → Turma | 0..1:N (opcional) | `Turma.disciplinaId` | Restrict |
 | Disciplina → DocumentoAcademico | 1:N | `DocumentoAcademico.disciplinaId` | SetNull (opcional) |
 | Professor → Turma | 1:N | `Turma.professorId` | SetNull (opcional) |
 | Aluno → Matricula | 1:N | `Matricula.alunoId` | Cascade |
@@ -216,10 +216,10 @@ erDiagram
     %% ===== Academy =====
     USUARIO ||--o| PROFESSOR : "e (opcional)"
     USUARIO ||--o| ALUNO : "e (opcional)"
-    CURSO ||--o{ DISCIPLINA : "cataloga"
+    CURSO |o--o{ DISCIPLINA : "cataloga (opcional)"
     CURSO ||--o{ ALUNO : "matricula em"
     PERIODO_LETIVO ||--o{ TURMA : "oferece em"
-    DISCIPLINA ||--o{ TURMA : "ofertada como"
+    DISCIPLINA |o--o{ TURMA : "ofertada como (opcional)"
     DISCIPLINA ||--o{ DOCUMENTO_ACADEMICO : "possui"
     PROFESSOR ||--o{ TURMA : "leciona"
     ALUNO ||--o{ MATRICULA : "matricula-se em"
@@ -467,7 +467,7 @@ erDiagram
     }
     DISCIPLINA {
         uuid id PK
-        uuid curso_id FK
+        uuid curso_id FK "opcional"
         string codigo UK
         string nome
     }
@@ -486,7 +486,7 @@ erDiagram
     TURMA {
         uuid id PK
         string codigo
-        uuid disciplina_id FK
+        uuid disciplina_id FK "opcional"
         uuid periodo_letivo_id FK
         uuid professor_id FK
         string sala "texto livre, sem FK"

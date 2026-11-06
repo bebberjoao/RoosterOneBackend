@@ -69,6 +69,16 @@ prazo expire sem devolução registrada.
 A ordem recomendada de cadastro é: cursos, período letivo, disciplinas, vínculos de professor e de aluno (a partir de
 usuários existentes no Hub), turmas e matrículas. A matrícula respeita a capacidade da turma.
 
+Os vínculos entre esses cadastros são flexíveis:
+
+- **Disciplina sem curso**: o campo "Curso" da disciplina é opcional. A disciplina pode ser cadastrada no catálogo
+  sem curso e sem turma, e vinculada a um curso depois, pela edição. O filtro "Sem curso" da aba Disciplinas lista as
+  que ainda não têm curso.
+- **Turma sem disciplina**: para criar uma turma basta a identificação e o período letivo; disciplina e professor são
+  opcionais. A disciplina é atribuída depois, em Turmas → abrir a turma → Editar → Disciplina. Enquanto a turma não
+  tiver disciplina, ela aparece como "Sem disciplina" e não permite anexar documentos acadêmicos (que pertencem à
+  disciplina).
+
 ## Cursos extracurriculares (Rooster Boost)
 
 A gestão dos cursos é realizada por permissão, sem responsável exclusivo por curso: quem possui a permissão de

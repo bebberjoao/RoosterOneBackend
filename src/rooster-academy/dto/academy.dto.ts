@@ -52,8 +52,12 @@ export class CreateDisciplinaDto {
   @ApiPropertyOptional({ example: 'Introdução a algoritmos, complexidade e estruturas de dados fundamentais.', description: 'Ementa/descrição da disciplina' })
   @IsOptional() @IsString() descricao?: string;
 
-  @ApiProperty({ example: '80000000-0000-0000-0000-000000000008', description: 'Id do Curso ao qual esta disciplina pertence' })
-  @IsUUID() cursoId: string;
+  @ApiPropertyOptional({
+    example: '80000000-0000-0000-0000-000000000008',
+    description: 'Id do Curso ao qual a disciplina pertence. Opcional: a disciplina pode ser cadastrada sem curso. Na edição, `null` remove o vínculo.',
+    nullable: true,
+  })
+  @IsOptional() @IsUUID() cursoId?: string | null;
 
   @ApiProperty({ example: 80, description: 'Carga horária total da disciplina, em horas' })
   @IsInt() @Min(1) cargaHoraria: number;
@@ -120,8 +124,12 @@ export class CreateTurmaDto {
   @ApiProperty({ example: 'ALG101-A', description: 'Código da turma, único dentro do mesmo período letivo' })
   @IsString() @Length(2, 40) codigo: string;
 
-  @ApiProperty({ example: '90000000-0000-0000-0000-000000000009', description: 'Id da Disciplina ofertada nesta turma' })
-  @IsUUID() disciplinaId: string;
+  @ApiPropertyOptional({
+    example: '90000000-0000-0000-0000-000000000009',
+    description: 'Id da Disciplina ofertada nesta turma. Opcional: a turma pode ser criada sem disciplina e recebê-la depois pela edição. Na edição, `null` remove o vínculo.',
+    nullable: true,
+  })
+  @IsOptional() @IsUUID() disciplinaId?: string | null;
 
   @ApiProperty({ example: 'a1000000-0000-0000-0000-00000000000a', description: 'Id do Período Letivo em que a turma é ofertada' })
   @IsUUID() periodoLetivoId: string;
