@@ -135,6 +135,14 @@ aluno em turmas de outros professores.
 - Nenhuma `RedefinicaoSenha`.
 - Nenhum vídeo hospedado no Boost: as aulas de vídeo utilizam link externo.
 
+## Dados iniciais sem demonstração
+
+O catálogo de módulos e permissões fica em `src/common/catalogo-permissoes.ts`, fonte única deste seed e de
+`scripts/preparar-base.ts`. Esse segundo script, executado pelo instalador para Windows (`npx ts-node
+scripts/preparar-base.ts`), prepara um banco para o primeiro uso **sem apagar nada**: garante os 9 módulos, as 149
+permissões e os status de chamado e, com `ROOSTER_ADMIN_EMAIL` definido, cria a conta de administrador com todas as
+permissões (a senha de uma conta existente nunca é alterada). Pode ser repetido a cada atualização.
+
 ## Aviso operacional
 
 A execução do seed **apaga todo usuário criado manualmente** que não conste do script (por exemplo, conta criada

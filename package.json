@@ -22,7 +22,8 @@
     "test:all": "npm test && npm run test:e2e",
     "load-test": "node scripts/load-test.mjs",
     "manual": "node docs/manual-usuario/gerar-manual.js",
-    "assistente:base": "node scripts/assistente/gerar-base.js"
+    "assistente:base": "node scripts/assistente/gerar-base.js",
+    "documentacao": "node docs/gerar-documentacao.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

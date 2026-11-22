@@ -23,7 +23,8 @@ src/
 │
 ├── common/                   # componentes compartilhados
 │   ├── all-exceptions.filter.ts   # filtro global; registra status >= 500 em logs_erro
-│   ├── prisma-erro.ts             # traduzirErroPrisma: P2002 → 409, P2025 → 404
+│   ├── catalogo-permissoes.ts     # módulos, permissões e conjuntos padrão de professor e de aluno (fonte única)
+│   ├── prisma-erro.ts             # traduzirErroPrisma: P2002 → 409, P2025 → 404, P2003 e RESTRICT → 409
 │   ├── cors.ts                    # critério único de origem (REST e WebSocket)
 │   ├── storage.config.ts          # pastas de upload, limites e opções do multer
 │   ├── assinatura-arquivo.ts      # verificação de assinatura binária (magic bytes)
@@ -184,3 +185,14 @@ O mesmo critério é adotado em `rooms.controller.ts` (`campus`, `blocos`, `ambi
 | `docs/manual-usuario/capturar-telas.mjs` | Captura automática das telas do manual (Playwright), com o sistema em execução sobre o banco de demonstração. |
 | `docs/manual-usuario/imagens/` | Capturas de tela inseridas no manual, nomeadas pela rota normalizada da tela. |
 | `scripts/assistente/gerar-base.js` | Gera `src/assistente/base-conhecimento.ts` (`npm run assistente:base`) a partir do manual e dos guias, sem as senhas de demonstração. |
+
+## Instalação e dados iniciais
+
+| Pasta ou arquivo | Responsabilidade |
+|---|---|
+| `scripts/instalador/INSTALAR.bat` | Único ponto de entrada da instalação no Windows: pede a elevação de administrador e abre a tela do instalador (`docs/operations/09-instalador.md`). |
+| `scripts/instalador/instalador-tela.ps1` | Tela do instalador (WPF): formulário do administrador, passo a passo, andamento e resultado. |
+| `scripts/instalador/instalador.ps1` | Motor da instalação (pré-requisitos, banco, configuração, compilação, migrations, dados iniciais e início automático) e menu avançado de console. |
+| `scripts/instalador/montar-pacote.ps1` | Gera o pacote de instalação (pasta com o `INSTALAR.exe`, os repositórios e os instaladores do Node.js e do PostgreSQL). |
+| `scripts/preparar-base.ts` | Dados iniciais sem demonstração: catálogo de módulos e permissões, status de chamado e conta de administrador; idempotente, executado pelo instalador. |
+| `prisma/seed-dev.ts` | Dados de demonstração (`npm run db:seed:dev`); apaga todos os dados antes de recriá-los. |

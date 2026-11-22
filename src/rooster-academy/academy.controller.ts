@@ -98,7 +98,9 @@ export class AcademyController {
   // ===================== Professor =====================
   @Post('professores')
   @RequirePermission(MODULO, TELA_MANAGE, 'gerenciar-professores')
-  createProfessor(@Body() dto: CreateProfessorDto) { return this.academyService.createProfessor(dto); }
+  createProfessor(@Req() request: Request, @Body() dto: CreateProfessorDto) {
+    return this.academyService.createProfessor(dto, (request.user as AuthedUser).id);
+  }
   @Get('professores')
   @RequirePermission(MODULO, TELA_MANAGE, 'acessar')
   findAllProfessores() { return this.academyService.findAllProfessores(); }
@@ -115,7 +117,9 @@ export class AcademyController {
   // ===================== Aluno =====================
   @Post('alunos')
   @RequirePermission(MODULO, TELA_MANAGE, 'gerenciar-alunos')
-  createAluno(@Body() dto: CreateAlunoDto) { return this.academyService.createAluno(dto); }
+  createAluno(@Req() request: Request, @Body() dto: CreateAlunoDto) {
+    return this.academyService.createAluno(dto, (request.user as AuthedUser).id);
+  }
   @Get('alunos')
   @RequirePermission(MODULO, TELA_MANAGE, 'acessar')
   findAllAlunos(@Query() query: FindAlunosQueryDto) { return this.academyService.findAllAlunos(query.cursoId, query); }
@@ -188,7 +192,11 @@ export class AcademyController {
   async registrarFrequencia(@Req() request: Request, @Param('id') turmaId: string, @Body() dto: RegistrarFrequenciaLoteDto) {
     const usuarioId = (request.user as AuthedUser).id;
     await this.exigirDonoOuGestor(usuarioId, turmaId, TELA_ATTENDANCE, 'registrar-chamada');
-    return this.academyService.registrarFrequenciaLote(turmaId, usuarioId, dto);
+    // Corrigir a chamada de uma data já registrada exige `editar-chamada` (a gestão acadêmica sempre pode).
+    const podeEditar =
+      (await this.usuariosService.hasPermission(usuarioId, MODULO, TELA_MANAGE, 'acessar')) ||
+      (await this.usuariosService.hasPermission(usuarioId, MODULO, TELA_ATTENDANCE, 'editar-chamada'));
+    return this.academyService.registrarFrequenciaLote(turmaId, usuarioId, dto, podeEditar);
   }
 
   @Get('turmas/:id/frequencia')

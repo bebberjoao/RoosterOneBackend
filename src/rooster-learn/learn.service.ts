@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -68,10 +69,44 @@ export class LearnService {
     return atividade;
   }
 
+  /**
+   * Edita a atividade e mantém em sincronia o item avaliativo do Academy gerado por ela (RN025): título, peso e
+   * nota máxima acompanham a atividade; a atividade publicada que passa a ter peso ganha o item; a que perde o peso
+   * deixa de ter o item, desde que ainda não haja nota lançada. A turma da atividade nunca é alterada.
+   */
   async updateAtividade(id: string, dto: UpdateAtividadeDto) {
-    await this.findOneAtividade(id);
+    const atual = await this.findOneAtividade(id);
+    const { turmaId: _ignorado, ...dados } = dto;
+    const titulo = dados.titulo ?? atual.titulo;
+    const peso = dados.peso ?? Number(atual.peso);
+    const notaMaxima = dados.notaMaxima ?? Number(atual.notaMaxima);
+    if (dados.notaMaxima != null && dados.notaMaxima < Number(atual.notaMaxima)) {
+      const maior = await this.prisma.entrega.aggregate({ where: { atividadeId: id }, _max: { nota: true } });
+      if (maior._max.nota != null && Number(maior._max.nota) > dados.notaMaxima) {
+        throw new ConflictException(`Já existe entrega corrigida com nota ${Number(maior._max.nota)}, acima da nova nota máxima.`);
+      }
+    }
+    const publicada = atual.status === 'publicada' || atual.status === 'encerrada';
     try {
-      return await this.prisma.atividade.update({ where: { id }, data: dto });
+      return await this.prisma.$transaction(async (tx) => {
+        const atualizada = await tx.atividade.update({ where: { id }, data: dados });
+        if (atual.itemAvaliativo) {
+          if (peso > 0) {
+            await tx.itemAvaliativo.update({ where: { id: atual.itemAvaliativo.id }, data: { nome: titulo, peso, notaMaxima } });
+          } else {
+            const lancadas = await tx.nota.count({ where: { itemAvaliativoId: atual.itemAvaliativo.id, valor: { not: null } } });
+            if (lancadas > 0) {
+              throw new ConflictException('A atividade já tem notas lançadas no Academy e não pode ficar sem peso.');
+            }
+            await tx.itemAvaliativo.delete({ where: { id: atual.itemAvaliativo.id } });
+          }
+        } else if (publicada && peso > 0) {
+          await tx.itemAvaliativo.create({
+            data: { turmaId: atual.turmaId, nome: titulo, peso, notaMaxima, origem: 'learn', atividadeId: id, criadoEm: new Date() },
+          });
+        }
+        return atualizada;
+      });
     } catch (error) {
       this.handleError(error, 'atualizar atividade');
     }
@@ -85,7 +120,12 @@ export class LearnService {
       select: { imagemCaminho: true },
     });
     try {
-      const removida = await this.prisma.atividade.delete({ where: { id } });
+      // O item avaliativo gerado pela atividade (e as notas dele) é excluído junto: sem a atividade, ele ficaria
+      // no Academy sem origem e sem possibilidade de correção.
+      const [, removida] = await this.prisma.$transaction([
+        this.prisma.itemAvaliativo.deleteMany({ where: { atividadeId: id } }),
+        this.prisma.atividade.delete({ where: { id } }),
+      ]);
       imagens.forEach((q) => this.questoes.apagarImagem(q.imagemCaminho));
       return removida;
     } catch (error) {
@@ -155,6 +195,7 @@ export class LearnService {
       where: { alunoId_turmaId: { alunoId, turmaId: atividade.turmaId } },
     });
     if (!matricula) throw new BadRequestException('Aluno não está matriculado na turma desta atividade.');
+    if (matricula.status !== 'ativa') throw new BadRequestException(`Sua matrícula nesta turma está ${matricula.status}; a entrega não é aceita.`);
 
     const agora = new Date();
     const atrasada = Boolean(atividade.prazoEm && agora > atividade.prazoEm);
@@ -221,6 +262,13 @@ export class LearnService {
 
       if (autoCorrigida && atividade.itemAvaliativo) {
         await this.lancarNotaNoAcademy(tx, atividade.itemAvaliativo.id, alunoId, notaAutomatica!, null);
+      } else if (atividade.itemAvaliativo) {
+        // O reenvio invalida a correção anterior (RN027): a nota já propagada ao Academy é retirada na mesma
+        // transação, e volta quando o professor corrigir a nova entrega.
+        await tx.nota.updateMany({
+          where: { itemAvaliativoId: atividade.itemAvaliativo.id, alunoId },
+          data: { valor: null, atualizadoEm: agora },
+        });
       }
     });
     anexosDeQuestao.forEach((c) => this.apagarAnexo(c));

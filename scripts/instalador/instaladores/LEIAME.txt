@@ -7,11 +7,13 @@ Para instalar sem depender da internet, baixe e coloque nesta pasta:
   - Node.js:    node-v24.x.x-x64.msi
       https://nodejs.org (versao LTS, instalador .msi para Windows 64 bits)
 
-Nao e preciso renomear os arquivos. O instalador (INSTALAR.bat) tambem os encontra na pasta
-scripts\instalador, na raiz do RoosterOneBackend ou na pasta que contem os dois repositorios
-(havendo mais de um, usa o de versao mais recente). O PostgreSQL e instalado em modo silencioso,
+Nao e preciso renomear os arquivos. O instalador (INSTALAR.bat ou INSTALAR.exe) tambem os encontra na pasta
+scripts\instalador, na raiz do RoosterOneBackend, na pasta que contem os dois repositorios ou na subpasta
+"pacotes" dela (havendo mais de um, usa o de versao mais recente). O script montar-pacote.ps1 baixa os dois
+instaladores das fontes oficiais e monta o pacote completo, com o INSTALAR.exe. O PostgreSQL e instalado em modo silencioso,
 sem nenhuma tela, com senha do superusuario gerada e guardada de forma protegida em .rooster.
 Se o PostgreSQL ou o Node.js ja estiverem instalados, os arquivos sao ignorados.
 
-A opcao 5 do menu (Verificar pre-requisitos) mostra qual arquivo sera usado.
+A tela inicial do instalador informa se o Node.js e o PostgreSQL ja estao instalados; a opcao 5 do
+menu avancado (INSTALAR.bat menu, "Verificar pre-requisitos") mostra qual arquivo sera usado.
 Os arquivos .exe e .msi nao sao versionados no Git (ver .gitignore).

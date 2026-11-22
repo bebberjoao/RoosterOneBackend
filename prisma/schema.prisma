@@ -732,7 +732,7 @@ model ItemAvaliativo {
   turmaId     String    @map("turma_id") @db.Uuid
   nome        String    @db.VarChar(120)
   peso        Decimal   @db.Decimal(4, 3) // 0..1
-  notaMaxima  Decimal   @default(10) @map("nota_maxima") @db.Decimal(4, 2)
+  notaMaxima  Decimal   @default(10) @map("nota_maxima") @db.Decimal(6, 2)
   origem      String    @default("manual") @db.VarChar(10) // manual | learn
   atividadeId String?   @unique @map("atividade_id") @db.Uuid
   criadoEm    DateTime? @map("criado_em") @db.Timestamp()
@@ -748,7 +748,7 @@ model Nota {
   id               String    @id @default(uuid()) @db.Uuid
   itemAvaliativoId String    @map("item_avaliativo_id") @db.Uuid
   alunoId          String    @map("aluno_id") @db.Uuid
-  valor            Decimal?  @db.Decimal(4, 2)
+  valor            Decimal?  @db.Decimal(6, 2)
   lancadoPorId     String?   @map("lancado_por_id") @db.Uuid
   atualizadoEm     DateTime? @map("atualizado_em") @db.Timestamp()
 
@@ -808,7 +808,7 @@ model Atividade {
   professorId    String?   @map("professor_id") @db.Uuid
   status         String    @default("rascunho") @db.VarChar(20) // rascunho | agendada | publicada | encerrada | arquivada
   peso           Decimal   @default(1) @db.Decimal(4, 3)
-  notaMaxima     Decimal   @default(10) @map("nota_maxima") @db.Decimal(4, 2)
+  notaMaxima     Decimal   @default(10) @map("nota_maxima") @db.Decimal(6, 2)
   abreEm         DateTime? @map("abre_em") @db.Timestamp()
   prazoEm        DateTime? @map("prazo_em") @db.Timestamp()
   tempoLimiteMin Int?      @map("tempo_limite_min")
@@ -832,7 +832,7 @@ model Entrega {
   status         String    @default("pendente") @db.VarChar(20) // pendente | enviada | corrigida | reenvio | atrasada
   texto          String?
   enviadoEm      DateTime? @map("enviado_em") @db.Timestamp()
-  nota           Decimal?  @db.Decimal(4, 2)
+  nota           Decimal?  @db.Decimal(6, 2)
   feedback       String?
   corrigidoPorId String?   @map("corrigido_por_id") @db.Uuid
   corrigidoEm    DateTime? @map("corrigido_em") @db.Timestamp()

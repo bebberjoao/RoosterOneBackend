@@ -66,8 +66,32 @@ prazo expire sem devolução registrada.
 
 ## Estrutura acadêmica (Rooster Academy)
 
-A ordem recomendada de cadastro é: cursos, período letivo, disciplinas, vínculos de professor e de aluno (a partir de
-usuários existentes no Hub), turmas e matrículas. A matrícula respeita a capacidade da turma.
+A ordem recomendada de cadastro, toda em Rooster Academy → Gestão acadêmica, é: cursos (aba Cursos), período letivo
+(aba Calendário → Períodos letivos), disciplinas, vínculos de professor e de aluno (a partir de usuários existentes no
+Hub), turmas e matrículas (aba Turmas → abrir a turma → Matrículas). A matrícula respeita a capacidade da turma; a
+capacidade 0 indica turma sem limite de vagas.
+
+Ao vincular um usuário como **professor** ou como **aluno**, o sistema concede a ele as permissões padrão do papel
+(as telas do professor no Academy e no Learn, ou o portal do aluno), de modo que ele já pode entrar e trabalhar, sem
+concessão manual em Acessos. Permissões adicionais continuam sendo concedidas em Rooster Hub → Acessos; a exclusão do
+vínculo não revoga as permissões, que devem ser retiradas em Acessos, se for o caso.
+
+Regras que o sistema aplica ao controle de notas e de frequência (detalhes em `docs/system/04-regras-de-negocio.md`,
+RN020 a RN027):
+
+- **Matrícula**: turma cheia, turma encerrada e aluno com cadastro não ativo recusam a matrícula. A reativação de
+  matrícula cancelada ocupa vaga. A ocupação exibida conta apenas as matrículas ativas.
+- **Média**: é sempre de 0 a 10. Cada nota é convertida pela nota máxima do item (até 1000 pontos) e ponderada pelo
+  peso; itens sem nota não entram. A situação "Aprovado" (média a partir de 6,0) é apenas referência visual.
+- **Itens do Rooster Learn**: aparecem em Notas como somente leitura. Título, peso e nota máxima são alterados na
+  atividade; a nota vem da correção; o reenvio do aluno retira a nota até a nova correção; excluir a atividade
+  exclui o item.
+- **Chamada**: não aceita data futura nem aluno sem matrícula ativa. Corrigir uma chamada já lançada exige a
+  permissão "Editar chamada anterior" (os professores a recebem por padrão; retire-a em Acessos para que apenas a
+  coordenação possa corrigir). Atraso e falta justificada contam como presença.
+
+Um cadastro em uso não pode ser excluído: curso com disciplinas ou alunos, disciplina com turmas e período letivo
+com turmas. Para tirá-lo de uso, altere o status (curso inativo, disciplina arquivada).
 
 Os vínculos entre esses cadastros são flexíveis:
 

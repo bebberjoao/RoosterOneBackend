@@ -87,7 +87,8 @@ export class MailService {
   status() {
     return {
       configurado: this.transporter !== null,
-      host: process.env.SMTP_HOST ?? null,
+      // SMTP_HOST vazio (valor do .env.example) equivale a ausente.
+      host: process.env.SMTP_HOST || null,
       porta: this.transporter ? Number(process.env.SMTP_PORT ?? 587) : null,
       seguro: process.env.SMTP_SECURE === 'true',
       remetente: this.from,

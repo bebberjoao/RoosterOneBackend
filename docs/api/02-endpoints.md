@@ -412,7 +412,7 @@ Ordem de declaração: `GET /patrimonio-emprestimos-atrasados` e `PATCH /patrimo
 | POST | `/periodos-letivos` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-turmas` | Cria período letivo (sem ação própria no catálogo; agrupado com a gestão de turmas) |
 | GET | `/periodos-letivos` | Bearer | Rooster Academy / `/academy/manage` / `acessar` | Lista períodos letivos |
 | GET | `/periodos-letivos/:id` | Bearer | Rooster Academy / `/academy/manage` / `acessar` | Busca período por id |
-| PATCH | `/periodos-letivos/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-turmas` | Atualiza período |
+| PATCH | `/periodos-letivos/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-turmas` | Atualiza período; término anterior ao início é recusado com `400` |
 | DELETE | `/periodos-letivos/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-turmas` | Remove período |
 
 ### 5.3 Disciplina
@@ -429,7 +429,7 @@ Ordem de declaração: `GET /patrimonio-emprestimos-atrasados` e `PATCH /patrimo
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
-| POST | `/professores` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-professores` | Cria o vínculo de professor para um `usuarioId` existente no Hub (não cria `Usuario`) |
+| POST | `/professores` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-professores` | Cria o vínculo de professor para um `usuarioId` existente no Hub (não cria `Usuario`) e concede as permissões padrão de professor que o usuário ainda não possui; a resposta inclui `permissoesConcedidas` (RN019) |
 | GET | `/professores` | Bearer | Rooster Academy / `/academy/manage` / `acessar` | Lista professores |
 | GET | `/professores/:id` | Bearer | Rooster Academy / `/academy/manage` / `acessar` | Busca professor por id |
 | PATCH | `/professores/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-professores` | Atualiza professor (`usuarioId` nunca é reatribuído) |
@@ -439,7 +439,7 @@ Ordem de declaração: `GET /patrimonio-emprestimos-atrasados` e `PATCH /patrimo
 
 | Método | Rota | Auth | Permissão exigida | Descrição |
 |---|---|---|---|---|
-| POST | `/alunos` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-alunos` | Cria o vínculo de aluno para um `usuarioId` existente no Hub (não cria `Usuario`) |
+| POST | `/alunos` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-alunos` | Cria o vínculo de aluno para um `usuarioId` existente no Hub (não cria `Usuario`) e concede as permissões padrão de aluno que o usuário ainda não possui; a resposta inclui `permissoesConcedidas` (RN019) |
 | GET | `/alunos` | Bearer | Rooster Academy / `/academy/manage` / `acessar` | Lista alunos (query `cursoId`, `pagina`/`limite` opcionais) |
 | GET | `/alunos/:id` | Bearer | Rooster Academy / `/academy/manage` / `acessar` | Busca aluno por id |
 | PATCH | `/alunos/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-alunos` | Atualiza aluno (`usuarioId` nunca é reatribuído) |
@@ -461,7 +461,7 @@ Ordem de declaração: `GET /patrimonio-emprestimos-atrasados` e `PATCH /patrimo
 |---|---|---|---|---|
 | POST | `/turmas/:id/matriculas` | Bearer | Rooster Academy / `/academy/manage` / `matricular` | Matricula um aluno na turma (recusada quando a turma atingiu a capacidade) |
 | GET | `/turmas/:id/matriculas` | Bearer | manual — ver nota (2) | Lista matrículas da turma |
-| PATCH | `/matriculas/:id` | Bearer | Rooster Academy / `/academy/manage` / `matricular` | Atualiza matrícula (ex.: status) |
+| PATCH | `/matriculas/:id` | Bearer | Rooster Academy / `/academy/manage` / `matricular` | Atualiza a situação da matrícula (`status`); a troca de aluno ou de turma é recusada com `400`, e a reativação em turma cheia, com `409` (RN020) |
 | DELETE | `/matriculas/:id` | Bearer | Rooster Academy / `/academy/manage` / `matricular` | Remove matrícula |
 
 ### 5.8 Frequência
@@ -479,8 +479,8 @@ Ordem de declaração: `GET /patrimonio-emprestimos-atrasados` e `PATCH /patrimo
 | GET | `/turmas/:id/itens-avaliativos` | Bearer | manual — ver nota (2) | Lista itens avaliativos da turma |
 | GET | `/turmas/:id/notas` | Bearer | manual — ver nota (3), ação `lancar-notas` | Boletim da turma: itens avaliativos com as notas de todos os alunos matriculados (tela de notas do professor). Restrito ao professor responsável e à coordenação; o aluno consulta apenas as próprias notas, em `GET /me/notas` (`403` nesta rota) |
 | PATCH | `/itens-avaliativos/:id` | Bearer | manual — ver nota (3), ação `configurar-pesos` | Atualiza item avaliativo |
-| DELETE | `/itens-avaliativos/:id` | Bearer | manual — ver nota (3), ação `configurar-pesos` | Remove item avaliativo; **recusado com `400 BadRequestException`** quando `origem === 'learn'` (a remoção deve ser feita pela exclusão ou despublicação da atividade correspondente no Learn) |
-| PATCH | `/itens-avaliativos/:id/notas` | Bearer | manual — ver nota (3), ação `lancar-notas` | Lança (ou atualiza) a nota de um aluno no item avaliativo; audita `nota_lancada` |
+| DELETE | `/itens-avaliativos/:id` | Bearer | manual — ver nota (3), ação `configurar-pesos` | Remove item avaliativo; **recusado com `400 BadRequestException`** quando o item foi gerado por atividade do Learn (`origem === 'learn'` com `atividadeId`): ele é excluído junto com a atividade (RN025) |
+| PATCH | `/itens-avaliativos/:id/notas` | Bearer | manual — ver nota (3), ação `lancar-notas` | Lança (ou atualiza) a nota de um aluno no item avaliativo; audita `nota_lancada`. Recusa com `400` a nota acima da máxima e a matrícula cancelada ou trancada, e com `409` o item gerado pelo Learn, cuja nota vem da correção da atividade (RN022) |
 
 ### 5.10 Calendário acadêmico
 
@@ -489,7 +489,7 @@ Ordem de declaração: `GET /patrimonio-emprestimos-atrasados` e `PATCH /patrimo
 | POST | `/eventos-calendario` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-calendario` | Cria evento de calendário |
 | GET | `/eventos-calendario` | Bearer | manual — `exigirLeituraCalendario`: Rooster Academy / `/academy/manage` / `acessar`, **ou** Rooster Academy / `/academy` / `acessar`, **ou** Rooster Student / `/student/calendar` / `acessar` | Lista eventos (calendário institucional, lido pela gestão, pelos professores e pelos alunos) |
 | GET | `/eventos-calendario/:id` | Bearer | manual — mesma regra da listagem | Busca evento por id |
-| PATCH | `/eventos-calendario/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-calendario` | Atualiza evento |
+| PATCH | `/eventos-calendario/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-calendario` | Atualiza evento; término anterior ao início é recusado com `400` |
 | DELETE | `/eventos-calendario/:id` | Bearer | Rooster Academy / `/academy/manage` / `gerenciar-calendario` | Remove evento |
 
 ### 5.11 Documento acadêmico
@@ -532,9 +532,9 @@ Notas de verificação manual:
 | POST | `/atividades` | Bearer | manual — ver nota (7), ação `criar-atividade` | Cria uma atividade, em rascunho, em uma turma do Academy |
 | GET | `/turmas/:turmaId/atividades` | Bearer | manual — ver nota (8) | Lista atividades da turma, com o código da turma e o nome da disciplina |
 | GET | `/atividades/:id` | Bearer | manual — ver nota (8) | Busca atividade por id |
-| PATCH | `/atividades/:id` | Bearer | manual — ver nota (7), ação `criar-atividade` | Atualiza atividade |
+| PATCH | `/atividades/:id` | Bearer | manual — ver nota (7), ação `criar-atividade` | Atualiza atividade e mantém em sincronia o item avaliativo do Academy (título, peso e nota máxima); `turmaId` é ignorado; `409` quando a nova nota máxima fica abaixo de nota já lançada ou quando o peso zera com nota lançada (RN025) |
 | PATCH | `/atividades/:id/publicar` | Bearer | manual — ver nota (7), ação `criar-atividade` | **Publica a atividade** (gera item avaliativo no Academy quando `peso > 0`; detalhado abaixo) e notifica os alunos matriculados |
-| DELETE | `/atividades/:id` | Bearer | manual — ver nota (7), ação `excluir` | Remove atividade, com as questões (em cascata) e as imagens de apoio em disco |
+| DELETE | `/atividades/:id` | Bearer | manual — ver nota (7), ação `excluir` | Remove atividade, com as questões (em cascata), as imagens de apoio em disco e o item avaliativo gerado por ela no Academy, com as notas (RN025) |
 
 ### 6.1.1 Questões da atividade (desde 02/10/2026)
 
@@ -1010,7 +1010,9 @@ attachment` gerado conforme a RFC 6266 (`filename*=UTF-8''...` para nomes não-A
 
 ### POST /turmas/:id/frequencia — registrar chamada em lote
 
-**Permissão:** manual; professor responsável pela turma com `Rooster Academy / /academy/attendance / registrar-chamada`, ou coordenação (`/academy/manage acessar`).
+**Permissão:** manual; professor responsável pela turma com `Rooster Academy / /academy/attendance / registrar-chamada`, ou coordenação (`/academy/manage acessar`). A correção de chamada já lançada (data que já possui registro na turma) exige também `editar-chamada`, salvo para a coordenação; sem ela, a resposta é `403` (RN023).
+
+**Validações:** a data futura e o aluno sem matrícula ativa na turma são recusados com `400`.
 
 **Corpo (`RegistrarFrequenciaLoteDto`):**
 

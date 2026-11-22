@@ -7,9 +7,10 @@ Documentação completa: [docs/README.md](docs/README.md).
 
 ## Instalação automática no Windows
 
-Com os dois repositórios lado a lado na mesma pasta, execute `scripts\instalador\INSTALAR.bat` (duplo clique). O menu
-instala Node.js e PostgreSQL, cria o banco, gera o `.env`, compila backend e frontend e registra o sistema para
-iniciar com o Windows, em `http://localhost:8080`. Detalhes: [docs/operations/09-instalador.md](docs/operations/09-instalador.md).
+Com os dois repositórios lado a lado na mesma pasta, execute `scripts\instalador\INSTALAR.bat` (duplo clique). A tela do
+instalador pede apenas os dados do administrador e mostra o passo a passo: instala Node.js e PostgreSQL, cria o banco
+sem pedir senha, gera o `.env`, compila backend e frontend, prepara as permissões e registra o sistema para iniciar
+com o Windows, em `http://localhost:8080`. Detalhes: [docs/operations/09-instalador.md](docs/operations/09-instalador.md).
 
 ## Início rápido (desenvolvimento)
 

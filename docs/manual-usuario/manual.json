@@ -741,7 +741,7 @@
         ],
         [
           "Média",
-          "média ponderada dos itens com nota lançada."
+          "média de 0 a 10: cada nota é convertida pela nota máxima do item e ponderada pelo peso; itens sem nota não entram."
         ]
       ],
       "fluxo": [
@@ -763,7 +763,7 @@
           "titulo": "Gestão acadêmica",
           "rota": "/academy/manage",
           "quemUsa": "Coordenação acadêmica.",
-          "oQueE": "Organização da estrutura do período letivo, em abas: Disciplinas, Turmas, Professores, Alunos e Calendário.",
+          "oQueE": "Organização da estrutura do período letivo, em abas: Cursos, Disciplinas, Turmas, Professores, Alunos e Calendário.",
           "bullets": [
             "Disciplinas: catálogo do que a instituição oferece, com carga horária, curso (opcional) e documentos (planos de ensino e ementas). A disciplina é cadastrada sem precisar de curso nem de turma.",
             "Turmas: oferta efetiva em um período letivo, com disciplina, professor, turno, sala, horário e quantidade de vagas. A turma pode ser criada sem disciplina; a disciplina é atribuída depois, pelo botão Editar da turma.",
@@ -795,10 +795,10 @@
           "oQueE": "Registro da presença dos alunos em cada aula.",
           "passos": [
             "Selecionar a turma; são exibidos os alunos e as chamadas anteriores.",
-            "Informar a data da aula e registrar presença, falta, atraso ou falta justificada para cada aluno matriculado.",
+            "Informar a data da aula (não é possível registrar data futura) e registrar presença, falta, atraso ou falta justificada para cada aluno com matrícula ativa.",
             "Salvar; o registro fica disponível ao aluno no Rooster Student."
           ],
-          "deOndeVem": "O professor registra a frequência apenas das turmas que leciona, ainda que possua a permissão; a coordenação pode registrar em qualquer turma. A frequência abaixo de 75% é destacada ao aluno como risco de reprovação, sem reprovação automática.",
+          "deOndeVem": "O professor registra a frequência apenas das turmas que leciona, ainda que possua a permissão; a coordenação pode registrar em qualquer turma. Corrigir a chamada de uma data já lançada exige a permissão Editar chamada anterior. Presente, atraso e falta justificada contam como presença; apenas a falta conta como ausência. A frequência abaixo de 75% é destacada ao aluno como risco de reprovação, sem reprovação automática.",
           "legenda": "Tela de Frequência (Chamada), com as turmas do professor e a frequência média de cada uma."
         },
         {
@@ -810,7 +810,7 @@
             "Selecionar a turma.",
             "Configurar os itens avaliativos da turma (por exemplo, \"Prova 1\", com peso 0,6) e a nota máxima de cada um.",
             "Lançar a nota de cada aluno em cada item; o aluno é notificado do lançamento.",
-            "A média é calculada automaticamente, ponderada pelos pesos dos itens com nota lançada (itens sem nota não são considerados)."
+            "A média é calculada automaticamente, na escala de 0 a 10: cada nota é convertida pela nota máxima do seu item (90 em um trabalho que vale 100 equivale a 9,0) e ponderada pelo peso; itens sem nota não são considerados."
           ],
           "deOndeVem": "A atividade do Rooster Learn publicada com peso aparece nesta tela como item avaliativo, e a nota atribuída na correção da atividade (capítulo 7) integra automaticamente a média, sem novo lançamento.",
           "legenda": "Tela de Notas, com as turmas do professor, a quantidade de alunos e de componentes de avaliação."
@@ -1453,7 +1453,7 @@
     },
     {
       "tipo": "p",
-      "texto": "Somente a atividade publicada com peso maior que zero compõe a média no Rooster Academy. A nota é propagada no momento da correção; entrega reenviada pelo aluno invalida a correção anterior e deve ser corrigida novamente."
+      "texto": "Somente a atividade publicada com peso maior que zero compõe a média no Rooster Academy. A nota é propagada no momento da correção; entrega reenviada pelo aluno invalida a correção anterior, retira a nota da média até a nova correção e deve ser corrigida novamente. Título, peso e nota máxima do item acompanham a atividade, e a exclusão da atividade exclui o item e as notas dele."
     },
     {
       "tipo": "h3",
@@ -1659,7 +1659,7 @@
     },
     {
       "tipo": "p",
-      "texto": "Esta seção destina-se a quem instala o Rooster One em um computador com Windows. A instalação é feita por um instalador com menu, que prepara tudo o que o sistema necessita e o deixa configurado para iniciar automaticamente sempre que o computador é ligado."
+      "texto": "Esta seção destina-se a quem instala o Rooster One em um computador com Windows. A instalação é feita por um único instalador, com uma tela que mostra o passo a passo, prepara tudo o que o sistema necessita (inclusive o banco de dados) e o deixa configurado para iniciar automaticamente sempre que o computador é ligado."
     },
     {
       "tipo": "h3",
@@ -1671,14 +1671,15 @@
         "Copiar as pastas do sistema (RoosterOneBackend e RoosterOneFrontEnd) para a mesma pasta do computador.",
         "Abrir a pasta RoosterOneBackend, depois scripts e instalador, e executar INSTALAR.bat com duplo clique.",
         "Confirmar a solicitação de permissão de administrador do Windows.",
-        "No menu, escolher a opção 1 (\"Instalação completa\"). O instalador instala, quando necessário, o Node.js e o banco de dados PostgreSQL, cria o banco, compila o sistema e registra o início automático. A primeira instalação leva de 10 a 20 minutos, conforme a internet e o computador.",
-        "Responder \"s\" à pergunta sobre os dados de demonstração, para carregar os usuários e as informações de exemplo do Apêndice B, ou \"n\", para iniciar com o sistema vazio.",
-        "Ao final, o navegador é aberto na tela de login, e o atalho \"Rooster One\" é criado na área de trabalho."
+        "Na tela do instalador, informar o nome, o e-mail (que será o login) e a senha da conta de administrador; com a senha em branco, o instalador gera uma senha segura e a exibe ao final.",
+        "Se desejar, marcar \"Carregar dados de demonstração\", para carregar os usuários e as informações de exemplo do Apêndice B; desmarcada, o sistema inicia vazio, apenas com o administrador.",
+        "Clicar em \"Instalar agora\". Nenhuma outra pergunta é feita: o instalador instala, quando necessário, o Node.js e o banco de dados PostgreSQL, cria o banco sem pedir senha, compila o sistema, prepara as permissões, gera esta documentação em Word e registra o início automático. A tela mostra cada passo concluído, o passo em andamento e os que faltam. A primeira instalação leva de 10 a 20 minutos, conforme a internet e o computador.",
+        "Ao final, a tela informa o endereço, o login e, se for o caso, a senha gerada; o botão \"Abrir o Rooster One\" abre a tela de login, e os atalhos \"Rooster One\" e \"Rooster One - Documentação\" são criados na área de trabalho; o segundo abre a pasta documentacao, com este Manual e a Documentação Geral. Se algum passo falhar, a tela indica o passo e o erro e oferece \"Tentar novamente\"."
       ]
     },
     {
       "tipo": "p",
-      "texto": "Instalação sem internet: basta baixar o instalador do PostgreSQL para Windows (arquivo postgresql-...-windows-x64.exe, do site da EDB) e, se o computador não tiver o Node.js, o instalador do Node.js (arquivo node-...-x64.msi), e colocá-los, sem renomear, na pasta scriptsinstaladorinstaladores. O instalador os utiliza automaticamente, sem nenhuma tela adicional; a opção 5 do menu confirma quais arquivos serão usados."
+      "texto": "Instalação sem internet: basta baixar o instalador do PostgreSQL para Windows (arquivo postgresql-...-windows-x64.exe, do site da EDB) e, se o computador não tiver o Node.js, o instalador do Node.js (arquivo node-...-x64.msi), e colocá-los, sem renomear, na pasta scriptsinstaladorinstaladores. O instalador os utiliza automaticamente, sem nenhuma tela adicional; a opção 5 do menu avançado confirma quais arquivos serão usados."
     },
     {
       "tipo": "h3",
@@ -1690,7 +1691,11 @@
     },
     {
       "tipo": "h3",
-      "texto": "Opções do menu do instalador"
+      "texto": "Menu avançado do instalador"
+    },
+    {
+      "tipo": "p",
+      "texto": "As demais operações ficam no menu avançado, aberto pelo link \"Menu avançado\" da tela do instalador. Com o sistema já instalado, a própria tela oferece \"Atualizar ou reparar\", que recompila o sistema e atualiza o banco sem alterar os dados."
     },
     {
       "tipo": "tabela",

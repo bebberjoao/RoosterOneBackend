@@ -23,10 +23,10 @@ export class CreateAtividadeDto {
   @IsUUID() turmaId: string;
 
   @ApiPropertyOptional({ example: 0.3, description: 'Peso da atividade na composição da nota final, quando ela gera um item avaliativo no Academy' })
-  @IsOptional() @IsNumber() @Min(0) peso?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(1) peso?: number;
 
-  @ApiPropertyOptional({ example: 10, description: 'Nota máxima possível para esta atividade' })
-  @IsOptional() @IsNumber() @Min(0) notaMaxima?: number;
+  @ApiPropertyOptional({ example: 10, description: 'Nota máxima possível para esta atividade (de 0,01 a 1000)' })
+  @IsOptional() @IsNumber() @Min(0.01) @Max(1000) notaMaxima?: number;
 
   @ApiPropertyOptional({ example: '2026-09-22T00:00:00.000Z', description: 'Data e hora em que a atividade fica disponível para os alunos' })
   @IsOptional() @IsDateString() abreEm?: string;

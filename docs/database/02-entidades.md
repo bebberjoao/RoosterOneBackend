@@ -713,12 +713,12 @@ PK: `id`. FKs: `turmaId` → `Turma.id` (`ON DELETE CASCADE`), `atividadeId` →
 | turmaId | turma_id | Uuid | obrigatório | |
 | nome | nome | VarChar(120) | obrigatório | |
 | peso | peso | Decimal(4,3) | obrigatório | intervalo `0`–`1` (validado no DTO, não no banco) |
-| notaMaxima | nota_maxima | Decimal(4,2) | obrigatório | padrão `10` |
+| notaMaxima | nota_maxima | Decimal(6,2) | obrigatório | padrão `10`; de 0,01 a 1000 (validado no DTO) |
 | **origem** | origem | VarChar(10) | obrigatório | padrão `"manual"` — `"manual"` (lançado à mão pelo professor) ou `"learn"` (gerado ao publicar uma `Atividade` do Rooster Learn) |
 | atividadeId | atividade_id | Uuid | opcional | `@unique`; relação 1:1 com `Atividade`, preenchida somente quando `origem = "learn"` |
 | criadoEm | criado_em | Timestamp | opcional | |
 
-> **Nota sobre `origem` e `atividadeId`**: constituem o elo da integração Learn → Academy. `DELETE /itens-avaliativos/:id` recusa (`400 BadRequestException`) a remoção de item com `origem = "learn"`; a exclusão deve ser realizada no Learn (exclusão ou despublicação da atividade), para que a `Atividade` não referencie `ItemAvaliativo` inexistente.
+> **Nota sobre `origem` e `atividadeId`**: constituem o elo da integração Learn → Academy. `DELETE /itens-avaliativos/:id` recusa (`400 BadRequestException`) a remoção de item com `origem = "learn"`; o item é excluído junto com a atividade (`LearnService.removeAtividade`) e acompanha o título, o peso e a nota máxima dela (RN025); nota, peso e nota máxima do item do Learn não são alteráveis pelo Academy (`409`). O item de `origem = "learn"` que tenha ficado sem `atividadeId` (registro anterior a essa regra) pode ser excluído pelo Academy.
 
 Relações: `turma` (N:1), `atividade` (N:1, opcional), `notas` → `Nota[]`.
 
@@ -731,7 +731,7 @@ PK: `id`. FKs: `itemAvaliativoId` → `ItemAvaliativo.id` (`ON DELETE CASCADE`),
 | id | id | Uuid | obrigatório | |
 | itemAvaliativoId | item_avaliativo_id | Uuid | obrigatório | |
 | alunoId | aluno_id | Uuid | obrigatório | |
-| valor | valor | Decimal(4,2) | opcional | `null` = item ainda não corrigido para este aluno — excluído do cálculo de média (não tratado como zero) |
+| valor | valor | Decimal(6,2) | opcional | `null` = item ainda não corrigido para este aluno — excluído do cálculo de média (não tratado como zero) |
 | lancadoPorId | lancado_por_id | Uuid | opcional | identificador sem relação Prisma para `Usuario` |
 | atualizadoEm | atualizado_em | Timestamp | opcional | |
 
@@ -790,7 +790,7 @@ PK: `id`. FKs: `turmaId` → `Turma.id` (`ON DELETE RESTRICT`), `professorId` �
 | professorId | professor_id | Uuid | opcional | |
 | status | status | VarChar(20) | obrigatório | padrão `"rascunho"` (`rascunho`\|`agendada`\|`publicada`\|`encerrada`\|`arquivada`) |
 | peso | peso | Decimal(4,3) | obrigatório | padrão `1` |
-| notaMaxima | nota_maxima | Decimal(4,2) | obrigatório | padrão `10` |
+| notaMaxima | nota_maxima | Decimal(6,2) | obrigatório | padrão `10`; de 0,01 a 1000 (validado no DTO) |
 | abreEm | abre_em | Timestamp | opcional | |
 | prazoEm | prazo_em | Timestamp | opcional | |
 | tempoLimiteMin | tempo_limite_min | Int | opcional | **não identificado no código analisado** nenhuma lógica de bloqueio por tempo decorrido — o campo existe no schema/DTO mas não é aplicado em `learn.service.ts` |
@@ -814,12 +814,12 @@ PK: `id`. FKs: `atividadeId` → `Atividade.id` (`ON DELETE CASCADE`) e `alunoId
 | status | status | VarChar(20) | obrigatório | padrão `"pendente"` (`pendente`\|`enviada`\|`corrigida`\|`reenvio`\|`atrasada`) |
 | texto | texto | Text | opcional | resposta em texto livre do aluno ou, na atividade com questões, observações gerais; as respostas às questões ficam em `RespostaQuestao` |
 | enviadoEm | enviado_em | Timestamp | opcional | |
-| nota | nota | Decimal(4,2) | opcional | espelhada (na correção) para a `Nota` do item avaliativo vinculado, se houver; na atividade com questões, calculada como (pontos obtidos ÷ total) × `notaMaxima` (RN049) |
+| nota | nota | Decimal(6,2) | opcional | espelhada (na correção) para a `Nota` do item avaliativo vinculado, se houver; na atividade com questões, calculada como (pontos obtidos ÷ total) × `notaMaxima` (RN049) |
 | feedback | feedback | Text | opcional | |
 | corrigidoPorId | corrigido_por_id | Uuid | opcional | identificador sem relação Prisma para `Usuario`; nulo na correção automática |
 | corrigidoEm | corrigido_em | Timestamp | opcional | |
 
-> **Nota sobre o reenvio**: no reenvio (`POST /atividades/:id/entregas` sobre entrega existente), o `update` do `upsert` limpa `nota`, `feedback`, `corrigidoPorId` e `corrigidoEm`; a correção anterior é invalidada, e o professor deve corrigir novamente. Na atividade com questões, as respostas (`RespostaQuestao`) e os anexos vinculados a questões são substituídos; se todas as questões forem objetivas, a entrega é novamente corrigida de forma automática. Não há histórico de versões de entrega nem de notas anteriores.
+> **Nota sobre o reenvio**: no reenvio (`POST /atividades/:id/entregas` sobre entrega existente), o `update` do `upsert` limpa `nota`, `feedback`, `corrigidoPorId` e `corrigidoEm`; a correção anterior é invalidada, e o professor deve corrigir novamente. Na mesma transação, a `Nota` já propagada ao item avaliativo do Academy tem o `valor` anulado, e deixa de entrar na média até a nova correção (RN027). Na atividade com questões, as respostas (`RespostaQuestao`) e os anexos vinculados a questões são substituídos; se todas as questões forem objetivas, a entrega é novamente corrigida de forma automática. Não há histórico de versões de entrega nem de notas anteriores.
 
 Relações: `atividade` (N:1, obrigatória), `aluno` (N:1, obrigatória), `anexos` → `AnexoEntrega[]`, `respostas` → `RespostaQuestao[]`.
 

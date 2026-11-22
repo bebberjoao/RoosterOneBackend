@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -17,6 +18,16 @@ import {
   UpdatePeriodoLetivoDto, UpdateProfessorDto, UpdateTurmaDto,
 } from './dto/academy.dto';
 import { traduzirErroPrisma } from '../common/prisma-erro';
+import { CHAVES_ALUNO, CHAVES_PROFESSOR, definicoesDasChaves } from '../common/catalogo-permissoes';
+
+/** Escala da média da turma: cada nota é convertida para 0–10 pela nota máxima do item antes de ser ponderada (RN022). */
+export const ESCALA_MEDIA = 10;
+
+/** Data local do servidor em `aaaa-mm-dd`. */
+function hojeIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 @Injectable()
 export class AcademyService {
@@ -81,7 +92,10 @@ export class AcademyService {
     return periodo;
   }
   async updatePeriodoLetivo(id: string, dto: UpdatePeriodoLetivoDto) {
-    await this.findOnePeriodoLetivo(id);
+    const atual = await this.findOnePeriodoLetivo(id);
+    const inicio = dto.dataInicio ? new Date(dto.dataInicio) : atual.dataInicio;
+    const fim = dto.dataFim ? new Date(dto.dataFim) : atual.dataFim;
+    if (fim < inicio) throw new BadRequestException('"dataFim" deve ser igual ou posterior a "dataInicio".');
     try {
       return await this.prisma.periodoLetivo.update({
         where: { id },
@@ -140,16 +154,22 @@ export class AcademyService {
   }
 
   // ===================== Professor =====================
-  async createProfessor(dto: CreateProfessorDto) {
+  /**
+   * Vincula um usuário do Hub ao corpo docente e concede a ele as permissões padrão de professor
+   * (`CHAVES_PROFESSOR`), para que acesse as próprias turmas sem concessão manual na tela de Acessos.
+   */
+  async createProfessor(dto: CreateProfessorDto, atorId?: string) {
     const usuario = await this.prisma.usuario.findUnique({ where: { id: dto.usuarioId } });
     if (!usuario) throw new NotFoundException('Usuário do Hub não encontrado.');
     const existente = await this.prisma.professor.findUnique({ where: { usuarioId: dto.usuarioId } });
     if (existente) throw new ConflictException('Este usuário já possui vínculo de professor.');
     try {
-      return await this.prisma.professor.create({
+      const professor = await this.prisma.professor.create({
         data: { ...dto, criadoEm: new Date(), atualizadoEm: new Date() },
-        include: { usuario: { select: { id: true, nome: true, email: true } } },
+        include: { usuario: { select: { id: true, nome: true, email: true, ativo: true } } },
       });
+      const permissoesConcedidas = await this.concederPermissoesPadrao(dto.usuarioId, CHAVES_PROFESSOR, atorId);
+      return { ...professor, permissoesConcedidas };
     } catch (error) {
       this.handleError(error, 'criar professor');
     }
@@ -176,7 +196,11 @@ export class AcademyService {
     // usuarioId nunca é reatribuído — o vínculo com o Hub é imutável após criado.
     const { usuarioId: _ignored, ...rest } = dto;
     try {
-      return await this.prisma.professor.update({ where: { id }, data: { ...rest, atualizadoEm: new Date() } });
+      return await this.prisma.professor.update({
+        where: { id },
+        data: { ...rest, atualizadoEm: new Date() },
+        include: { usuario: { select: { id: true, nome: true, email: true, ativo: true } } },
+      });
     } catch (error) {
       this.handleError(error, 'atualizar professor');
     }
@@ -191,17 +215,20 @@ export class AcademyService {
   }
 
   // ===================== Aluno =====================
-  async createAluno(dto: CreateAlunoDto) {
+  /** Vincula um usuário do Hub como aluno e concede a ele as permissões padrão do portal do aluno (`CHAVES_ALUNO`). */
+  async createAluno(dto: CreateAlunoDto, atorId?: string) {
     const usuario = await this.prisma.usuario.findUnique({ where: { id: dto.usuarioId } });
     if (!usuario) throw new NotFoundException('Usuário do Hub não encontrado.');
     const existente = await this.prisma.aluno.findUnique({ where: { usuarioId: dto.usuarioId } });
     if (existente) throw new ConflictException('Este usuário já possui vínculo de aluno.');
     await this.findOneCurso(dto.cursoId);
     try {
-      return await this.prisma.aluno.create({
+      const aluno = await this.prisma.aluno.create({
         data: { ...dto, criadoEm: new Date(), atualizadoEm: new Date() },
-        include: { usuario: { select: { id: true, nome: true, email: true } }, curso: true },
+        include: { usuario: { select: { id: true, nome: true, email: true, ativo: true } }, curso: true },
       });
+      const permissoesConcedidas = await this.concederPermissoesPadrao(dto.usuarioId, CHAVES_ALUNO, atorId);
+      return { ...aluno, permissoesConcedidas };
     } catch (error) {
       this.handleError(error, 'criar aluno');
     }
@@ -242,7 +269,11 @@ export class AcademyService {
     if (dto.cursoId) await this.findOneCurso(dto.cursoId);
     const { usuarioId: _ignored, ...rest } = dto;
     try {
-      return await this.prisma.aluno.update({ where: { id }, data: { ...rest, atualizadoEm: new Date() } });
+      return await this.prisma.aluno.update({
+        where: { id },
+        data: { ...rest, atualizadoEm: new Date() },
+        include: { usuario: { select: { id: true, nome: true, email: true, ativo: true } }, curso: true },
+      });
     } catch (error) {
       this.handleError(error, 'atualizar aluno');
     }
@@ -287,7 +318,8 @@ export class AcademyService {
         disciplina: true,
         periodoLetivo: true,
         professor: { include: { usuario: { select: { id: true, nome: true } } } },
-        _count: { select: { matriculas: true } },
+        // Ocupação = matrículas ativas, o mesmo critério do limite de vagas (RN020).
+        _count: { select: { matriculas: { where: { status: 'ativa' } } } },
       },
     } satisfies Prisma.TurmaFindManyArgs;
 
@@ -354,13 +386,21 @@ export class AcademyService {
   }
 
   // ===================== Matrícula =====================
+  /** Recusa com 409 quando a turma tem limite de vagas e ele já foi atingido pelas matrículas ativas (RN020). */
+  private async exigirVaga(turma: { id: string; capacidade: number }) {
+    if (turma.capacidade <= 0) return;
+    const total = await this.prisma.matricula.count({ where: { turmaId: turma.id, status: 'ativa' } });
+    if (total >= turma.capacidade) throw new ConflictException('Turma já atingiu a capacidade máxima.');
+  }
+
   async createMatricula(dto: CreateMatriculaDto) {
-    await this.findOneAluno(dto.alunoId);
-    const turma = await this.findOneTurma(dto.turmaId);
-    if (turma.capacidade > 0) {
-      const total = await this.prisma.matricula.count({ where: { turmaId: dto.turmaId, status: 'ativa' } });
-      if (total >= turma.capacidade) throw new ConflictException('Turma já atingiu a capacidade máxima.');
+    const aluno = await this.findOneAluno(dto.alunoId);
+    if (aluno.situacao !== 'ativo') {
+      throw new ConflictException(`O aluno está com a situação "${aluno.situacao}" e não pode ser matriculado; reative o cadastro do aluno antes.`);
     }
+    const turma = await this.findOneTurma(dto.turmaId);
+    if (turma.status === 'encerrada') throw new ConflictException('A turma está encerrada e não aceita novas matrículas.');
+    if ((dto.status ?? 'ativa') === 'ativa') await this.exigirVaga(turma);
     try {
       return await this.prisma.matricula.create({
         data: { ...dto, status: dto.status ?? 'ativa', criadoEm: new Date(), atualizadoEm: new Date() },
@@ -385,10 +425,16 @@ export class AcademyService {
     });
   }
   async updateMatricula(id: string, dto: UpdateMatriculaDto) {
-    const existente = await this.prisma.matricula.findUnique({ where: { id } });
+    const existente = await this.prisma.matricula.findUnique({ where: { id }, include: { turma: { select: { id: true, capacidade: true } } } });
     if (!existente) throw new NotFoundException(`Matrícula com id ${id} não encontrada.`);
+    // Somente a situação é alterável: aluno e turma identificam a matrícula (mudar de turma é nova matrícula).
+    if ((dto.alunoId && dto.alunoId !== existente.alunoId) || (dto.turmaId && dto.turmaId !== existente.turmaId)) {
+      throw new BadRequestException('A matrícula não pode ser transferida para outro aluno ou outra turma; cancele-a e crie outra.');
+    }
+    // A reativação ocupa vaga, como uma matrícula nova.
+    if (dto.status === 'ativa' && existente.status !== 'ativa') await this.exigirVaga(existente.turma);
     try {
-      return await this.prisma.matricula.update({ where: { id }, data: { ...dto, atualizadoEm: new Date() } });
+      return await this.prisma.matricula.update({ where: { id }, data: { ...(dto.status ? { status: dto.status } : {}), atualizadoEm: new Date() } });
     } catch (error) {
       this.handleError(error, 'atualizar matrícula');
     }
@@ -404,15 +450,26 @@ export class AcademyService {
   }
 
   // ===================== Frequência =====================
-  async registrarFrequenciaLote(turmaId: string, registradoPorId: string, dto: RegistrarFrequenciaLoteDto) {
+  /**
+   * Registra a chamada de uma data. `podeEditar` indica se quem registra pode corrigir uma chamada já lançada
+   * (permissão `editar-chamada` ou gestão acadêmica): sem ela, a data que já tem registro é recusada com 403 (RN023).
+   */
+  async registrarFrequenciaLote(turmaId: string, registradoPorId: string, dto: RegistrarFrequenciaLoteDto, podeEditar = true) {
     await this.findOneTurma(turmaId);
-    const alunosMatriculados = new Set((await this.findMatriculasDaTurma(turmaId)).map((m) => m.alunoId));
+    const dia = dto.data.slice(0, 10);
+    if (dia > hojeIso()) throw new BadRequestException('Não é possível registrar a chamada de uma data futura.');
+    if (!dto.registros.length) throw new BadRequestException('Informe ao menos um registro de presença.');
+    const matriculas = await this.prisma.matricula.findMany({ where: { turmaId }, select: { alunoId: true, status: true } });
+    const situacaoPorAluno = new Map(matriculas.map((m) => [m.alunoId, m.status]));
     for (const registro of dto.registros) {
-      if (!alunosMatriculados.has(registro.alunoId)) {
-        throw new BadRequestException(`Aluno ${registro.alunoId} não está matriculado nesta turma.`);
-      }
+      const situacao = situacaoPorAluno.get(registro.alunoId);
+      if (!situacao) throw new BadRequestException(`Aluno ${registro.alunoId} não está matriculado nesta turma.`);
+      if (situacao !== 'ativa') throw new BadRequestException(`A matrícula do aluno ${registro.alunoId} nesta turma não está ativa.`);
     }
-    const data = new Date(dto.data.slice(0, 10));
+    const data = new Date(dia);
+    if (!podeEditar && (await this.prisma.registroFrequencia.count({ where: { turmaId, data } })) > 0) {
+      throw new ForbiddenException('A chamada desta data já foi registrada; a correção exige a permissão "Editar chamada anterior".');
+    }
     return this.prisma.$transaction(
       dto.registros.map((registro) =>
         this.prisma.registroFrequencia.upsert({
@@ -464,16 +521,28 @@ export class AcademyService {
     return item;
   }
   async updateItemAvaliativo(id: string, dto: UpdateItemAvaliativoDto) {
-    await this.findOneItemAvaliativo(id);
+    const item = await this.findOneItemAvaliativo(id);
+    if (item.origem === 'learn' && item.atividadeId) {
+      throw new ConflictException('Item gerado pelo Rooster Learn: altere o título, o peso ou a nota máxima na atividade correspondente.');
+    }
+    // O item nunca muda de turma: a autorização foi conferida contra a turma atual.
+    const { turmaId: _ignorado, ...dados } = dto;
+    if (dados.notaMaxima != null) {
+      const maior = item.notas.reduce((m, n) => (n.valor != null && Number(n.valor) > m ? Number(n.valor) : m), 0);
+      if (maior > Number(dados.notaMaxima)) {
+        throw new ConflictException(`Já existe nota lançada (${maior}) acima da nova nota máxima; ajuste as notas antes.`);
+      }
+    }
     try {
-      return await this.prisma.itemAvaliativo.update({ where: { id }, data: dto });
+      return await this.prisma.itemAvaliativo.update({ where: { id }, data: dados });
     } catch (error) {
       this.handleError(error, 'atualizar item avaliativo');
     }
   }
   async removeItemAvaliativo(id: string) {
     const item = await this.findOneItemAvaliativo(id);
-    if (item.origem === 'learn') {
+    // O item do Learn acompanha a atividade; só o item que ficou sem atividade (registro antigo) pode ser excluído aqui.
+    if (item.origem === 'learn' && item.atividadeId) {
       throw new BadRequestException('Item gerado pelo Rooster Learn — exclua a atividade correspondente.');
     }
     try {
@@ -486,8 +555,14 @@ export class AcademyService {
   async lancarNota(itemAvaliativoId: string, lancadoPorId: string, dto: LancarNotaDto) {
     // lancadoPorId é sempre o professor/coordenação autenticado — ver AcademyController.
     const item = await this.findOneItemAvaliativo(itemAvaliativoId);
+    if (item.origem === 'learn' && item.atividadeId) {
+      throw new ConflictException('A nota deste item vem da correção da atividade no Rooster Learn; corrija a entrega por lá.');
+    }
     const matricula = await this.prisma.matricula.findUnique({ where: { alunoId_turmaId: { alunoId: dto.alunoId, turmaId: item.turmaId } } });
     if (!matricula) throw new BadRequestException('Aluno não está matriculado na turma deste item avaliativo.');
+    if (matricula.status === 'cancelada' || matricula.status === 'trancada') {
+      throw new BadRequestException(`A matrícula do aluno nesta turma está ${matricula.status}; não é possível lançar nota.`);
+    }
     if (dto.valor != null && Number(dto.valor) > Number(item.notaMaxima)) {
       throw new BadRequestException(`A nota não pode exceder o valor máximo do item (${item.notaMaxima}).`);
     }
@@ -506,7 +581,11 @@ export class AcademyService {
     return nota;
   }
 
-  /** Média ponderada dos itens avaliativos lançados da turma para um aluno (itens sem nota lançada não entram no cálculo). */
+  /**
+   * Média do aluno na turma, na escala 0–10 (`ESCALA_MEDIA`). Cada nota é convertida para a escala pela nota máxima
+   * do item e ponderada pelo peso; os itens sem nota lançada não entram no cálculo (RN022). Sem a conversão, itens com
+   * notas máximas diferentes (por exemplo, prova valendo 10 e trabalho valendo 5) seriam somados em escalas distintas.
+   */
   async calcularMediaTurma(alunoId: string, turmaId: string) {
     const itens = await this.prisma.itemAvaliativo.findMany({
       where: { turmaId },
@@ -517,8 +596,10 @@ export class AcademyService {
     for (const item of itens) {
       const nota = item.notas[0]?.valor;
       if (nota == null) continue;
+      const maximo = new Prisma.Decimal(item.notaMaxima);
+      if (maximo.lte(0)) continue;
       somaPesos = somaPesos.add(item.peso);
-      somaPonderada = somaPonderada.add(new Prisma.Decimal(nota).mul(item.peso));
+      somaPonderada = somaPonderada.add(new Prisma.Decimal(nota).div(maximo).mul(ESCALA_MEDIA).mul(item.peso));
     }
     return somaPesos.isZero() ? null : Number(somaPonderada.div(somaPesos).toFixed(2));
   }
@@ -526,7 +607,7 @@ export class AcademyService {
   async findNotasDoAluno(alunoId: string, turmaId?: string) {
     const matriculas = turmaId
       ? [{ turmaId }]
-      : (await this.findMatriculasDoAluno(alunoId)).map((m) => ({ turmaId: m.turmaId }));
+      : (await this.findMatriculasDoAluno(alunoId)).filter((m) => m.status !== 'cancelada').map((m) => ({ turmaId: m.turmaId }));
 
     const resultado: Array<{ turmaId: string; itens: unknown[]; media: number | null }> = [];
     for (const { turmaId: id } of matriculas) {
@@ -545,6 +626,9 @@ export class AcademyService {
 
   // ===================== Calendário =====================
   async createEventoCalendario(dto: CreateEventoCalendarioDto) {
+    if (dto.dataFim && new Date(dto.dataFim) < new Date(dto.data)) {
+      throw new BadRequestException('"dataFim" deve ser igual ou posterior a "data".');
+    }
     try {
       return await this.prisma.eventoCalendarioAcademico.create({
         data: { ...dto, data: new Date(dto.data), dataFim: dto.dataFim ? new Date(dto.dataFim) : undefined, criadoEm: new Date() },
@@ -562,7 +646,10 @@ export class AcademyService {
     return evento;
   }
   async updateEventoCalendario(id: string, dto: UpdateEventoCalendarioDto) {
-    await this.findOneEventoCalendario(id);
+    const atual = await this.findOneEventoCalendario(id);
+    const inicio = dto.data ? new Date(dto.data) : atual.data;
+    const fim = dto.dataFim ? new Date(dto.dataFim) : dto.dataFim === null ? null : atual.dataFim;
+    if (fim && fim < inicio) throw new BadRequestException('"dataFim" deve ser igual ou posterior a "data".');
     try {
       return await this.prisma.eventoCalendarioAcademico.update({
         where: { id },
@@ -618,6 +705,32 @@ export class AcademyService {
     } catch (error) {
       this.handleError(error, 'remover documento');
     }
+  }
+
+  /**
+   * Concede ao usuário as permissões do catálogo correspondentes às chaves informadas que ele ainda não possui e
+   * devolve quantas foram concedidas. As permissões são localizadas por módulo, recurso e ação (o mesmo critério do
+   * `PermissionGuard`); as que não existem no banco são ignoradas. Nada é revogado na exclusão do vínculo: a
+   * permissão pode ter sido concedida por outro motivo, e a remoção cabe à tela de Acessos.
+   */
+  private async concederPermissoesPadrao(usuarioId: string, chaves: readonly string[], atorId?: string) {
+    const definicoes = definicoesDasChaves(chaves);
+    const permissoes = await this.prisma.permissao.findMany({
+      where: { OR: definicoes.map(([, , modulo, recurso, acao]) => ({ recurso, acao, modulo: { nome: modulo } })) },
+      select: { id: true },
+    });
+    const vinculos = await this.prisma.usuarioPermissao.findMany({ where: { usuarioId }, select: { permissaoId: true } });
+    const jaPossui = new Set(vinculos.map((v) => v.permissaoId));
+    const novas = permissoes.filter((p) => !jaPossui.has(p.id));
+    if (!novas.length) return 0;
+    const agora = new Date();
+    await this.prisma.$transaction(
+      novas.map((p) => this.prisma.usuarioPermissao.create({ data: { usuarioId, permissaoId: p.id, criadoEm: agora } })),
+    );
+    await this.auditoria.registrar({
+      usuarioId: atorId ?? usuarioId, modulo: 'Rooster Academy', acao: 'permissoes_padrao_concedidas', entidade: 'usuario', entidadeId: usuarioId,
+    });
+    return novas.length;
   }
 
   /** `tamanho` é BigInt no schema — JSON.stringify não serializa BigInt (mesmo padrão de anexoTicket). */

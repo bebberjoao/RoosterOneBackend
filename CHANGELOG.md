@@ -25,6 +25,45 @@ estão indicadas; as demais não alteram o banco de dados.
 
 ### Adicionado
 
+- **Tela do instalador, banco criado sem senha e dados iniciais** (10/11/2026). Não exige migration.
+  `scripts/instalador/INSTALAR.bat` passa a abrir uma tela (`instalador-tela.ps1`, WPF) com o passo a passo da
+  instalação: os 12 passos com a situação e a duração de cada um, barra de progresso, tempo decorrido, detalhes de
+  cada operação e tela final com endereço e login, ou com o passo e o erro e a opção de tentar novamente. O motor
+  (`instalador.ps1`) deixou de fazer perguntas durante a instalação: a porta ocupada por outro programa é trocada pela
+  próxima livre, e o banco é preparado sem a senha do superusuário `postgres` (mantém a conexão do `.env` que já
+  funciona, adota a pasta `banco-local` de desenvolvimento ou cria um banco próprio em
+  `C:\ProgramData\RoosterOne\pgdata`, em porta livre, como o serviço `RoosterOnePostgres`). O novo
+  `scripts/preparar-base.ts` garante o catálogo de módulos e permissões, os status de chamado e a conta de
+  administrador informada na tela: antes, a instalação sem os dados de demonstração resultava em banco sem
+  permissões e sem nenhum usuário. O menu de console continua disponível (`INSTALAR.bat menu`). O `INSTALAR.bat` é o
+  único caminho de instalação no Windows: `scripts/criar-meu-usuario.ts`, que criava o administrador à parte, foi
+  removido, pois a conta passou a ser criada pelo instalador (`preparar-base.ts`). Documentação em
+  `docs/operations/09-instalador.md`.
+- **Documentação gerada pelo instalador** (11/11/2026). A instalação ganhou o passo "Documentação", que gera o Manual do
+  Usuário e a Documentação Geral em Word na pasta `documentacao`, ao lado dos repositórios, e cria o atalho
+  **Rooster One - Documentação** na área de trabalho; a tela final oferece o botão **Abrir a documentação**. A falha
+  nesse passo é apenas aviso. O pacote de instalação deixou de levar cópias de documentos Word, que a instalação gera
+  já atualizados.
+- **Pacote de instalação com executável** (11/11/2026). `scripts/instalador/montar-pacote.ps1` gera a pasta
+  `instalador`, autocontida para outro computador: `INSTALAR.exe` (compilado pelo script, pede a elevação e abre a tela
+  do instalador), a cópia dos dois repositórios e, em `pacotes`, os instaladores oficiais do Node.js LTS (SHA-256
+  conferido) e do PostgreSQL (assinatura digital conferida). O instalador passou a procurar os pacotes também na
+  subpasta `pacotes`. Documentação em `docs/operations/09-instalador.md`, seção "Pacote de instalação".
+- **Gerador do documento consolidado** (11/11/2026): `npm run documentacao` (`docs/gerar-documentacao.js`) monta o
+  `Rooster-One-Documentacao-Geral.docx` a partir da árvore `docs/` (na ordem do índice), da documentação do frontend,
+  dos diagramas de `docs/diagramas/png` (os largos em página deitada) e deste histórico. Antes, o documento era montado
+  à parte, sem script no repositório.
+- **Catálogo de permissões em fonte única** (10/11/2026): `src/common/catalogo-permissoes.ts` reúne os 9 módulos,
+  as 149 permissões e os conjuntos padrão de professor e de aluno, usados pelo seed de demonstração, por
+  `preparar-base.ts` e pelo Academy.
+- **Permissões padrão no vínculo de professor e de aluno** (10/11/2026). `POST /professores` e `POST /alunos`
+  concedem ao usuário vinculado as permissões padrão do papel que ele ainda não possui e devolvem a quantidade em
+  `permissoesConcedidas`; a concessão é auditada (`permissoes_padrao_concedidas`). Antes, o usuário recém-vinculado
+  entrava no sistema sem acesso a nenhuma tela, até a concessão manual em Acessos. A exclusão do vínculo não revoga
+  permissões. Coberto por teste e2e do ciclo completo (usuário, professor, curso, período, disciplina, turma, aluno,
+  matrícula, chamada e nota).
+- **Aba Cursos na gestão acadêmica** (10/11/2026; frontend). O cadastro de curso existia apenas na API; em banco sem
+  dados de demonstração não era possível cadastrar alunos, que exigem curso.
 - **Assistente de dúvidas com roteiros guiados** (06/10/2026). Não exige migration. Novo módulo `src/assistente/`
   (`AssistenteModule`), com as rotas `POST /assistente/perguntas`, `GET /assistente/sugestoes`,
   `GET /assistente/entradas/:id` e `GET /assistente/roteiros/:id`, disponíveis a qualquer usuário autenticado. O
@@ -273,6 +312,50 @@ estão indicadas; as demais não alteram o banco de dados.
 
 ### Corrigido
 
+- **Média calculada com itens em escalas diferentes** (10/11/2026). A média somava as notas brutas ponderadas pelo
+  peso, sem considerar a nota máxima de cada item: um trabalho valendo 5 com nota 5 contribuía com 5, e não com 10, e
+  itens valendo 100 distorciam a média. `calcularMediaTurma` passou a converter cada nota para a escala de 0 a 10 pela
+  nota máxima do item (`ESCALA_MEDIA`); a tela do professor e o portal do aluno usam a mesma regra
+  (`src/lib/regras-academicas.ts`, no frontend). RN022 reescrita.
+- **Nota ou nota máxima de 100 pontos provocava erro interno** (10/11/2026). **Exige migration**
+  (`20261110120000_notas_ate_mil`): as colunas de nota e de nota máxima do Academy e do Learn passam de
+  `DECIMAL(4,2)` (até 99,99) para `DECIMAL(6,2)`, e os DTOs limitam o valor a 1000.
+- **Integração Learn → Academy inconsistente após a publicação** (10/11/2026). (1) O reenvio da entrega limpava a
+  nota no Learn, mas a nota antiga continuava na média do Academy; agora é retirada na mesma transação. (2) A edição
+  do título, do peso ou da nota máxima da atividade publicada não chegava ao item avaliativo; o item passa a acompanhar
+  a atividade. (3) A exclusão da atividade deixava o item no Academy sem origem, e ele não podia mais ser excluído;
+  agora é excluído junto. (4) O item do Learn, somente leitura na tela, aceitava nota e alteração pela API; a recusa
+  (`409`) passou a ser do backend. (5) `PATCH /atividades/:id` e `PATCH /itens-avaliativos/:id` aceitavam `turmaId`,
+  o que permitia mover o registro para turma de outro professor; o campo passou a ser ignorado. RN025 e RN027.
+- **Permissão "Editar chamada anterior" sem efeito** (10/11/2026). `editar-chamada` constava do catálogo e da RN023,
+  mas nenhuma rota a exigia: quem registrava a chamada podia regravar qualquer data. A correção de data já lançada
+  passou a exigi-la (`403`), salvo para a gestão acadêmica. A chamada também deixou de aceitar data futura e aluno sem
+  matrícula ativa.
+- **Percentual de presença diferente para o professor e para o aluno** (10/11/2026; frontend). A tela do professor
+  contava o atraso como presença, e o portal do aluno, não; o critério foi unificado (presente, atraso e falta
+  justificada contam como presença). A matrícula cancelada deixou de ser exibida ao aluno como "Reprovado por falta".
+  As faixas de cor das notas no portal do aluno (antes 7 e 5, sobre o valor bruto) passaram a usar a mesma referência
+  da tela do professor (6 e 4, sobre a nota convertida para a escala 0–10), e o peso é exibido em percentual.
+- **Matrícula contornava o limite de vagas** (10/11/2026). A reativação de matrícula cancelada e a edição com outro
+  `turmaId` não verificavam a capacidade; a ocupação das turmas contava também as matrículas canceladas. A matrícula
+  em turma encerrada e a de aluno com cadastro não ativo passaram a ser recusadas (`409`). RN020.
+- **Datas invertidas aceitas na edição** (10/11/2026): período letivo e evento do calendário com término anterior ao
+  início eram recusados na criação, mas aceitos na edição.
+- **Exclusão de registro ainda referenciado respondia HTTP 500** (10/11/2026). Excluir disciplina com turmas, curso
+  com disciplinas ou alunos, ou período letivo com turmas resultava em erro interno. `traduzirErroPrisma` passou a
+  responder `409` para a violação de chave estrangeira (`P2003`) e para a violação de `RESTRICT` do PostgreSQL 18
+  (SQLSTATE 23001), que o Prisma não mapeia e entrega sem código. No frontend, a confirmação de exclusão informa o
+  vínculo antes da tentativa.
+- **Cadastro de professor recusado com título ou departamento em branco** (10/11/2026; frontend). O formulário
+  enviava texto vazio, recusado pela validação (`400`); o campo vazio passou a ser enviado como nulo.
+- **Nome substituído por "—" após editar professor ou aluno** (10/11/2026): `PATCH /professores/:id` e
+  `PATCH /alunos/:id` não devolviam o usuário vinculado.
+- **Edição de turma** (10/11/2026; frontend): o professor não podia ser retirado da turma; a nova turma não trazia
+  período letivo selecionado, embora o campo aparentasse estar preenchido; e a turma sem limite de vagas exibia
+  ocupação inválida.
+- **`SMTP_HOST` vazio informado como servidor de e-mail** (10/11/2026): com o valor do `.env.example`,
+  `GET /configuracoes/email` devolvia `host: ""` em vez de `null`, o que fazia falhar um teste e2e em ambiente com
+  `.env`.
 - **Telas do Rooms, do Desk e do Assets com "Acesso negado" para usuários autorizados** (05/10/2026). **Exige
   migration** (`20261005090000_permissoes_acesso_telas`, somente dados). O frontend exige a ação `acessar` para a
   entrada em cada tela, mas Reservar, Minhas reservas, Gerenciar reservas, Estrutura física, Categorias, Atendentes e

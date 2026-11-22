@@ -1506,6 +1506,169 @@ describe('Full API e2e tests', () => {
       expect(comCurso.body.cursoId).toBe(cenario.curso.id);
     });
 
+    it('Ciclo completo pela API: usuário novo vira professor e aluno já com as permissões padrão, sem concessão manual', async () => {
+      const server = app.getHttpServer();
+      const login = async (email: string) =>
+        `Bearer ${(await request(server).post('/v1/auth/login').send({ email, senha: 'Senha123!' }).expect(201)).body.accessToken}`;
+
+      // Usuários criados no Hub, ainda sem nenhuma permissão.
+      const usuarioProf = await request(server).post('/v1/usuarios').set('Authorization', authHeader)
+        .send({ nome: 'Professora Nova', email: 'prof.nova@example.com', senhaHash: 'Senha123!' }).expect(201);
+      const usuarioAluno = await request(server).post('/v1/usuarios').set('Authorization', authHeader)
+        .send({ nome: 'Aluno Novo', email: 'aluno.novo@example.com', senhaHash: 'Senha123!' }).expect(201);
+      await request(server).get('/v1/me/turmas-lecionadas').set('Authorization', await login('prof.nova@example.com')).expect(403);
+
+      // O vínculo acadêmico concede as permissões padrão do papel.
+      const professor = await request(server).post('/v1/professores').set('Authorization', authHeader)
+        .send({ usuarioId: usuarioProf.body.id, titulacao: 'Profa.' }).expect(201);
+      expect(professor.body.permissoesConcedidas).toBeGreaterThan(0);
+
+      const curso = await request(server).post('/v1/cursos').set('Authorization', authHeader)
+        .send({ nome: 'Curso do Ciclo', codigo: 'CICLO', grau: 'Graduação' }).expect(201);
+      const periodo = await request(server).post('/v1/periodos-letivos').set('Authorization', authHeader)
+        .send({ nome: '2026.2', dataInicio: '2026-08-01', dataFim: '2026-12-20', ativo: true }).expect(201);
+      const disciplina = await request(server).post('/v1/disciplinas').set('Authorization', authHeader)
+        .send({ codigo: 'CIC101', nome: 'Matéria do Ciclo', cargaHoraria: 60, cursoId: curso.body.id }).expect(201);
+      const turma = await request(server).post('/v1/turmas').set('Authorization', authHeader)
+        .send({ codigo: 'CIC101-A', periodoLetivoId: periodo.body.id, disciplinaId: disciplina.body.id, professorId: professor.body.id, capacidade: 30 }).expect(201);
+
+      const aluno = await request(server).post('/v1/alunos').set('Authorization', authHeader)
+        .send({ usuarioId: usuarioAluno.body.id, ra: 'CICLO001', cursoId: curso.body.id }).expect(201);
+      expect(aluno.body.permissoesConcedidas).toBeGreaterThan(0);
+      await request(server).post(`/v1/turmas/${turma.body.id}/matriculas`).set('Authorization', authHeader)
+        .send({ alunoId: aluno.body.id }).expect(201);
+
+      // O professor enxerga a própria turma, registra a chamada e lança nota.
+      const authProf = await login('prof.nova@example.com');
+      const lecionadas = await request(server).get('/v1/me/turmas-lecionadas').set('Authorization', authProf).expect(200);
+      expect(lecionadas.body.map((t: { id: string }) => t.id)).toEqual([turma.body.id]);
+      await request(server).post(`/v1/turmas/${turma.body.id}/frequencia`).set('Authorization', authProf)
+        .send({ data: '2026-09-22', registros: [{ alunoId: aluno.body.id, data: '2026-09-22', presenca: 'presente' }] }).expect(201);
+      const item = await request(server).post(`/v1/turmas/${turma.body.id}/itens-avaliativos`).set('Authorization', authProf)
+        .send({ nome: 'Prova 1', peso: 1, notaMaxima: 10 }).expect(201);
+      await request(server).patch(`/v1/itens-avaliativos/${item.body.id}/notas`).set('Authorization', authProf)
+        .send({ alunoId: aluno.body.id, valor: 8.5 }).expect(200);
+
+      // O aluno acessa o portal e vê a turma e a nota.
+      const authAluno = await login('aluno.novo@example.com');
+      const minhasTurmas = await request(server).get('/v1/me/turmas').set('Authorization', authAluno).expect(200);
+      expect(minhasTurmas.body).toHaveLength(1);
+      const notas = await request(server).get('/v1/me/notas').set('Authorization', authAluno).expect(200);
+      expect(notas.body[0].media).toBe(8.5);
+
+      // A edição devolve o usuário vinculado (o frontend exibe o nome a partir da resposta).
+      const editado = await request(server).patch(`/v1/professores/${professor.body.id}`).set('Authorization', authHeader)
+        .send({ departamento: 'Computação' }).expect(200);
+      expect(editado.body.usuario.nome).toBe('Professora Nova');
+
+      // Exclusão de registro ainda referenciado é recusa de negócio (409), e não erro interno.
+      await request(server).delete(`/v1/disciplinas/${disciplina.body.id}`).set('Authorization', authHeader).expect(409);
+      await request(server).delete(`/v1/cursos/${curso.body.id}`).set('Authorization', authHeader).expect(409);
+
+      // O professor pode ser retirado da turma pela edição.
+      const semProfessor = await request(server).patch(`/v1/turmas/${turma.body.id}`).set('Authorization', authHeader)
+        .send({ professorId: null }).expect(200);
+      expect(semProfessor.body.professorId).toBeNull();
+    });
+
+    it('Controle de notas, frequência e matrícula: média em escala única, chamada anterior protegida, vagas e integração com o Learn', async () => {
+      const server = app.getHttpServer();
+      const adm = (req: any) => req.set('Authorization', authHeader);
+      const login = async (email: string) =>
+        `Bearer ${(await request(server).post('/v1/auth/login').send({ email, senha: 'Senha123!' }).expect(201)).body.accessToken}`;
+      const novoUsuario = async (nome: string, email: string) =>
+        (await adm(request(server).post('/v1/usuarios')).send({ nome, email, senhaHash: 'Senha123!' }).expect(201)).body.id as string;
+
+      const curso = (await adm(request(server).post('/v1/cursos')).send({ nome: 'Curso Regras', codigo: 'REGRAS', grau: 'Graduação' }).expect(201)).body;
+      const periodo = (await adm(request(server).post('/v1/periodos-letivos')).send({ nome: '2026.R', dataInicio: '2026-08-01', dataFim: '2026-12-20' }).expect(201)).body;
+      // Período com término anterior ao início é recusado também na edição.
+      await adm(request(server).patch(`/v1/periodos-letivos/${periodo.id}`)).send({ dataFim: '2026-07-01' }).expect(400);
+
+      const disciplina = (await adm(request(server).post('/v1/disciplinas')).send({ codigo: 'REG101', nome: 'Regras', cargaHoraria: 40 }).expect(201)).body;
+      const turma = (await adm(request(server).post('/v1/turmas')).send({ codigo: 'REG101-A', periodoLetivoId: periodo.id, disciplinaId: disciplina.id, capacidade: 1 }).expect(201)).body;
+      const outraTurma = (await adm(request(server).post('/v1/turmas')).send({ codigo: 'REG101-B', periodoLetivoId: periodo.id }).expect(201)).body;
+
+      const alunoA = (await adm(request(server).post('/v1/alunos')).send({ usuarioId: await novoUsuario('Aluna A', 'aluna.a@example.com'), ra: 'REG001', cursoId: curso.id }).expect(201)).body;
+      const alunoB = (await adm(request(server).post('/v1/alunos')).send({ usuarioId: await novoUsuario('Aluno B', 'aluno.b@example.com'), ra: 'REG002', cursoId: curso.id }).expect(201)).body;
+
+      // ---- Matrícula: vagas, reativação e transferência ----
+      const matA = (await adm(request(server).post(`/v1/turmas/${turma.id}/matriculas`)).send({ alunoId: alunoA.id }).expect(201)).body;
+      await adm(request(server).post(`/v1/turmas/${turma.id}/matriculas`)).send({ alunoId: alunoB.id }).expect(409);
+      await adm(request(server).patch(`/v1/matriculas/${matA.id}`)).send({ status: 'cancelada' }).expect(200);
+      const matB = (await adm(request(server).post(`/v1/turmas/${turma.id}/matriculas`)).send({ alunoId: alunoB.id }).expect(201)).body;
+      // A reativação ocupa vaga; e a matrícula não muda de turma pela edição.
+      await adm(request(server).patch(`/v1/matriculas/${matA.id}`)).send({ status: 'ativa' }).expect(409);
+      await adm(request(server).patch(`/v1/matriculas/${matB.id}`)).send({ turmaId: outraTurma.id }).expect(400);
+      // Aluno com o cadastro inativo não é matriculado.
+      await adm(request(server).patch(`/v1/alunos/${alunoA.id}`)).send({ situacao: 'inativo' }).expect(200);
+      await adm(request(server).post(`/v1/turmas/${outraTurma.id}/matriculas`)).send({ alunoId: alunoA.id }).expect(409);
+
+      // ---- Notas: itens com notas máximas diferentes entram na média na mesma escala (0 a 10) ----
+      const prova = (await adm(request(server).post(`/v1/turmas/${turma.id}/itens-avaliativos`)).send({ nome: 'Prova', peso: 0.5, notaMaxima: 10 }).expect(201)).body;
+      const trabalho = (await adm(request(server).post(`/v1/turmas/${turma.id}/itens-avaliativos`)).send({ nome: 'Trabalho', peso: 0.5, notaMaxima: 100 }).expect(201)).body;
+      await adm(request(server).patch(`/v1/itens-avaliativos/${prova.id}/notas`)).send({ alunoId: alunoB.id, valor: 8 }).expect(200);
+      await adm(request(server).patch(`/v1/itens-avaliativos/${trabalho.id}/notas`)).send({ alunoId: alunoB.id, valor: 90 }).expect(200);
+      const authB = await login('aluno.b@example.com');
+      const notasB = await request(server).get('/v1/me/notas').set('Authorization', authB).expect(200);
+      expect(notasB.body[0].media).toBe(8.5);
+      // Matrícula cancelada não recebe nota.
+      await adm(request(server).patch(`/v1/itens-avaliativos/${prova.id}/notas`)).send({ alunoId: alunoA.id, valor: 5 }).expect(400);
+      // A nota máxima não pode ficar abaixo de nota já lançada, e o item não muda de turma.
+      await adm(request(server).patch(`/v1/itens-avaliativos/${trabalho.id}`)).send({ notaMaxima: 50 }).expect(409);
+      const movido = await adm(request(server).patch(`/v1/itens-avaliativos/${prova.id}`)).send({ turmaId: outraTurma.id, nome: 'Prova 1' }).expect(200);
+      expect(movido.body.turmaId).toBe(turma.id);
+      expect(movido.body.nome).toBe('Prova 1');
+
+      // ---- Frequência: data futura, matrícula não ativa e correção de chamada anterior ----
+      const chamada = (data: string, alunoId: string) => ({ data, registros: [{ alunoId, data, presenca: 'falta' }] });
+      await adm(request(server).post(`/v1/turmas/${turma.id}/frequencia`)).send(chamada('2999-01-01', alunoB.id)).expect(400);
+      await adm(request(server).post(`/v1/turmas/${turma.id}/frequencia`)).send(chamada('2026-09-01', alunoA.id)).expect(400);
+      // Professor da turma apenas com "registrar-chamada": lança a chamada do dia, mas não corrige a já lançada.
+      const semEditar = await criarUsuarioComPermissoes('Prof Sem Editar', 'prof.sem.editar@example.com', [
+        ['Rooster Academy', '/academy', 'acessar'],
+        ['Rooster Academy', '/academy/attendance', 'acessar'],
+        ['Rooster Academy', '/academy/attendance', 'registrar-chamada'],
+      ]);
+      const professor = await prisma.professor.create({ data: { usuarioId: semEditar.usuario.id, status: 'ativo' } });
+      await adm(request(server).patch(`/v1/turmas/${turma.id}`)).send({ professorId: professor.id }).expect(200);
+      await request(server).post(`/v1/turmas/${turma.id}/frequencia`).set('Authorization', semEditar.header).send(chamada('2026-09-01', alunoB.id)).expect(201);
+      await request(server).post(`/v1/turmas/${turma.id}/frequencia`).set('Authorization', semEditar.header).send(chamada('2026-09-01', alunoB.id)).expect(403);
+      await adm(request(server).post(`/v1/turmas/${turma.id}/frequencia`)).send(chamada('2026-09-01', alunoB.id)).expect(201);
+
+      // ---- Learn → Academy: o item acompanha a atividade ----
+      const atividade = (await adm(request(server).post('/v1/atividades')).send({ titulo: 'Lista 1', tipo: 'lista', turmaId: turma.id, peso: 0.2, notaMaxima: 10 }).expect(201)).body;
+      await adm(request(server).patch(`/v1/atividades/${atividade.id}/publicar`)).expect(200);
+      const itemDaAtividade = async () =>
+        (await adm(request(server).get(`/v1/turmas/${turma.id}/notas`)).expect(200)).body.find((i: { atividadeId: string | null }) => i.atividadeId === atividade.id);
+      const item = await itemDaAtividade();
+      expect(item.origem).toBe('learn');
+      // A nota e a configuração do item do Learn não são alteradas pelo Academy.
+      await adm(request(server).patch(`/v1/itens-avaliativos/${item.id}/notas`)).send({ alunoId: alunoB.id, valor: 9 }).expect(409);
+      await adm(request(server).patch(`/v1/itens-avaliativos/${item.id}`)).send({ peso: 0.9 }).expect(409);
+      // A edição da atividade se reflete no item; a atividade não muda de turma.
+      const editada = await adm(request(server).patch(`/v1/atividades/${atividade.id}`)).send({ titulo: 'Lista 1 (revisada)', peso: 0.3, turmaId: outraTurma.id }).expect(200);
+      expect(editada.body.turmaId).toBe(turma.id);
+      const sincronizado = await itemDaAtividade();
+      expect(sincronizado.nome).toBe('Lista 1 (revisada)');
+      expect(Number(sincronizado.peso)).toBe(0.3);
+
+      const entrega = (await request(server).post(`/v1/atividades/${atividade.id}/entregas`).set('Authorization', authB).send({ texto: 'primeira versão' }).expect(201)).body;
+      await adm(request(server).patch(`/v1/entregas/${entrega.id}/corrigir`)).send({ nota: 7 }).expect(200);
+      const notaDe = async () => (await itemDaAtividade()).notas.find((n: { alunoId: string }) => n.alunoId === alunoB.id);
+      expect(Number((await notaDe()).valor)).toBe(7);
+      // Com nota lançada, a nota máxima não desce abaixo dela e a atividade não fica sem peso.
+      await adm(request(server).patch(`/v1/atividades/${atividade.id}`)).send({ notaMaxima: 5 }).expect(409);
+      await adm(request(server).patch(`/v1/atividades/${atividade.id}`)).send({ peso: 0 }).expect(409);
+      // O reenvio invalida a correção: a nota sai também do Academy, até a nova correção.
+      await request(server).post(`/v1/atividades/${atividade.id}/entregas`).set('Authorization', authB).send({ texto: 'segunda versão' }).expect(201);
+      expect((await notaDe()).valor).toBeNull();
+      // A exclusão da atividade leva o item avaliativo gerado por ela.
+      await adm(request(server).delete(`/v1/atividades/${atividade.id}`)).expect(200);
+      expect(await itemDaAtividade()).toBeUndefined();
+      const restantes = (await adm(request(server).get(`/v1/turmas/${turma.id}/notas`)).expect(200)).body;
+      expect(restantes.map((i: { nome: string }) => i.nome).sort()).toEqual(['Prova 1', 'Trabalho']);
+    });
+
     it('Rooms ↔ Academy: ao criar a reserva de uma aula, só o professor dono da turma pode vinculá-la', async () => {
       const cenario = await montarCenarioAcademico();
 

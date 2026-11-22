@@ -5,6 +5,7 @@ import { randomBytes } from 'crypto';
 import PDFDocument from 'pdfkit';
 import { escreverDocumentoEncriptadoComNome } from '../src/common/file-encryption.util';
 import { PASTAS } from '../src/common/storage.config';
+import { CHAVES_ALUNO, CHAVES_PROFESSOR, PERMISSOES } from '../src/common/catalogo-permissoes';
 
 const prisma = new PrismaClient();
 const SALT_ROUNDS = 10;
@@ -196,194 +197,12 @@ function diaFuturo(diasAdiante: number): Date {
 }
 
 /**
- * Catálogo de permissões: usuário -> permissão direta (sem Perfil
- * intermediário). `recurso` é sempre a rota da tela no frontend e `acao` o
- * id da ação, igual ao catálogo em
- * src/components/rooster/hub/permission-catalog.ts do frontend — é o que
- * cada @RequirePermission(modulo, recurso, acao) do backend compara.
+ * Catálogo de permissões: usuário -> permissão direta (sem Perfil intermediário). As definições ficam em
+ * src/common/catalogo-permissoes.ts (fonte única, também usada pela preparação de uma instalação nova e pela
+ * concessão automática a professores e alunos); aqui apenas se resolve o módulo de cada uma.
  */
-function permissionDefinitions(
-  hubModulo: { id: string },
-  deskModulo: { id: string },
-  roomsModulo: { id: string },
-  assetsModulo: { id: string },
-  academyModulo: { id: string },
-  learnModulo: { id: string },
-  studentModulo: { id: string },
-  boostModulo: { id: string },
-  financeModulo: { id: string },
-) {
-  return [
-    // Rooster Hub
-    ['hub.usuarios.acessar', 'Acessar Usuários', hubModulo, '/hub/usuarios', 'acessar'],
-    ['hub.usuarios.criar', 'Criar usuário', hubModulo, '/hub/usuarios', 'criar'],
-    ['hub.usuarios.editar', 'Editar usuário', hubModulo, '/hub/usuarios', 'editar'],
-    ['hub.usuarios.excluir', 'Excluir usuário', hubModulo, '/hub/usuarios', 'excluir'],
-    ['hub.setores.acessar', 'Acessar Setores', hubModulo, '/hub/setores', 'acessar'],
-    ['hub.setores.criar', 'Criar setor', hubModulo, '/hub/setores', 'criar'],
-    ['hub.setores.editar', 'Editar setor', hubModulo, '/hub/setores', 'editar'],
-    ['hub.setores.excluir', 'Excluir setor', hubModulo, '/hub/setores', 'excluir'],
-    ['hub.setores.gerenciar-usuarios', 'Gerenciar usuários do setor', hubModulo, '/hub/setores', 'gerenciar-usuarios'],
-    ['hub.acessos.acessar', 'Acessar Acessos e permissões', hubModulo, '/hub/acessos', 'acessar'],
-    ['hub.acessos.gerenciar-permissoes', 'Gerenciar permissões', hubModulo, '/hub/acessos', 'gerenciar-permissoes'],
-    ['hub.acessos.relatorio-auditoria', 'Ver relatório de auditoria', hubModulo, '/hub/acessos', 'relatorio-auditoria'],
-    ['hub.acessos.relatorio-erros', 'Ver relatório de erros', hubModulo, '/hub/acessos', 'relatorio-erros'],
-    ['hub.acessos.conceder', 'Conceder permissões a usuário', hubModulo, '/hub/acessos', 'conceder'],
-    ['hub.acessos.revogar', 'Revogar permissões de usuário', hubModulo, '/hub/acessos', 'revogar'],
-    ['hub.configuracoes.acessar', 'Acessar Configurações do sistema', hubModulo, '/hub/configuracoes', 'acessar'],
-    ['hub.dashboard.acessar', 'Acessar Rooster Hub', hubModulo, '/hub', 'acessar'],
-
-    // Rooster Desk
-    ['desk.dashboard.acessar', 'Acessar Rooster Desk', deskModulo, '/desk', 'acessar'],
-    ['desk.tickets.acessar', 'Acessar Chamados', deskModulo, '/desk/tickets', 'acessar'],
-    ['desk.tickets.criar', 'Abrir chamado', deskModulo, '/desk/tickets', 'criar'],
-    ['desk.tickets.editar', 'Editar chamado', deskModulo, '/desk/tickets', 'editar'],
-    ['desk.tickets.encerrar', 'Encerrar chamado', deskModulo, '/desk/tickets', 'encerrar'],
-    ['desk.tickets.reabrir', 'Reabrir chamado', deskModulo, '/desk/tickets', 'reabrir'],
-    ['desk.tickets.transferir', 'Transferir chamado', deskModulo, '/desk/tickets', 'transferir'],
-    ['desk.tickets.anexar', 'Anexar arquivo', deskModulo, '/desk/tickets', 'anexar'],
-    ['desk.tickets.nota-interna', 'Registrar nota interna', deskModulo, '/desk/tickets', 'nota-interna'],
-    ['desk.tickets.ver-sla', 'Visualizar SLA', deskModulo, '/desk/tickets', 'ver-sla'],
-    ['desk.categories.acessar', 'Acessar categorias', deskModulo, '/desk/categories', 'acessar'],
-    ['desk.categories.criar', 'Criar categoria', deskModulo, '/desk/categories', 'criar'],
-    ['desk.categories.editar', 'Editar categoria', deskModulo, '/desk/categories', 'editar'],
-    ['desk.categories.excluir', 'Excluir categoria', deskModulo, '/desk/categories', 'excluir'],
-    ['desk.categories.subcategorias', 'Gerenciar subcategorias', deskModulo, '/desk/categories', 'subcategorias'],
-    ['desk.team.acessar', 'Acessar atendentes', deskModulo, '/desk/team', 'acessar'],
-    ['desk.team.vincular-categoria', 'Vincular atendente a categoria', deskModulo, '/desk/team', 'vincular-categoria'],
-
-    // Rooster Rooms
-    ['rooms.dashboard.acessar', 'Acessar Rooster Rooms', roomsModulo, '/rooms', 'acessar'],
-    ['rooms.structure.acessar', 'Acessar estrutura física', roomsModulo, '/rooms/structure', 'acessar'],
-    ['rooms.structure.criar', 'Criar estrutura física', roomsModulo, '/rooms/structure', 'criar'],
-    ['rooms.structure.editar', 'Editar estrutura física', roomsModulo, '/rooms/structure', 'editar'],
-    ['rooms.structure.excluir', 'Excluir estrutura física', roomsModulo, '/rooms/structure', 'excluir'],
-    ['rooms.book.acessar', 'Acessar reserva de ambientes', roomsModulo, '/rooms/book', 'acessar'],
-    ['rooms.book.solicitar', 'Solicitar reserva', roomsModulo, '/rooms/book', 'solicitar'],
-    ['rooms.book.solicitar-recorrente', 'Solicitar reserva recorrente', roomsModulo, '/rooms/book', 'solicitar-recorrente'],
-    ['rooms.book.prazo-estendido', 'Reservar com prazo estendido (sem limite de 15 dias)', roomsModulo, '/rooms/book', 'prazo-estendido'],
-    ['rooms.manage.acessar', 'Acessar gestão de reservas', roomsModulo, '/rooms/manage', 'acessar'],
-    ['rooms.manage.aprovar', 'Aprovar reserva', roomsModulo, '/rooms/manage', 'aprovar'],
-    ['rooms.manage.responder', 'Responder solicitante (equipe)', roomsModulo, '/rooms/manage', 'responder'],
-    ['rooms.manage.alterar-horario', 'Alterar horário (equipe)', roomsModulo, '/rooms/manage', 'alterar-horario'],
-    ['rooms.manage.cancelar', 'Cancelar com motivo (equipe)', roomsModulo, '/rooms/manage', 'cancelar'],
-    ['rooms.reservations.acessar', 'Acessar minhas reservas', roomsModulo, '/rooms/reservations', 'acessar'],
-    ['rooms.reservations.mensagem', 'Enviar mensagem na reserva própria', roomsModulo, '/rooms/reservations', 'mensagem'],
-    ['rooms.reservations.alterar-horario', 'Solicitar alteração de horário', roomsModulo, '/rooms/reservations', 'alterar-horario'],
-    ['rooms.reservations.cancelar', 'Cancelar reserva própria', roomsModulo, '/rooms/reservations', 'cancelar'],
-
-    // Rooster Assets
-    ['assets.dashboard.acessar', 'Acessar Rooster Assets', assetsModulo, '/assets', 'acessar'],
-    ['assets.inventory.acessar', 'Acessar patrimônio', assetsModulo, '/assets/inventory', 'acessar'],
-    ['assets.inventory.criar', 'Criar patrimônio', assetsModulo, '/assets/inventory', 'criar'],
-    ['assets.inventory.editar', 'Editar patrimônio', assetsModulo, '/assets/inventory', 'editar'],
-    ['assets.inventory.excluir', 'Excluir patrimônio', assetsModulo, '/assets/inventory', 'excluir'],
-    ['assets.inventory.gerenciar-categorias', 'Gerenciar categorias de patrimônio', assetsModulo, '/assets/inventory', 'gerenciar-categorias'],
-    ['assets.inventory.movimentar', 'Registrar movimentação', assetsModulo, '/assets/inventory', 'movimentar'],
-
-    // Rooster Academy
-    ['academy.dashboard.acessar', 'Acessar Rooster Academy', academyModulo, '/academy', 'acessar'],
-    ['academy.manage.acessar', 'Acessar gestão acadêmica', academyModulo, '/academy/manage', 'acessar'],
-    ['academy.manage.gerenciar-cursos', 'Gerenciar cursos', academyModulo, '/academy/manage', 'gerenciar-cursos'],
-    ['academy.manage.gerenciar-disciplinas', 'Gerenciar disciplinas', academyModulo, '/academy/manage', 'gerenciar-disciplinas'],
-    ['academy.manage.gerenciar-turmas', 'Gerenciar turmas', academyModulo, '/academy/manage', 'gerenciar-turmas'],
-    ['academy.manage.gerenciar-professores', 'Gerenciar professores', academyModulo, '/academy/manage', 'gerenciar-professores'],
-    ['academy.manage.gerenciar-alunos', 'Gerenciar alunos', academyModulo, '/academy/manage', 'gerenciar-alunos'],
-    ['academy.manage.gerenciar-calendario', 'Gerenciar calendário acadêmico', academyModulo, '/academy/manage', 'gerenciar-calendario'],
-    ['academy.manage.matricular', 'Matricular aluno', academyModulo, '/academy/manage', 'matricular'],
-    ['academy.attendance.acessar', 'Acessar frequência', academyModulo, '/academy/attendance', 'acessar'],
-    ['academy.attendance.registrar-chamada', 'Registrar chamada', academyModulo, '/academy/attendance', 'registrar-chamada'],
-    ['academy.attendance.editar-chamada', 'Editar chamada anterior', academyModulo, '/academy/attendance', 'editar-chamada'],
-    ['academy.grades.acessar', 'Acessar notas e conteúdos', academyModulo, '/academy/grades', 'acessar'],
-    ['academy.grades.lancar-notas', 'Lançar notas', academyModulo, '/academy/grades', 'lancar-notas'],
-    ['academy.grades.configurar-pesos', 'Configurar componentes e pesos', academyModulo, '/academy/grades', 'configurar-pesos'],
-
-    // Rooster Learn
-    ['learn.dashboard.acessar', 'Acessar Rooster Learn', learnModulo, '/learn', 'acessar'],
-    ['learn.classes.acessar', 'Acessar turmas e atividades', learnModulo, '/learn/classes', 'acessar'],
-    ['learn.classes.criar-atividade', 'Criar atividade', learnModulo, '/learn/classes', 'criar-atividade'],
-    ['learn.classes.editar-questoes', 'Editar questões', learnModulo, '/learn/classes', 'editar-questoes'],
-    ['learn.classes.corrigir', 'Corrigir entregas', learnModulo, '/learn/classes', 'corrigir'],
-    ['learn.classes.duplicar', 'Duplicar atividade', learnModulo, '/learn/classes', 'duplicar'],
-    ['learn.classes.excluir', 'Excluir atividade', learnModulo, '/learn/classes', 'excluir'],
-    ['learn.classes.gerenciar-turmas', 'Gerenciar turmas (coordenação)', learnModulo, '/learn/classes', 'gerenciar-turmas'],
-    ['learn.student.acessar', 'Acessar minhas atividades', learnModulo, '/learn/student', 'acessar'],
-    ['learn.student.responder', 'Responder atividade', learnModulo, '/learn/student', 'responder'],
-    ['learn.student.anexar', 'Anexar arquivo', learnModulo, '/learn/student', 'anexar'],
-    ['learn.student.ver-correcao', 'Ver correção do professor', learnModulo, '/learn/student', 'ver-correcao'],
-
-    // Rooster Student
-    ['student.dashboard.acessar', 'Acessar Rooster Student', studentModulo, '/student', 'acessar'],
-    ['student.profile.acessar', 'Acessar perfil acadêmico', studentModulo, '/student/profile', 'acessar'],
-    ['student.disciplines.acessar', 'Acessar disciplinas', studentModulo, '/student/disciplines', 'acessar'],
-    ['student.activities.acessar', 'Acessar atividades', studentModulo, '/student/activities', 'acessar'],
-    ['student.activities.entregar', 'Realizar entrega', studentModulo, '/student/activities', 'entregar'],
-    ['student.grades.acessar', 'Acessar notas e desempenho', studentModulo, '/student/grades', 'acessar'],
-    ['student.attendance.acessar', 'Acessar frequência', studentModulo, '/student/attendance', 'acessar'],
-    ['student.history.acessar', 'Acessar histórico', studentModulo, '/student/history', 'acessar'],
-    ['student.history.baixar', 'Baixar histórico', studentModulo, '/student/history', 'baixar'],
-    ['student.calendar.acessar', 'Acessar calendário', studentModulo, '/student/calendar', 'acessar'],
-    ['student.documents.acessar', 'Acessar documentos', studentModulo, '/student/documents', 'acessar'],
-    ['student.documents.enviar', 'Enviar documento', studentModulo, '/student/documents', 'enviar'],
-    ['student.documents.baixar', 'Baixar documento', studentModulo, '/student/documents', 'baixar'],
-    ['student.notifications.acessar', 'Acessar notificações', studentModulo, '/student/notifications', 'acessar'],
-    ['student.notifications.marcar-lida', 'Marcar como lida', studentModulo, '/student/notifications', 'marcar-lida'],
-    ['student.finance.acessar', 'Acessar financeiro do aluno', studentModulo, '/student/finance', 'acessar'],
-    ['student.finance.baixar-boleto', 'Baixar boleto (portal do aluno)', studentModulo, '/student/finance', 'baixar-boleto'],
-
-    // Rooster Boost (lado instrutor — o aluno do Boost usa login próprio, fora deste catálogo)
-    ['boost.dashboard.acessar', 'Acessar Rooster Boost', boostModulo, '/boost', 'acessar'],
-    ['boost.manage.acessar', 'Acessar gestão de cursos Boost', boostModulo, '/boost/manage', 'acessar'],
-    ['boost.manage.gerenciar-cursos', 'Gerenciar cursos Boost', boostModulo, '/boost/manage', 'gerenciar-cursos'],
-    ['boost.manage.gerenciar-conteudo', 'Gerenciar módulos, aulas e materiais', boostModulo, '/boost/manage', 'gerenciar-conteudo'],
-    ['boost.manage.ver-progresso', 'Ver progresso dos alunos', boostModulo, '/boost/manage', 'ver-progresso'],
-    ['boost.manage.certificado', 'Configurar certificado do curso', boostModulo, '/boost/manage', 'certificado'],
-    ['boost.manage.vincular-orientadores', 'Vincular orientadores ao curso', boostModulo, '/boost/manage', 'vincular-orientadores'],
-    ['boost.manage.matricular', 'Matricular e cancelar matrícula de alunos', boostModulo, '/boost/manage', 'matricular'],
-    // Conversa aluno ↔ orientador: o professor vinculado a um curso só conversa (não gere o curso).
-    ['boost.conversas.acessar', 'Acessar conversas com alunos', boostModulo, '/boost/conversas', 'acessar'],
-    ['boost.conversas.responder', 'Responder alunos', boostModulo, '/boost/conversas', 'responder'],
-    // Contas externas (BoostUsuario) — gestão entre cursos, por isso tela própria.
-    ['boost.students.acessar', 'Ver contas externas do Boost', boostModulo, '/boost/students', 'acessar'],
-    ['boost.students.gerenciar', 'Cadastrar, editar, ativar/desativar, excluir e redefinir senha de conta externa', boostModulo, '/boost/students', 'gerenciar'],
-
-    // Rooster Finance
-    ['finance.dashboard.acessar', 'Acessar Rooster Finance', financeModulo, '/finance', 'acessar'],
-    ['finance.charges.acessar', 'Acessar Cobranças', financeModulo, '/finance/charges', 'acessar'],
-    ['finance.charges.criar', 'Nova cobrança', financeModulo, '/finance/charges', 'criar'],
-    ['finance.charges.marcar-pago', 'Marcar cobrança como paga', financeModulo, '/finance/charges', 'marcar-pago'],
-    ['finance.charges.negociar', 'Negociar cobrança', financeModulo, '/finance/charges', 'negociar'],
-    ['finance.charges.cancelar', 'Cancelar cobrança', financeModulo, '/finance/charges', 'cancelar'],
-    ['finance.charges.exportar', 'Exportar cobranças', financeModulo, '/finance/charges', 'exportar'],
-    ['finance.tuitions.acessar', 'Acessar Mensalidades', financeModulo, '/finance/tuitions', 'acessar'],
-    ['finance.tuitions.gerar-lote', 'Gerar mensalidades em lote', financeModulo, '/finance/tuitions', 'gerar-lote'],
-    ['finance.tuitions.editar', 'Editar mensalidade', financeModulo, '/finance/tuitions', 'editar'],
-    ['finance.boletos.acessar', 'Acessar Boletos', financeModulo, '/finance/boletos', 'acessar'],
-    ['finance.boletos.emitir', 'Emitir boleto', financeModulo, '/finance/boletos', 'emitir'],
-    ['finance.boletos.baixar', 'Baixar boleto', financeModulo, '/finance/boletos', 'baixar'],
-    ['finance.products.acessar', 'Acessar Produtos', financeModulo, '/finance/products', 'acessar'],
-    ['finance.products.criar', 'Criar produto', financeModulo, '/finance/products', 'criar'],
-    ['finance.products.editar', 'Editar produto', financeModulo, '/finance/products', 'editar'],
-    ['finance.products.excluir', 'Excluir produto', financeModulo, '/finance/products', 'excluir'],
-    ['finance.services.acessar', 'Acessar Serviços', financeModulo, '/finance/services', 'acessar'],
-    ['finance.services.criar', 'Criar serviço', financeModulo, '/finance/services', 'criar'],
-    ['finance.services.editar', 'Editar serviço', financeModulo, '/finance/services', 'editar'],
-    ['finance.services.excluir', 'Excluir serviço', financeModulo, '/finance/services', 'excluir'],
-    ['finance.nfe.acessar', 'Acessar Notas Fiscais', financeModulo, '/finance/nfe', 'acessar'],
-    ['finance.nfe.emitir', 'Emitir nota fiscal', financeModulo, '/finance/nfe', 'emitir'],
-    ['finance.nfe.exportar-xml', 'Exportar XML da nota fiscal', financeModulo, '/finance/nfe', 'exportar-xml'],
-    ['finance.reports.acessar', 'Acessar Relatórios', financeModulo, '/finance/reports', 'acessar'],
-    ['finance.reports.exportar', 'Exportar relatório', financeModulo, '/finance/reports', 'exportar'],
-    ['finance.discounts.acessar', 'Acessar Descontos', financeModulo, '/finance/discounts', 'acessar'],
-    ['finance.discounts.criar', 'Criar desconto', financeModulo, '/finance/discounts', 'criar'],
-    ['finance.discounts.editar', 'Editar desconto', financeModulo, '/finance/discounts', 'editar'],
-    ['finance.discounts.excluir', 'Excluir desconto', financeModulo, '/finance/discounts', 'excluir'],
-    // Regra de multa/juros por atraso, criada pelo próprio financeiro (RN043) — não é fixa no código.
-    ['finance.policies.acessar', 'Acessar Políticas de multa/juros', financeModulo, '/finance/policies', 'acessar'],
-    ['finance.policies.criar', 'Criar política de multa/juros', financeModulo, '/finance/policies', 'criar'],
-    ['finance.policies.editar', 'Editar política de multa/juros', financeModulo, '/finance/policies', 'editar'],
-    ['finance.policies.excluir', 'Excluir política de multa/juros', financeModulo, '/finance/policies', 'excluir'],
-  ] as const;
+function permissionDefinitions(modulosPorNome: Record<string, { id: string }>) {
+  return PERMISSOES.map(([key, nome, modulo, recurso, acao]) => [key, nome, modulosPorNome[modulo], recurso, acao] as const);
 }
 
 const deskTicketOperationKeys = [
@@ -428,33 +247,14 @@ const academyCoordenadorKeys = [
   // (nunca criar/editar/excluir usuário a partir do Academy).
   'hub.usuarios.acessar',
 ];
-/** Professor: só o que precisa para lecionar as próprias turmas — a checagem de "é dono da turma" acontece no backend. */
-const academyProfessorKeys = [
-  'academy.dashboard.acessar',
-  'academy.attendance.acessar', 'academy.attendance.registrar-chamada', 'academy.attendance.editar-chamada',
-  'academy.grades.acessar', 'academy.grades.lancar-notas', 'academy.grades.configurar-pesos',
-  'learn.dashboard.acessar', 'learn.classes.acessar', 'learn.classes.criar-atividade', 'learn.classes.editar-questoes', 'learn.classes.corrigir', 'learn.classes.excluir',
-  'student.documents.acessar',
-  // Orientador do Boost = Professor do Academy vinculado a um curso: SÓ conversa com os alunos
-  // dele. Gerir curso (criar, editar, tirar do ar, certificado) é permissão de gestão, abaixo.
-  'boost.conversas.acessar', 'boost.conversas.responder',
-];
+const academyProfessorKeys = [...CHAVES_PROFESSOR];
 /** Gestão do Boost: age sobre TODOS os cursos (não existe mais "dono"). */
 const boostGestaoKeys = [
   'boost.dashboard.acessar', 'boost.manage.acessar', 'boost.manage.gerenciar-cursos',
   'boost.manage.gerenciar-conteudo', 'boost.manage.ver-progresso',
   'boost.manage.certificado', 'boost.manage.vincular-orientadores', 'boost.manage.matricular',
 ];
-/** Aluno: portal do Rooster Student + as ações do Rooster Learn como respondente. */
-const alunoKeys = [
-  'student.dashboard.acessar', 'student.profile.acessar', 'student.disciplines.acessar',
-  'student.activities.acessar', 'student.activities.entregar', 'student.grades.acessar', 'student.attendance.acessar',
-  'student.history.acessar', 'student.history.baixar', 'student.calendar.acessar',
-  'student.documents.acessar', 'student.documents.enviar', 'student.documents.baixar',
-  'student.notifications.acessar', 'student.notifications.marcar-lida',
-  'student.finance.acessar', 'student.finance.baixar-boleto',
-  'learn.dashboard.acessar', 'learn.student.acessar', 'learn.student.responder', 'learn.student.anexar', 'learn.student.ver-correcao',
-];
+const alunoKeys = [...CHAVES_ALUNO];
 /** Financeiro: gestão completa do Rooster Finance (cobranças, produtos, serviços, descontos, NF, relatórios). */
 const financeStaffKeys = [
   'finance.dashboard.acessar',
@@ -553,7 +353,11 @@ async function main() {
   const financeModulo = await prisma.modulo.create({ data: { id: ids.financeModule, nome: 'Rooster Finance', rota: '/finance', icone: 'Wallet', ativo: true } });
 
   const permissions = new Map<string, { id: string }>();
-  for (const [key, nome, moduloAlvo, recurso, acao] of permissionDefinitions(hubModulo, modulo, roomsModulo, assetsModulo, academyModulo, learnModulo, studentModulo, boostModulo, financeModulo)) {
+  for (const [key, nome, moduloAlvo, recurso, acao] of permissionDefinitions({
+    'Rooster Hub': hubModulo, 'Rooster Desk': modulo, 'Rooster Rooms': roomsModulo, 'Rooster Assets': assetsModulo,
+    'Rooster Academy': academyModulo, 'Rooster Learn': learnModulo, 'Rooster Student': studentModulo,
+    'Rooster Boost': boostModulo, 'Rooster Finance': financeModulo,
+  })) {
     const permission = await prisma.permissao.create({
       data: { moduloId: moduloAlvo.id, nome: key, descricao: nome, recurso, acao },
       select: { id: true },

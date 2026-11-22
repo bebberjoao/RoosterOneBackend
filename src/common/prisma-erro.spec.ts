@@ -32,7 +32,28 @@ describe('traduzirErroPrisma', () => {
     expect(() => traduzirErroPrisma(new Error('conexão recusada'), 'listar chamados')).toThrow(
       new InternalServerErrorException('Erro inesperado ao listar chamados.'),
     );
-    expect(() => traduzirErroPrisma(erroPrisma('P2003'), 'remover curso')).toThrow(InternalServerErrorException);
+    expect(() => traduzirErroPrisma(erroPrisma('P2010'), 'remover curso')).toThrow(InternalServerErrorException);
+  });
+
+  it('converte violação de chave estrangeira (P2003) em 409: o registro ainda é referenciado por outros', () => {
+    expect(() => traduzirErroPrisma(erroPrisma('P2003'), 'remover disciplina')).toThrow(
+      new ConflictException('Não foi possível remover disciplina: há registros vinculados a este item, ou um dos itens informados não existe.'),
+    );
+  });
+});
+
+describe('violação de RESTRICT no PostgreSQL 18', () => {
+  it('converte em 409 o erro que o Prisma não mapeia (SQLSTATE 23001, sem código)', () => {
+    const erro = new Prisma.PrismaClientUnknownRequestError(
+      'ConnectorError(... message: "update or delete on table \\"disciplinas\\" violates RESTRICT setting of foreign key constraint \\"turmas_disciplina_id_fkey\\" on table \\"turmas\\"" ...)',
+      { clientVersion: 'teste' },
+    );
+    expect(() => traduzirErroPrisma(erro, 'remover disciplina')).toThrow(ConflictException);
+  });
+
+  it('mantém 500 para os demais erros não mapeados', () => {
+    const erro = new Prisma.PrismaClientUnknownRequestError('falha qualquer', { clientVersion: 'teste' });
+    expect(() => traduzirErroPrisma(erro, 'remover disciplina')).toThrow(InternalServerErrorException);
   });
 });
 

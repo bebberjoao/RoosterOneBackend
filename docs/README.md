@@ -110,7 +110,8 @@ autorização, validações, tratamento de erros e guia do desenvolvedor.
 
 ## Documento consolidado
 
-O documento `Rooster-One-Documentacao-Geral.docx`, na raiz da pasta do TCC, consolida esta árvore, com as 63 figuras
-incorporadas (os diagramas mais largos em página deitada), e o `Rooster-One-Manual-do-Usuario.docx` descreve a
-operação do sistema tela a tela. A árvore `docs/` permanece a fonte de verdade técnica, mantida junto ao código; os
+O documento `Rooster-One-Documentacao-Geral.docx`, na raiz da pasta do TCC, consolida esta árvore, a documentação do
+frontend, os diagramas (os mais largos em página deitada) e o histórico de alterações; é gerado por
+`npm run documentacao` (`docs/gerar-documentacao.js`), que deve ser executado de novo sempre que a documentação mudar.
+O `Rooster-One-Manual-do-Usuario.docx` (`npm run manual`) descreve a operação do sistema tela a tela. A árvore `docs/` permanece a fonte de verdade técnica, mantida junto ao código; os
 documentos Word constituem a visão consolidada para a entrega acadêmica.

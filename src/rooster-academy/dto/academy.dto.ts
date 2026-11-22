@@ -217,8 +217,8 @@ export class CreateItemAvaliativoDto {
   @ApiProperty({ example: 0.4, description: 'Peso do item avaliativo na média final, de 0 a 1' })
   @IsNumber() @Min(0) @Max(1) peso: number;
 
-  @ApiPropertyOptional({ example: 10, description: 'Nota máxima possível para este item avaliativo' })
-  @IsOptional() @IsNumber() @Min(0) notaMaxima?: number;
+  @ApiPropertyOptional({ example: 10, description: 'Nota máxima possível para este item avaliativo (de 0,01 a 1000)' })
+  @IsOptional() @IsNumber() @Min(0.01) @Max(1000) notaMaxima?: number;
 }
 export class UpdateItemAvaliativoDto extends PartialType(CreateItemAvaliativoDto) {}
 
@@ -227,7 +227,7 @@ export class LancarNotaDto {
   @IsUUID() alunoId: string;
 
   @ApiPropertyOptional({ example: 8.5, description: 'Valor da nota lançada para o aluno neste item avaliativo (null remove a nota)' })
-  @IsOptional() @IsNumber() @Min(0) valor?: number | null;
+  @IsOptional() @IsNumber() @Min(0) @Max(1000) valor?: number | null;
 }
 
 // ===================== Calendário =====================

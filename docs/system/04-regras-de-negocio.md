@@ -164,7 +164,14 @@ usuário. `usuarioId` inexistente resulta em falha. As duas relações são 1:1 
 `Usuario` pode ser professor e aluno simultaneamente (por exemplo, professor que cursa pós-graduação na própria
 instituição).
 
-**Implementação**: `academy.service.ts::createProfessor/createAluno`.
+O vínculo concede ao usuário as **permissões padrão do papel** que ele ainda não possui: as de professor
+(`CHAVES_PROFESSOR`: telas do professor no Academy e no Learn e conversas do Boost) ou as de aluno (`CHAVES_ALUNO`:
+portal do aluno e respostas no Learn), definidas em `src/common/catalogo-permissoes.ts`. Sem isso, o usuário
+recém-vinculado entraria no sistema sem acesso a nenhuma tela. A concessão é auditada
+(`permissoes_padrao_concedidas`), e a exclusão do vínculo não revoga permissões, pois elas podem ter outra origem; a
+retirada cabe à tela de Acessos.
+
+**Implementação**: `academy.service.ts::createProfessor/createAluno/concederPermissoesPadrao`.
 
 ## RN020 — A matrícula respeita a capacidade da turma
 
@@ -173,7 +180,13 @@ ativas**: a matrícula cancelada libera a vaga. `capacidade` igual a zero signif
 verificação não é realizada. Não há lista de espera: a matrícula é recusada (pendência registrada em
 `docs/engineering/10-melhorias-futuras.md`).
 
-**Implementação**: `academy.service.ts::createMatricula`.
+A mesma contagem vale em todos os pontos: a **reativação** de matrícula cancelada ou trancada ocupa vaga e é
+recusada com `409` quando a turma está cheia, e a ocupação exibida nas listagens de turma (`_count.matriculas`)
+considera apenas as matrículas ativas. São também recusadas com `409` a matrícula em turma **encerrada** e a de aluno
+cujo cadastro não esteja com a situação `ativo`. A edição da matrícula altera somente a situação: a troca de aluno
+ou de turma é recusada com `400`, pois equivaleria a uma matrícula nova sem as verificações acima.
+
+**Implementação**: `academy.service.ts::createMatricula/updateMatricula/exigirVaga`.
 
 ## RN021 — O vínculo com a turma é condição obrigatória, além da permissão (Academy e Learn)
 
@@ -190,26 +203,52 @@ acessíveis a outros professores.
 **Implementação**: `academy.controller.ts` e `learn.controller.ts`, métodos `exigirEscopoTurma` e
 `exigirDonoOuGestor` (replicados em cada controller, por decisão de projeto, para manter os módulos independentes).
 
-## RN022 — A nota é validada contra o máximo do item, e a média desconsidera itens sem nota
+## RN022 — A nota é validada contra o máximo do item, e a média é calculada em escala única, sem os itens sem nota
 
 O lançamento de nota exige `academy.grades.lancar-notas` e vínculo com a turma; a configuração de pesos exige
-`configurar-pesos`. A nota é validada contra a nota máxima do item avaliativo. A média é ponderada pelos pesos e
-**desconsidera os itens ainda sem nota**, em vez de tratá-los como zero; do contrário, a média exibida durante o
-período penalizaria o aluno por avaliações ainda não realizadas. O lançamento é registrado em auditoria e notificado
-ao aluno.
+`configurar-pesos`. A nota é validada contra a nota máxima do item avaliativo (de 0,01 a 1000) e só é aceita para
+matrícula ativa ou concluída: a matrícula cancelada ou trancada é recusada com `400`. O lançamento é registrado em
+auditoria e notificado ao aluno.
 
-Não há arredondamento nem regra de aprovação automática: o sistema calcula e exibe, e a decisão acadêmica cabe aos
-responsáveis.
+A **média da turma é expressa na escala de 0 a 10**. Cada nota é convertida para essa escala pela nota máxima do
+seu item e, então, ponderada pelo peso:
 
-**Implementação**: `academy.service.ts::lancarNota` e cálculo de média (`calcularMediaTurma`).
+`média = Σ (nota ÷ nota máxima × 10 × peso) ÷ Σ peso`, considerados somente os itens com nota lançada.
+
+A conversão é o que permite combinar itens com notas máximas diferentes: com uma prova valendo 10 (nota 8) e um
+trabalho valendo 100 (nota 90), de mesmo peso, a média é 8,5. Os **itens ainda sem nota são desconsiderados**, em vez
+de tratados como zero; do contrário, a média exibida durante o período penalizaria o aluno por avaliações ainda não
+realizadas. Pelo mesmo motivo, a soma dos pesos não precisa ser 1: a média é dividida pela soma dos pesos dos itens
+com nota. O resultado tem duas casas decimais.
+
+A configuração do item preserva a coerência das notas já lançadas: a nota máxima não pode ser reduzida abaixo da
+maior nota lançada (`409`), e o item nunca muda de turma (o campo é ignorado na edição). O item gerado por atividade
+do Learn é somente leitura no Academy: nota, peso, nome e nota máxima vêm da atividade (RN025 e RN026), e a tentativa
+de alterá-los pelo Academy é recusada com `409`.
+
+Não há regra de aprovação automática: o sistema calcula e exibe, e a decisão acadêmica cabe aos responsáveis. As
+telas destacam, apenas como referência, a média a partir de 6,0 ("Aprovado" na tela do professor; "Suficiente" no
+portal do aluno) e, abaixo de 4,0, a nota insuficiente; os valores ficam em `src/lib/regras-academicas.ts`, no
+frontend, e são os mesmos na tela do professor e no portal do aluno.
+
+**Implementação**: `academy.service.ts::lancarNota/updateItemAvaliativo` e cálculo de média (`calcularMediaTurma`,
+constante `ESCALA_MEDIA`); no frontend, `src/lib/regras-academicas.ts::mediaPonderada`, réplica usada enquanto o
+professor digita.
 
 ## RN023 — A frequência não reprova automaticamente
 
-O registro de frequência é realizado em lote por data e exige `registrar-chamada` (ou `editar-chamada`, para a
-correção de registro anterior) e vínculo com a turma. O percentual de presença é calculado e exibido, mas **nenhuma
-reprovação por falta é aplicada pelo sistema**: não há limite de faltas codificado.
+O registro de frequência é realizado em lote por data e exige `registrar-chamada` e vínculo com a turma. A **correção
+de chamada já lançada** (data que já possui registro na turma) exige, além disso, `editar-chamada`; sem ela, a
+requisição é recusada com `403`. A gestão acadêmica (`/academy/manage acessar`) pode sempre corrigir. A chamada de
+**data futura** é recusada com `400`, assim como o registro para aluno sem matrícula **ativa** na turma.
 
-**Implementação**: `academy.service.ts::registrarFrequenciaLote`.
+Presente, atraso e falta justificada **contam como presença**; apenas a falta conta como ausência. O critério é o
+mesmo na tela do professor e no portal do aluno (`src/lib/regras-academicas.ts::contaComoPresenca`, no frontend). O
+percentual de presença é calculado e exibido, e a frequência abaixo de 75% é destacada ao aluno, mas **nenhuma
+reprovação por falta é aplicada pelo sistema**: não há limite de faltas codificado, e a matrícula cancelada é exibida
+como "Cancelada", e não como reprovação.
+
+**Implementação**: `academy.service.ts::registrarFrequenciaLote` e `academy.controller.ts::registrarFrequencia`.
 
 ## RN024 — Não há fechamento de período letivo
 
@@ -221,13 +260,23 @@ de definição de regra de negócio.
 
 **Implementação**: ausência deliberada, registrada para que não seja interpretada como omissão.
 
-## RN025 — A publicação de atividade cria o item avaliativo no Academy, de forma idempotente
+## RN025 — A publicação de atividade cria o item avaliativo no Academy, e o item acompanha a atividade
 
 A publicação de atividade do Learn é transição de status que, quando a atividade possui peso, cria o
 `ItemAvaliativo` correspondente no Academy. A operação é idempotente: a nova publicação não duplica o item. Os alunos
 com matrícula ativa são notificados.
 
-**Implementação**: `learn.service.ts::publicarAtividade`.
+Depois de criado, o item **acompanha a atividade**, sempre na mesma transação:
+
+- a edição do título, do peso (de 0 a 1) ou da nota máxima da atividade atualiza o item;
+- a atividade publicada que passa a ter peso ganha o item; a que passa a ter peso zero perde o item, desde que não
+  haja nota lançada (com nota, a alteração é recusada com `409`);
+- a nota máxima não pode ser reduzida abaixo da maior nota de entrega já corrigida (`409`);
+- a exclusão da atividade exclui o item e as notas dele; do contrário, o item ficaria no Academy sem origem e sem
+  possibilidade de correção;
+- a atividade nunca muda de turma (o campo é ignorado na edição).
+
+**Implementação**: `learn.service.ts::publicarAtividade/updateAtividade/removeAtividade`.
 
 ## RN026 — A correção do Learn e a nota do Academy são atômicas
 
@@ -241,12 +290,16 @@ pontuação de cada questão (RN049), gravada na mesma transação.
 
 ## RN027 — O prazo de entrega é determinado pelo servidor, e o reenvio invalida a correção
 
-A entrega exige `learn.student.responder`, matrícula na turma da atividade e atividade publicada. A entrega após o
+A entrega exige `learn.student.responder`, matrícula **ativa** na turma da atividade e atividade publicada. A entrega após o
 prazo é marcada como atrasada, se a atividade admitir atraso, ou recusada, em caso contrário, sempre com base no
 relógio do servidor, e nunca no do cliente. O reenvio é permitido enquanto a atividade o admitir e **sempre invalida
 a correção anterior** (nota, parecer e corretor são limpos), pois a correção anterior refere-se a conteúdo que não é
 mais o entregue. Na atividade com questões, o reenvio substitui as respostas e os arquivos enviados como resposta a
 questões; na atividade composta apenas por questões objetivas, o reenvio produz nova correção automática (RN049).
+
+A invalidação alcança o Academy: a nota já propagada ao item avaliativo é retirada na mesma transação do reenvio
+(passa a "sem nota", e deixa de entrar na média) e volta quando o professor corrige a nova entrega. Antes, a entrega
+ficava sem nota no Learn enquanto a nota antiga continuava valendo no Academy.
 
 **Implementação**: `learn.service.ts::enviarEntrega`.
 

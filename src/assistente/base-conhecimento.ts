@@ -528,7 +528,7 @@ export const BASE_CONHECIMENTO: EntradaBase[] = [
       "Turma: oferta em um período letivo, com professor, horário e vagas; a disciplina é opcional e pode ser atribuída depois.",
       "Matrícula: inclusão do aluno em uma turma.",
       "Item avaliativo: avaliação da turma (prova, trabalho ou atividade do Learn), com peso e nota máxima.",
-      "Média: média ponderada dos itens com nota lançada."
+      "Média: média de 0 a 10: cada nota é convertida pela nota máxima do item e ponderada pelo peso; itens sem nota não entram."
     ],
     "id": "modulo-rooster-academy",
     "origem": "manual-modulo",
@@ -563,13 +563,13 @@ export const BASE_CONHECIMENTO: EntradaBase[] = [
     "titulo": "Gestão acadêmica",
     "rota": "/academy/manage",
     "quemUsa": "Coordenação acadêmica.",
-    "resumo": "Organização da estrutura do período letivo, em abas: Disciplinas, Turmas, Professores, Alunos e Calendário.",
+    "resumo": "Organização da estrutura do período letivo, em abas: Cursos, Disciplinas, Turmas, Professores, Alunos e Calendário.",
     "efeitos": "A turma depende apenas do cadastro prévio do período letivo; disciplina e professor são opcionais e podem ser atribuídos depois, na edição da turma. Documentos acadêmicos só ficam disponíveis na turma depois que ela recebe uma disciplina. O aluno somente aparece nas telas de frequência e de notas de uma turma após a matrícula."
   },
   {
     "passos": [
       "Selecionar a turma; são exibidos os alunos e as chamadas anteriores.",
-      "Informar a data da aula e registrar presença, falta, atraso ou falta justificada para cada aluno matriculado.",
+      "Informar a data da aula (não é possível registrar data futura) e registrar presença, falta, atraso ou falta justificada para cada aluno com matrícula ativa.",
       "Salvar; o registro fica disponível ao aluno no Rooster Student."
     ],
     "observacoes": [],
@@ -580,14 +580,14 @@ export const BASE_CONHECIMENTO: EntradaBase[] = [
     "rota": "/academy/attendance",
     "quemUsa": "Professores (nas próprias turmas) e coordenação.",
     "resumo": "Registro da presença dos alunos em cada aula.",
-    "efeitos": "O professor registra a frequência apenas das turmas que leciona, ainda que possua a permissão; a coordenação pode registrar em qualquer turma. A frequência abaixo de 75% é destacada ao aluno como risco de reprovação, sem reprovação automática."
+    "efeitos": "O professor registra a frequência apenas das turmas que leciona, ainda que possua a permissão; a coordenação pode registrar em qualquer turma. Corrigir a chamada de uma data já lançada exige a permissão Editar chamada anterior. Presente, atraso e falta justificada contam como presença; apenas a falta conta como ausência. A frequência abaixo de 75% é destacada ao aluno como risco de reprovação, sem reprovação automática."
   },
   {
     "passos": [
       "Selecionar a turma.",
       "Configurar os itens avaliativos da turma (por exemplo, \"Prova 1\", com peso 0,6) e a nota máxima de cada um.",
       "Lançar a nota de cada aluno em cada item; o aluno é notificado do lançamento.",
-      "A média é calculada automaticamente, ponderada pelos pesos dos itens com nota lançada (itens sem nota não são considerados)."
+      "A média é calculada automaticamente, na escala de 0 a 10: cada nota é convertida pela nota máxima do seu item (90 em um trabalho que vale 100 equivale a 9,0) e ponderada pelo peso; itens sem nota não são considerados."
     ],
     "observacoes": [],
     "id": "academy-grades",
@@ -1363,7 +1363,7 @@ export const BASE_CONHECIMENTO: EntradaBase[] = [
     "modulo": "Geral",
     "titulo": "Nota do Rooster Learn ausente no boletim",
     "rota": null,
-    "resumo": "Somente a atividade publicada com peso maior que zero compõe a média no Rooster Academy. A nota é propagada no momento da correção; entrega reenviada pelo aluno invalida a correção anterior e deve ser corrigida novamente."
+    "resumo": "Somente a atividade publicada com peso maior que zero compõe a média no Rooster Academy. A nota é propagada no momento da correção; entrega reenviada pelo aluno invalida a correção anterior, retira a nota da média até a nova correção e deve ser corrigida novamente. Título, peso e nota máxima do item acompanham a atividade, e a exclusão da atividade exclui o item e as notas dele."
   },
   {
     "passos": [],
@@ -1610,9 +1610,10 @@ export const BASE_CONHECIMENTO: EntradaBase[] = [
       "Copiar as pastas do sistema (RoosterOneBackend e RoosterOneFrontEnd) para a mesma pasta do computador.",
       "Abrir a pasta RoosterOneBackend, depois scripts e instalador, e executar INSTALAR.bat com duplo clique.",
       "Confirmar a solicitação de permissão de administrador do Windows.",
-      "No menu, escolher a opção 1 (\"Instalação completa\"). O instalador instala, quando necessário, o Node.js e o banco de dados PostgreSQL, cria o banco, compila o sistema e registra o início automático. A primeira instalação leva de 10 a 20 minutos, conforme a internet e o computador.",
-      "Responder \"s\" à pergunta sobre os dados de demonstração, para carregar os usuários e as informações de exemplo do Apêndice B, ou \"n\", para iniciar com o sistema vazio.",
-      "Ao final, o navegador é aberto na tela de login, e o atalho \"Rooster One\" é criado na área de trabalho."
+      "Na tela do instalador, informar o nome, o e-mail (que será o login) e a senha da conta de administrador; com a senha em branco, o instalador gera uma senha segura e a exibe ao final.",
+      "Se desejar, marcar \"Carregar dados de demonstração\", para carregar os usuários e as informações de exemplo do Apêndice B; desmarcada, o sistema inicia vazio, apenas com o administrador.",
+      "Clicar em \"Instalar agora\". Nenhuma outra pergunta é feita: o instalador instala, quando necessário, o Node.js e o banco de dados PostgreSQL, cria o banco sem pedir senha, compila o sistema, prepara as permissões, gera esta documentação em Word e registra o início automático. A tela mostra cada passo concluído, o passo em andamento e os que faltam. A primeira instalação leva de 10 a 20 minutos, conforme a internet e o computador.",
+      "Ao final, a tela informa o endereço, o login e, se for o caso, a senha gerada; o botão \"Abrir o Rooster One\" abre a tela de login, e os atalhos \"Rooster One\" e \"Rooster One - Documentação\" são criados na área de trabalho; o segundo abre a pasta documentacao, com este Manual e a Documentação Geral. Se algum passo falhar, a tela indica o passo e o erro e oferece \"Tentar novamente\"."
     ],
     "observacoes": [
       "1. Instalação completa: Instala ou atualiza o sistema; pode ser repetida sem perda de dados.",
@@ -1629,7 +1630,7 @@ export const BASE_CONHECIMENTO: EntradaBase[] = [
     "modulo": "Geral",
     "titulo": "Instalação e inicialização do sistema",
     "rota": null,
-    "resumo": "Esta seção destina-se a quem instala o Rooster One em um computador com Windows. A instalação é feita por um instalador com menu, que prepara tudo o que o sistema necessita e o deixa configurado para iniciar automaticamente sempre que o computador é ligado. Instalação sem internet: basta baixar o instalador do PostgreSQL para Windows (arquivo postgresql-...-windows-x64.exe, do site da EDB) e, se o computador não tiver o Node.js, o instalador do Node.js (arquivo node-...-x64.msi), e colocá-los, sem renomear, na pasta scriptsinstaladorinstaladores. O instalador os utiliza automaticamente, sem nenhuma tela adicional; a opção 5 do menu confirma quais arquivos serão usados. Após a instalação, nenhum procedimento é necessário: o sistema inicia junto com o Windows. Para acessá-lo, utiliza-se o atalho \"Rooster One\" da área de trabalho ou o endereço http://localhost:8080 no navegador. Recomenda-se realizar o backup periodicamente e guardar, junto com ele, uma cópia do arquivo .env da pasta RoosterOneBackend, que contém a chave necessária à leitura dos arquivos enviados ao sistema."
+    "resumo": "Esta seção destina-se a quem instala o Rooster One em um computador com Windows. A instalação é feita por um único instalador, com uma tela que mostra o passo a passo, prepara tudo o que o sistema necessita (inclusive o banco de dados) e o deixa configurado para iniciar automaticamente sempre que o computador é ligado. Instalação sem internet: basta baixar o instalador do PostgreSQL para Windows (arquivo postgresql-...-windows-x64.exe, do site da EDB) e, se o computador não tiver o Node.js, o instalador do Node.js (arquivo node-...-x64.msi), e colocá-los, sem renomear, na pasta scriptsinstaladorinstaladores. O instalador os utiliza automaticamente, sem nenhuma tela adicional; a opção 5 do menu avançado confirma quais arquivos serão usados. Após a instalação, nenhum procedimento é necessário: o sistema inicia junto com o Windows. Para acessá-lo, utiliza-se o atalho \"Rooster One\" da área de trabalho ou o endereço http://localhost:8080 no navegador. As demais operações ficam no menu avançado, aberto pelo link \"Menu avançado\" da tela do instalador. Com o sistema já instalado, a própria tela oferece \"Atualizar ou reparar\", que recompila o sistema e atualiza o banco sem alterar os dados. Recomenda-se realizar o backup periodicamente e guardar, junto com ele, uma cópia do arquivo .env da pasta RoosterOneBackend, que contém a chave necessária à leitura dos arquivos enviados ao sistema."
   },
   {
     "passos": [],
@@ -1824,6 +1825,10 @@ export const BASE_CONHECIMENTO: EntradaBase[] = [
   {
     "passos": [],
     "observacoes": [
+      "Matrícula: turma cheia, turma encerrada e aluno com cadastro não ativo recusam a matrícula. A reativação de",
+      "Média: é sempre de 0 a 10. Cada nota é convertida pela nota máxima do item (até 1000 pontos) e ponderada pelo",
+      "Itens do Rooster Learn: aparecem em Notas como somente leitura. Título, peso e nota máxima são alterados na",
+      "Chamada: não aceita data futura nem aluno sem matrícula ativa. Corrigir uma chamada já lançada exige a",
       "Disciplina sem curso: o campo \"Curso\" da disciplina é opcional. A disciplina pode ser cadastrada no catálogo",
       "Turma sem disciplina: para criar uma turma basta a identificação e o período letivo; disciplina e professor são"
     ],
@@ -1832,7 +1837,7 @@ export const BASE_CONHECIMENTO: EntradaBase[] = [
     "modulo": "Guia do administrador",
     "titulo": "Estrutura acadêmica (Rooster Academy) (guia do administrador)",
     "rota": null,
-    "resumo": "A ordem recomendada de cadastro é: cursos, período letivo, disciplinas, vínculos de professor e de aluno (a partir de usuários existentes no Hub), turmas e matrículas. A matrícula respeita a capacidade da turma. Os vínculos entre esses cadastros são flexíveis: sem curso e sem turma, e vinculada a um curso depois, pela edição. O filtro \"Sem curso\" da aba Disciplinas lista as que ainda não têm curso. opcionais. A disciplina é atribuída depois, em Turmas → abrir a turma → Editar → Disciplina. Enquanto a turma não tiver disciplina, ela aparece como \"Sem disciplina\" e não permite anexar documentos acadêmicos (que pertencem à disciplina)."
+    "resumo": "A ordem recomendada de cadastro, toda em Rooster Academy → Gestão acadêmica, é: cursos (aba Cursos), período letivo (aba Calendário → Períodos letivos), disciplinas, vínculos de professor e de aluno (a partir de usuários existentes no Hub), turmas e matrículas (aba Turmas → abrir a turma → Matrículas). A matrícula respeita a capacidade da turma; a capacidade 0 indica turma sem limite de vagas. Ao vincular um usuário como professor ou como aluno, o sistema concede a ele as permissões padrão do papel (as telas do professor no Academy e no Learn, ou o portal do aluno), de modo que ele já pode entrar e trabalhar, sem concessão manual em Acessos. Permissões adicionais continuam sendo concedidas em Rooster Hub → Acessos; a exclusão do vínculo não revoga as permissões, que devem ser retiradas em Acessos, se for o caso. Regras que o sistema aplica ao controle de notas e de frequência (detalhes em docs/system/04-regras-de-negocio.md, RN020 a RN027): matrícula cancelada ocupa vaga. A ocupação exibida conta apenas as matrículas ativas. peso; itens sem nota não entram. A situação \"Aprovado\" (média a partir de 6,0) é apenas referência visual. atividade; a nota vem da correção; o reenvio do aluno retira a nota até a nova correção; excluir a atividade exclui o item. permissão \"Editar chamada anterior\" (os professores a recebem por padrão; retire-a em Acessos para que apenas a coordenação possa corrigir). Atraso e falta justificada contam como presença. Um cadastro em uso não pode ser excluído: curso com disciplinas ou alunos, disciplina com turmas e período letivo com turmas. Para tirá-lo de uso, altere o status (curso inativo, disciplina arquivada). Os vínculos entre esses cadastros são flexíveis: sem curso e sem turma, e vinculada a um curso depois, pela edição. O filtro \"Sem curso\" da aba Disciplinas lista as que ainda não têm curso. opcionais. A disciplina é atribuída depois, em Turmas → abrir a turma → Editar → Disciplina. Enquanto a turma não tiver disciplina, ela aparece como \"Sem disciplina\" e não permite anexar documentos acadêmicos (que pertencem à disciplina)."
   },
   {
     "passos": [],
